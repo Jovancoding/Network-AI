@@ -51,6 +51,42 @@ console.log(result.data); // "Hello, World! Your task: welcome"
 
 That's it. No config files, no setup wizards. Add more agents, swap frameworks, layer on security -- all optional.
 
+## Why This Exists -- The Multi-Agent Race Condition Problem
+
+Most agent frameworks let you run multiple AI agents in parallel. None of them protect you when those agents write to the same resource at the same time.
+
+**The "Bank Run" scenario:**
+
+```
+Agent A reads balance:  $10,000
+Agent B reads balance:  $10,000       (same moment)
+Agent A writes balance: $10,000 - $7,000 = $3,000
+Agent B writes balance: $10,000 - $6,000 = $4,000   <-- Agent A's write is gone
+```
+
+Both agents thought they had $10,000. Both spent from it. You just lost $3,000 to a race condition. This isn't theoretical -- it happens any time two LLM agents hit a shared database, file, or API concurrently.
+
+**This is a split-brain problem.** Without concurrency control, your agents will:
+- **Corrupt shared state** -- Two agents overwrite each other's blackboard entries
+- **Double-spend budgets** -- Token costs exceed limits because agents don't see each other's spending
+- **Produce contradictory outputs** -- Agent A says "approved", Agent B says "denied", both write to the same key
+
+**How Network-AI prevents this:**
+
+```typescript
+// Atomic commit -- no other agent can read or write "account:balance" during this operation
+const blackboard = new LockedBlackboard('.');
+const changeId = blackboard.proposeChange('account:balance', { amount: 7000, type: 'debit' }, 'agent-a');
+blackboard.validateChange(changeId);   // Checks for conflicts
+blackboard.commitChange(changeId);     // Atomic write with file-system mutex
+
+// Budget tracking -- hard ceiling on token spend
+// Even if 5 agents run in parallel, total spend cannot exceed the budget
+python scripts/swarm_guard.py budget-init --task-id "task_001" --budget 10000
+```
+
+Network-AI wraps your agent swarm with **file-system mutexes**, **atomic commits**, and **token budget ceilings** so race conditions, double-spends, and split-brain writes simply cannot happen. This works with any framework -- LangChain, CrewAI, AutoGen, or anything else connected through the adapter system.
+
 ## Features
 
 ### Core Orchestration (Multi-Agent Coordination)
