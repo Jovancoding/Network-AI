@@ -37,7 +37,7 @@ function log(message: string, color: keyof typeof colors = 'reset') {
 
 function header(title: string) {
   console.log('\n' + '='.repeat(60));
-  log(`  🔒 ${title}`, 'bold');
+  log(`  [LOCK] ${title}`, 'bold');
   console.log('='.repeat(60));
 }
 
@@ -46,12 +46,12 @@ let failCount = 0;
 
 function pass(test: string) {
   passCount++;
-  log(`  ✅ PASS: ${test}`, 'green');
+  log(`  [PASS] PASS: ${test}`, 'green');
 }
 
 function fail(test: string, error?: string) {
   failCount++;
-  log(`  ❌ FAIL: ${test}`, 'red');
+  log(`  [FAIL] FAIL: ${test}`, 'red');
   if (error) log(`     Error: ${error}`, 'red');
 }
 
@@ -68,7 +68,7 @@ async function testSecureTokenManager() {
   });
   
   // Test: Generate token
-  log('\n  🎫 Testing token generation...', 'blue');
+  log('\n  [TKT] Testing token generation...', 'blue');
   const token = tokenManager.generateToken('data_analyst', 'SAP_API', 'read:invoices');
   
   if (token.tokenId && token.signature && token.agentId === 'data_analyst') {
@@ -80,7 +80,7 @@ async function testSecureTokenManager() {
   }
   
   // Test: Valid token validation
-  log('\n  ✓ Testing valid token validation...', 'blue');
+  log('\n  [v] Testing valid token validation...', 'blue');
   const validResult = tokenManager.validateToken(token);
   if (validResult.valid) {
     pass('Valid token accepted');
@@ -89,7 +89,7 @@ async function testSecureTokenManager() {
   }
   
   // Test: Tampered token detection
-  log('\n  🚫 Testing tampered token detection...', 'blue');
+  log('\n  [BLOCK] Testing tampered token detection...', 'blue');
   const tamperedToken = { ...token, agentId: 'malicious_agent' };
   const tamperedResult = tokenManager.validateToken(tamperedToken);
   if (!tamperedResult.valid && tamperedResult.reason?.includes('signature')) {
@@ -100,7 +100,7 @@ async function testSecureTokenManager() {
   }
   
   // Test: Token revocation
-  log('\n  🗑️ Testing token revocation...', 'blue');
+  log('\n  [DEL] Testing token revocation...', 'blue');
   tokenManager.revokeToken(token.tokenId);
   const revokedResult = tokenManager.validateToken(token);
   if (!revokedResult.valid && revokedResult.reason?.includes('revoked')) {
@@ -111,7 +111,7 @@ async function testSecureTokenManager() {
   }
   
   // Test: Token expiration
-  log('\n  ⏰ Testing token expiration (waiting 6 seconds)...', 'yellow');
+  log('\n  [TIME] Testing token expiration (waiting 6 seconds)...', 'yellow');
   const shortToken = tokenManager.generateToken('test_agent', 'SAP_API', 'read');
   await new Promise(resolve => setTimeout(resolve, 6000));
   const expiredResult = tokenManager.validateToken(shortToken);
@@ -131,7 +131,7 @@ async function testInputSanitizer() {
   header('TEST 2: Input Sanitizer');
   
   // Test: XSS prevention
-  log('\n  🛡️ Testing XSS prevention...', 'blue');
+  log('\n  [SHIELD] Testing XSS prevention...', 'blue');
   const xssInput = '<script>alert("xss")</script>';
   const sanitizedXss = InputSanitizer.sanitizeString(xssInput);
   if (!sanitizedXss.includes('<script>') && !sanitizedXss.includes('</script>')) {
@@ -143,7 +143,7 @@ async function testInputSanitizer() {
   }
   
   // Test: Template injection prevention
-  log('\n  🛡️ Testing template injection prevention...', 'blue');
+  log('\n  [SHIELD] Testing template injection prevention...', 'blue');
   const templateInput = '${process.env.SECRET}';
   const sanitizedTemplate = InputSanitizer.sanitizeString(templateInput);
   if (!sanitizedTemplate.includes('${')) {
@@ -155,7 +155,7 @@ async function testInputSanitizer() {
   }
   
   // Test: Path traversal prevention
-  log('\n  🛡️ Testing path traversal prevention...', 'blue');
+  log('\n  [SHIELD] Testing path traversal prevention...', 'blue');
   const pathInput = '../../../etc/passwd';
   const sanitizedPath = InputSanitizer.sanitizeString(pathInput);
   if (!sanitizedPath.includes('../')) {
@@ -167,7 +167,7 @@ async function testInputSanitizer() {
   }
   
   // Test: Command injection prevention
-  log('\n  🛡️ Testing command injection prevention...', 'blue');
+  log('\n  [SHIELD] Testing command injection prevention...', 'blue');
   const cmdInput = 'file; rm -rf /';
   const sanitizedCmd = InputSanitizer.sanitizeString(cmdInput);
   if (!sanitizedCmd.includes(';')) {
@@ -179,7 +179,7 @@ async function testInputSanitizer() {
   }
   
   // Test: Prototype pollution prevention
-  log('\n  🛡️ Testing prototype pollution prevention...', 'blue');
+  log('\n  [SHIELD] Testing prototype pollution prevention...', 'blue');
   const pollutionInput = { '__proto__': { admin: true }, 'constructor': { admin: true }, normalKey: 'value' };
   const sanitizedPollution = InputSanitizer.sanitizeObject(pollutionInput) as Record<string, unknown>;
   // The sanitizer removes dangerous keys, so check they're not present
@@ -193,7 +193,7 @@ async function testInputSanitizer() {
   }
   
   // Test: Agent ID validation
-  log('\n  🛡️ Testing agent ID validation...', 'blue');
+  log('\n  [SHIELD] Testing agent ID validation...', 'blue');
   try {
     InputSanitizer.sanitizeAgentId('valid_agent-123');
     pass('Valid agent ID accepted');
@@ -208,7 +208,7 @@ async function testInputSanitizer() {
   }
   
   // Test: Path sanitization
-  log('\n  🛡️ Testing path sanitization...', 'blue');
+  log('\n  [SHIELD] Testing path sanitization...', 'blue');
   try {
     InputSanitizer.sanitizePath('../../../secret', process.cwd());
     fail('Path traversal should be blocked');
@@ -236,7 +236,7 @@ async function testRateLimiter() {
   });
   
   // Test: Normal requests allowed
-  log('\n  📊 Testing normal request rate...', 'blue');
+  log('\n  [#] Testing normal request rate...', 'blue');
   for (let i = 0; i < 3; i++) {
     const result = rateLimiter.isRateLimited('test_agent');
     if (result.limited) {
@@ -247,7 +247,7 @@ async function testRateLimiter() {
   pass('Normal requests allowed');
   
   // Test: Rate limiting kicks in
-  log('\n  🚦 Testing rate limit enforcement...', 'blue');
+  log('\n  [RATE] Testing rate limit enforcement...', 'blue');
   // Make more requests to exceed limit
   for (let i = 0; i < 5; i++) {
     rateLimiter.isRateLimited('rate_test_agent');
@@ -261,7 +261,7 @@ async function testRateLimiter() {
   }
   
   // Test: Failed auth lockout
-  log('\n  🔐 Testing failed auth lockout...', 'blue');
+  log('\n  [SEC] Testing failed auth lockout...', 'blue');
   const lockoutAgent = 'lockout_test';
   for (let i = 0; i < 3; i++) {
     rateLimiter.recordFailedAuth(lockoutAgent);
@@ -274,7 +274,7 @@ async function testRateLimiter() {
   }
   
   // Test: Lockout duration
-  log('\n  ⏱️ Testing lockout duration (waiting 3 seconds)...', 'yellow');
+  log('\n  [TIME] Testing lockout duration (waiting 3 seconds)...', 'yellow');
   await new Promise(resolve => setTimeout(resolve, 3000));
   const afterLockout = rateLimiter.isRateLimited(lockoutAgent);
   if (!afterLockout.limited) {
@@ -294,7 +294,7 @@ async function testDataEncryption() {
   const encryptor = new DataEncryptor('test-encryption-key-32-chars!!!');
   
   // Test: String encryption/decryption
-  log('\n  🔐 Testing string encryption...', 'blue');
+  log('\n  [SEC] Testing string encryption...', 'blue');
   const sensitiveData = 'This is sensitive financial data: $1,000,000';
   const encrypted = encryptor.encrypt(sensitiveData);
   const decrypted = encryptor.decrypt(encrypted);
@@ -309,7 +309,7 @@ async function testDataEncryption() {
   }
   
   // Test: Object encryption/decryption
-  log('\n  🔐 Testing object encryption...', 'blue');
+  log('\n  [SEC] Testing object encryption...', 'blue');
   const sensitiveObject = {
     accountNumber: '1234-5678-9012',
     balance: 50000,
@@ -327,7 +327,7 @@ async function testDataEncryption() {
   }
   
   // Test: Different encryptions are unique (IV uniqueness)
-  log('\n  🔐 Testing encryption uniqueness...', 'blue');
+  log('\n  [SEC] Testing encryption uniqueness...', 'blue');
   const encrypted1 = encryptor.encrypt('same data');
   const encrypted2 = encryptor.encrypt('same data');
   if (encrypted1 !== encrypted2) {
@@ -339,7 +339,7 @@ async function testDataEncryption() {
   }
   
   // Test: Tampered data detection
-  log('\n  🔐 Testing tampered data detection...', 'blue');
+  log('\n  [SEC] Testing tampered data detection...', 'blue');
   try {
     const tampered = encrypted.slice(0, -5) + 'XXXXX';
     encryptor.decrypt(tampered);
@@ -358,10 +358,13 @@ async function testPermissionHardening() {
   header('TEST 5: Permission Hardening');
   
   const auditLogger = new SecureAuditLogger({ auditLogPath: './test-audit.log' });
-  const permissionHardener = new PermissionHardener(auditLogger);
+  const permissionHardener = new PermissionHardener(auditLogger, [
+    { agentId: 'orchestrator', trustLevel: 0.9, allowedResources: ['*'], maxScope: ['read', 'write', 'execute', 'delegate'], immutable: true },
+    { agentId: 'data_analyst', trustLevel: 0.8, allowedResources: ['SAP_API', 'EXTERNAL_SERVICE'], maxScope: ['read'], immutable: false },
+  ]);
   
   // Test: Orchestrator can access everything
-  log('\n  👑 Testing orchestrator access...', 'blue');
+  log('\n  [ADMIN] Testing orchestrator access...', 'blue');
   const orchAccess = permissionHardener.canAccess('orchestrator', 'SAP_API', 'read');
   if (orchAccess.allowed) {
     pass('Orchestrator has full access');
@@ -370,7 +373,7 @@ async function testPermissionHardening() {
   }
   
   // Test: Data analyst restricted access
-  log('\n  📊 Testing data_analyst restricted access...', 'blue');
+  log('\n  [#] Testing data_analyst restricted access...', 'blue');
   const analystRead = permissionHardener.canAccess('data_analyst', 'SAP_API', 'read');
   const analystWrite = permissionHardener.canAccess('data_analyst', 'FINANCIAL_API', 'write');
   
@@ -383,7 +386,7 @@ async function testPermissionHardening() {
   }
   
   // Test: Unknown agent denied
-  log('\n  🚫 Testing unknown agent denial...', 'blue');
+  log('\n  [BLOCK] Testing unknown agent denial...', 'blue');
   const unknownAccess = permissionHardener.canAccess('hacker_bot', 'SAP_API', 'read');
   if (!unknownAccess.allowed) {
     pass('Unknown agent denied');
@@ -393,7 +396,7 @@ async function testPermissionHardening() {
   }
   
   // Test: Privilege escalation prevention
-  log('\n  ⚠️ Testing privilege escalation prevention...', 'blue');
+  log('\n  [WARN] Testing privilege escalation prevention...', 'blue');
   const escalationResult = permissionHardener.modifyTrustLevel('data_analyst', 'data_analyst', 1.0);
   if (!escalationResult.success) {
     pass('Privilege escalation blocked');
@@ -403,7 +406,7 @@ async function testPermissionHardening() {
   }
   
   // Test: Cannot set trust higher than own
-  log('\n  ⚠️ Testing trust ceiling enforcement...', 'blue');
+  log('\n  [WARN] Testing trust ceiling enforcement...', 'blue');
   const ceilingResult = permissionHardener.modifyTrustLevel('orchestrator', 'new_agent', 0.95);
   if (!ceilingResult.success && ceilingResult.reason?.includes('higher')) {
     pass('Cannot grant trust higher than own');
@@ -427,7 +430,7 @@ async function testSecureAuditLogger() {
   });
   
   // Test: Log security events
-  log('\n  📝 Testing audit logging...', 'blue');
+  log('\n  [LOG] Testing audit logging...', 'blue');
   const entry1 = auditLogger.log('TEST_EVENT', 'test_agent', 'test_action', 'success', { detail: 'test' });
   const entry2 = auditLogger.log('TEST_VIOLATION', 'bad_agent', 'malicious_action', 'denied', { reason: 'blocked' });
   
@@ -440,7 +443,7 @@ async function testSecureAuditLogger() {
   }
   
   // Test: Log chain integrity
-  log('\n  🔗 Testing audit log integrity...', 'blue');
+  log('\n  [CHAIN] Testing audit log integrity...', 'blue');
   // Add more entries
   auditLogger.log('CHAIN_TEST', 'agent1', 'action1', 'success', {});
   auditLogger.log('CHAIN_TEST', 'agent2', 'action2', 'success', {});
@@ -467,7 +470,7 @@ async function testSecureSwarmGateway() {
   });
   
   // Test: Valid request processing
-  log('\n  🌐 Testing valid request processing...', 'blue');
+  log('\n  [NET] Testing valid request processing...', 'blue');
   const validResult = await gateway.handleSecureRequest(
     'orchestrator',
     'query_state',
@@ -482,7 +485,7 @@ async function testSecureSwarmGateway() {
   }
   
   // Test: Malicious input blocked
-  log('\n  🚫 Testing malicious input blocking...', 'blue');
+  log('\n  [BLOCK] Testing malicious input blocking...', 'blue');
   const maliciousResult = await gateway.handleSecureRequest(
     'test_agent',
     'execute',
@@ -509,7 +512,7 @@ async function testSecureSwarmGateway() {
   }
   
   // Test: Permission request flow
-  log('\n  🔐 Testing permission request flow...', 'blue');
+  log('\n  [SEC] Testing permission request flow...', 'blue');
   const permResult = await gateway.requestPermission(
     'orchestrator',
     'SAP_API',
@@ -525,7 +528,7 @@ async function testSecureSwarmGateway() {
   }
   
   // Test: Data encryption through gateway
-  log('\n  🔐 Testing gateway encryption...', 'blue');
+  log('\n  [SEC] Testing gateway encryption...', 'blue');
   const sensitiveData = { apiKey: 'sk-1234567890', password: 'secret123' };
   const encrypted = gateway.encryptSensitiveData(sensitiveData);
   const decrypted = gateway.decryptSensitiveData<typeof sensitiveData>(encrypted);
@@ -538,7 +541,7 @@ async function testSecureSwarmGateway() {
   }
   
   // Test: Audit integrity check
-  log('\n  📋 Testing audit integrity through gateway...', 'blue');
+  log('\n  [LOG] Testing audit integrity through gateway...', 'blue');
   const auditIntegrity = gateway.verifyAuditIntegrity();
   if (auditIntegrity.valid) {
     pass('Audit integrity verified through gateway');
@@ -553,10 +556,10 @@ async function testSecureSwarmGateway() {
 
 async function runAllTests() {
   console.log('\n');
-  log('╔════════════════════════════════════════════════════════════╗', 'bold');
-  log('║     🔒 SECURITY MODULE TEST SUITE                          ║', 'bold');
-  log('║     Testing all security protections                       ║', 'bold');
-  log('╚════════════════════════════════════════════════════════════╝', 'bold');
+  log('+============================================================+', 'bold');
+  log('|     [LOCK] SECURITY MODULE TEST SUITE                       |', 'bold');
+  log('|     Testing all security protections                        |', 'bold');
+  log('+============================================================+', 'bold');
   
   const startTime = Date.now();
   
@@ -571,7 +574,7 @@ async function runAllTests() {
     
     const duration = Date.now() - startTime;
     
-    header('📊 SECURITY TEST SUMMARY');
+    header('[#] SECURITY TEST SUMMARY');
     console.log('');
     log(`  Tests Passed: ${passCount}`, 'green');
     log(`  Tests Failed: ${failCount}`, failCount > 0 ? 'red' : 'green');
@@ -579,26 +582,26 @@ async function runAllTests() {
     console.log('');
     
     if (failCount === 0) {
-      log('  ✨ All security tests passed!', 'green');
+      log('  [*] All security tests passed!', 'green');
       console.log('');
       log('  Security Protections Verified:', 'cyan');
-      log('    🔐 HMAC-signed tokens with expiration', 'cyan');
-      log('    🛡️ XSS, injection, and traversal prevention', 'cyan');
-      log('    🚦 Rate limiting and lockout protection', 'cyan');
-      log('    🔒 AES-256-GCM data encryption', 'cyan');
-      log('    👮 Privilege escalation prevention', 'cyan');
-      log('    📋 Cryptographically signed audit logs', 'cyan');
-      log('    🌐 Integrated security gateway', 'cyan');
+      log('    [SEC] HMAC-signed tokens with expiration', 'cyan');
+      log('    [SHIELD] XSS, injection, and traversal prevention', 'cyan');
+      log('    [RATE] Rate limiting and lockout protection', 'cyan');
+      log('    [LOCK] AES-256-GCM data encryption', 'cyan');
+      log('    [GUARD] Privilege escalation prevention', 'cyan');
+      log('    [LOG] Cryptographically signed audit logs', 'cyan');
+      log('    [NET] Integrated security gateway', 'cyan');
       console.log('');
-      log('  The SwarmOrchestrator is secured! 🛡️', 'green');
+      log('  The SwarmOrchestrator is secured! [SHIELD]', 'green');
     } else {
-      log(`  ⚠️  ${failCount} security test(s) failed!`, 'red');
+      log(`  [WARN]  ${failCount} security test(s) failed!`, 'red');
     }
     
     console.log('\n');
     
   } catch (error) {
-    header('❌ SECURITY TEST FAILURE');
+    header('[FAIL] SECURITY TEST FAILURE');
     log('\n  Tests failed with unexpected error:', 'red');
     console.error(error);
     process.exit(1);

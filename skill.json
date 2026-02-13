@@ -1,10 +1,10 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "1.0.0",
-  "description": "Multi-Agent Swarm Orchestrator for OpenClaw ecosystem. Enables agent-to-agent communication, shared memory via blackboard pattern, and permission-gated access to sensitive APIs.",
-  "author": "OpenClaw Community",
+  "version": "3.0.0",
+  "description": "Multi-Agent Swarm Orchestrator with plug-and-play adapter support. Works with OpenClaw, LangChain, AutoGen, CrewAI, MCP, custom agents, and any other agent framework via the adapter interface.",
+  "author": "Network-AI Community",
   "license": "MIT",
-  "tags": ["OpenClaw", "A2A", "swarm", "multi-agent", "orchestration"],
+  "tags": ["multi-agent", "A2A", "swarm", "orchestration", "plug-and-play", "adapter", "langchain", "autogen", "crewai", "mcp", "openclaw"],
   "runtime": "node",
   "entrypoint": "index.ts",
   "gateway": "local",
@@ -176,8 +176,13 @@
     }
   },
   "dependencies": {
-    "openclaw-core": "^2.0.0",
-    "agent-skills-protocol": "^1.0.0"
+    "openclaw-core": "^2.0.0 (optional - only needed for OpenClaw adapter)",
+    "agent-skills-protocol": "^1.0.0 (optional)"
+  },
+  "adapters": {
+    "supported": ["openclaw", "langchain", "autogen", "crewai", "mcp", "custom"],
+    "defaultAdapter": null,
+    "note": "No adapter dependencies are required at install time. Import only what you use."
   },
   "config": {
     "blackboardPath": "./swarm-blackboard.md",

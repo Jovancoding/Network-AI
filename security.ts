@@ -435,6 +435,22 @@ export class SecureAuditLogger {
     const logPath = this.config.auditLogPath;
     if (!existsSync(logPath)) {
       writeFileSync(logPath, '');
+    } else {
+      // Continue the hash chain from the last entry so integrity
+      // verification works across process restarts.
+      try {
+        const content = readFileSync(logPath, 'utf-8').trim();
+        if (content) {
+          const lines = content.split('\n').filter((l: string) => l);
+          const lastLine = lines[lines.length - 1];
+          const lastEntry = JSON.parse(lastLine) as AuditEntry;
+          if (lastEntry.signature) {
+            this.previousHash = lastEntry.signature;
+          }
+        }
+      } catch {
+        // If we can't read the last entry, start fresh chain
+      }
     }
   }
   
@@ -644,29 +660,67 @@ export class PermissionHardener {
   private trustPolicies: Map<string, TrustPolicy> = new Map();
   private auditLogger: SecureAuditLogger;
   
-  constructor(auditLogger: SecureAuditLogger) {
+  constructor(auditLogger: SecureAuditLogger, defaultPolicies?: Array<{
+    agentId: string;
+    trustLevel: number;
+    allowedResources: string[];
+    maxScope?: string[];
+    immutable?: boolean;
+  }>) {
     this.auditLogger = auditLogger;
-    this.initializeDefaultPolicies();
+    this.initializeDefaultPolicies(defaultPolicies);
   }
   
-  private initializeDefaultPolicies(): void {
-    // System policies that cannot be modified
+  private initializeDefaultPolicies(customPolicies?: Array<{
+    agentId: string;
+    trustLevel: number;
+    allowedResources: string[];
+    maxScope?: string[];
+    immutable?: boolean;
+  }>): void {
+    if (customPolicies && customPolicies.length > 0) {
+      for (const policy of customPolicies) {
+        this.trustPolicies.set(policy.agentId, {
+          agentId: policy.agentId,
+          trustLevel: policy.trustLevel,
+          allowedResources: policy.allowedResources,
+          maxScope: policy.maxScope ?? ['read'],
+          createdBy: 'SYSTEM',
+          immutable: policy.immutable ?? false,
+        });
+      }
+      return;
+    }
+    // Fallback: universal defaults that cover common domains
     this.trustPolicies.set('orchestrator', {
       agentId: 'orchestrator',
       trustLevel: 0.9,
-      allowedResources: ['SAP_API', 'FINANCIAL_API', 'EXTERNAL_SERVICE', 'DATA_EXPORT'],
-      maxScope: ['read', 'write'],
+      allowedResources: ['*'],
+      maxScope: ['read', 'write', 'execute', 'delegate'],
       createdBy: 'SYSTEM',
       immutable: true,
     });
-    
-    this.trustPolicies.set('data_analyst', {
-      agentId: 'data_analyst',
-      trustLevel: 0.8,
-      allowedResources: ['SAP_API', 'EXTERNAL_SERVICE'],
-      maxScope: ['read'],
-      createdBy: 'SYSTEM',
-      immutable: true,
+  }
+  
+  /**
+   * Register or update a trust policy for an agent at runtime.
+   */
+  registerPolicy(policy: {
+    agentId: string;
+    trustLevel: number;
+    allowedResources: string[];
+    maxScope?: string[];
+    immutable?: boolean;
+  }): void {
+    const existing = this.trustPolicies.get(policy.agentId);
+    if (existing?.immutable) return; // Cannot overwrite immutable policies
+    this.trustPolicies.set(policy.agentId, {
+      agentId: policy.agentId,
+      trustLevel: policy.trustLevel,
+      allowedResources: policy.allowedResources,
+      maxScope: policy.maxScope ?? ['read'],
+      createdBy: 'RUNTIME',
+      immutable: policy.immutable ?? false,
     });
   }
   
@@ -684,8 +738,8 @@ export class PermissionHardener {
       return { allowed: false, reason: 'Agent has no trust policy' };
     }
     
-    // Check resource access
-    if (!policy.allowedResources.includes(resourceType)) {
+    // Check resource access (support '*' wildcard)
+    if (!policy.allowedResources.includes('*') && !policy.allowedResources.includes(resourceType)) {
       this.auditLogger.logViolation(agentId, 'RESOURCE_NOT_ALLOWED', { 
         resourceType, 
         allowedResources: policy.allowedResources 

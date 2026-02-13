@@ -17,7 +17,7 @@ const mockAgentResponses: Record<string, unknown> = {
 
 // Override the module resolution for testing
 const originalCallSkill = async (skillName: string, params: Record<string, unknown>) => {
-  console.log(`  📡 [Mock] Calling skill: ${skillName}`);
+  console.log(`  [>] [Mock] Calling skill: ${skillName}`);
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
   
@@ -66,11 +66,11 @@ function header(title: string) {
 }
 
 function pass(test: string) {
-  log(`  ✅ PASS: ${test}`, 'green');
+  log(`  [PASS] PASS: ${test}`, 'green');
 }
 
 function fail(test: string, error?: string) {
-  log(`  ❌ FAIL: ${test}`, 'red');
+  log(`  [FAIL] FAIL: ${test}`, 'red');
   if (error) log(`     Error: ${error}`, 'red');
 }
 
@@ -232,7 +232,7 @@ async function testSwarmOrchestrator() {
   };
   
   // Test: Update blackboard
-  log('\n  📝 Testing update_blackboard capability...', 'blue');
+  log('\n  [LOG] Testing update_blackboard capability...', 'blue');
   const bbResult = await orchestrator.execute('update_blackboard', {
     key: 'test:orchestrator:data',
     value: { message: 'Hello from orchestrator test' },
@@ -246,7 +246,7 @@ async function testSwarmOrchestrator() {
   }
   
   // Test: Query swarm state
-  log('\n  📊 Testing query_swarm_state capability...', 'blue');
+  log('\n  [#] Testing query_swarm_state capability...', 'blue');
   const stateResult = await orchestrator.execute('query_swarm_state', {
     scope: 'all',
     includeHistory: true,
@@ -262,7 +262,7 @@ async function testSwarmOrchestrator() {
   }
   
   // Test: Request permission
-  log('\n  🔐 Testing request_permission capability...', 'blue');
+  log('\n  [SEC] Testing request_permission capability...', 'blue');
   const permResult = await orchestrator.execute('request_permission', {
     resourceType: 'SAP_API',
     justification: 'Need to access SAP invoice data for the quarterly financial reconciliation task. This is a scheduled operation.',
@@ -281,7 +281,7 @@ async function testSwarmOrchestrator() {
   }
   
   // Test: Register agents
-  log('\n  👥 Testing agent registration...', 'blue');
+  log('\n  [+] Testing agent registration...', 'blue');
   orchestrator.registerAgent('DataAnalyst', 'available');
   orchestrator.registerAgent('StrategyAdvisor', 'available');
   orchestrator.registerAgent('RiskAssessor', 'busy');
@@ -301,7 +301,7 @@ async function testSwarmOrchestrator() {
   }
   
   // Test: Unknown action handling
-  log('\n  ⚠️ Testing error handling...', 'blue');
+  log('\n  [WARN] Testing error handling...', 'blue');
   const errorResult = await orchestrator.execute('unknown_action', {}, mockContext);
   if (!errorResult.success && errorResult.error?.code === 'UNKNOWN_ACTION') {
     pass('Unknown action error handling');
@@ -317,7 +317,7 @@ async function testSwarmOrchestrator() {
 async function testTaskDelegation() {
   header('TEST 4: Task Delegation Flow');
   
-  log('\n  ⚡ This test simulates the full delegation flow...', 'blue');
+  log('\n  [!] This test simulates the full delegation flow...', 'blue');
   log('  (Note: callSkill is mocked since openclaw-core is hypothetical)\n', 'yellow');
   
   // We'll test the blackboard caching behavior
@@ -334,7 +334,7 @@ async function testTaskDelegation() {
     ttl: 3600,
   }, mockContext);
   
-  log('  📦 Pre-cached a task result in blackboard', 'cyan');
+  log('  [PKG] Pre-cached a task result in blackboard', 'cyan');
   
   // Now try to delegate - it should find the cached result
   // (Note: actual delegation would require the real callSkill)
@@ -395,7 +395,7 @@ async function testFilePersistence() {
     log(`     Last modified: ${stats.mtime.toISOString()}`, 'cyan');
     
     // Show a preview of the content
-    log('\n  📄 Blackboard Preview:', 'blue');
+    log('\n  [DOC] Blackboard Preview:', 'blue');
     const lines = content.split('\n').slice(0, 15);
     lines.forEach(line => log(`     ${line}`, 'cyan'));
     if (content.split('\n').length > 15) {
@@ -412,10 +412,10 @@ async function testFilePersistence() {
 
 async function runAllTests() {
   console.log('\n');
-  log('╔════════════════════════════════════════════════════════════╗', 'bold');
-  log('║     SWARM ORCHESTRATOR TEST SUITE                          ║', 'bold');
-  log('║     Testing core functionality locally                     ║', 'bold');
-  log('╚════════════════════════════════════════════════════════════╝', 'bold');
+  log('+============================================================+', 'bold');
+  log('|     SWARM ORCHESTRATOR TEST SUITE                          |', 'bold');
+  log('|     Testing core functionality locally                     |', 'bold');
+  log('+============================================================+', 'bold');
   
   const startTime = Date.now();
   
@@ -429,20 +429,20 @@ async function runAllTests() {
     const duration = Date.now() - startTime;
     
     header('TEST SUMMARY');
-    log(`\n  ✨ All tests completed in ${duration}ms`, 'green');
+    log(`\n  [*] All tests completed in ${duration}ms`, 'green');
     log('\n  The SwarmOrchestrator skill is working correctly!', 'green');
     log('  Core components verified:', 'cyan');
-    log('    • SharedBlackboard: Read/Write/TTL/Persistence ✅', 'cyan');
-    log('    • AuthGuardian: Permission Wall enforcement ✅', 'cyan');
-    log('    • SwarmOrchestrator: All capabilities ✅', 'cyan');
-    log('    • File persistence: Markdown blackboard ✅', 'cyan');
+    log('    * SharedBlackboard: Read/Write/TTL/Persistence [PASS]', 'cyan');
+    log('    * AuthGuardian: Permission Wall enforcement [PASS]', 'cyan');
+    log('    * SwarmOrchestrator: All capabilities [PASS]', 'cyan');
+    log('    * File persistence: Markdown blackboard [PASS]', 'cyan');
     
     log('\n  Note: Full agent-to-agent calls require the openclaw-core', 'yellow');
     log('  runtime. The delegation logic is ready for integration.\n', 'yellow');
     
   } catch (error) {
     header('TEST FAILURE');
-    log(`\n  ❌ Tests failed with error:`, 'red');
+    log(`\n  [FAIL] Tests failed with error:`, 'red');
     console.error(error);
     process.exit(1);
   }

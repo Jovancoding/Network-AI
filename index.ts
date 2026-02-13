@@ -5,14 +5,46 @@
  * task decomposition, permission management, and shared blackboard coordination.
  * 
  * @module SwarmOrchestrator
- * @version 1.0.0
+ * @version 3.0.0
  * @license MIT
  */
 
-import { OpenClawSkill, SkillContext, SkillResult, callSkill } from 'openclaw-core';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'fs';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHmac } from 'crypto';
+import { AdapterRegistry } from './adapters/adapter-registry';
+import { InputSanitizer, SecureSwarmGateway, RateLimiter, SecureAuditLogger, DataEncryptor, SecurityError } from './security';
+import { LockedBlackboard } from './lib/locked-blackboard';
+import { BlackboardValidator, QualityGateAgent } from './lib/blackboard-validator';
+import type { ValidationResult, QualityGateResult, ValidationConfig, AIReviewCallback, CustomValidationRule } from './lib/blackboard-validator';
+import type { IAgentAdapter, AgentPayload, AgentContext, AgentResult, AdapterConfig } from './types/agent-adapter';
+
+// Backward-compatible re-exports: OpenClaw types still work
+// but are now optional -- the system works without openclaw-core
+type OpenClawSkill = {
+  name: string;
+  version: string;
+  execute(action: string, params: Record<string, unknown>, context: SkillContext): Promise<SkillResult>;
+};
+
+interface SkillContext {
+  agentId: string;
+  taskId?: string;
+  sessionId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface SkillResult {
+  success: boolean;
+  data?: unknown;
+  error?: {
+    code: string;
+    message: string;
+    recoverable: boolean;
+    suggestedAction?: string;
+    trace?: Record<string, unknown>;
+  };
+}
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -82,6 +114,34 @@ interface ActiveGrant {
   resourceType: string;
   agentId: string;
   expiresAt: string;
+  restrictions: string[];
+  scope?: string;
+}
+
+/**
+ * Configurable resource profile -- makes the system domain-agnostic.
+ * Users can define any resource type (coding, finance, devops, etc.)
+ */
+interface ResourceProfile {
+  /** Base risk score 0-1 */
+  baseRisk: number;
+  /** Default restrictions applied when access is granted */
+  defaultRestrictions: string[];
+  /** Human-readable description */
+  description?: string;
+}
+
+/**
+ * Configuration for agent trust levels.
+ * Pass your own agents with their trust scores.
+ */
+interface AgentTrustConfig {
+  agentId: string;
+  trustLevel: number;
+  /** Namespace prefixes this agent can read from the blackboard */
+  allowedNamespaces?: string[];
+  /** Resource types this agent can request */
+  allowedResources?: string[];
 }
 
 interface ParallelTask {
@@ -116,169 +176,334 @@ const CONFIG = {
   defaultTimeout: 30000,
   enableTracing: true,
   grantTokenTTL: 300000, // 5 minutes in milliseconds
+  maxBlackboardValueSize: 1024 * 1024, // 1 MB max per entry
+  auditLogPath: './data/audit_log.jsonl',
+  trustConfigPath: './data/trust_levels.json',
 };
 
 // ============================================================================
-// BLACKBOARD MANAGEMENT
+// DEFAULT RESOURCE PROFILES -- Universal, domain-agnostic
+// Users can override/extend these for any domain (coding, finance, devops, etc.)
+// ============================================================================
+
+const DEFAULT_RESOURCE_PROFILES: Record<string, ResourceProfile> = {
+  // --- Financial / Enterprise ---
+  SAP_API:          { baseRisk: 0.5, defaultRestrictions: ['read_only', 'max_records:100'], description: 'SAP enterprise API' },
+  FINANCIAL_API:    { baseRisk: 0.7, defaultRestrictions: ['read_only', 'no_pii_fields', 'audit_required'], description: 'Financial data API' },
+  DATA_EXPORT:      { baseRisk: 0.6, defaultRestrictions: ['anonymize_pii', 'local_only'], description: 'Data export operations' },
+  // --- Coding / Development ---
+  FILE_SYSTEM:      { baseRisk: 0.5, defaultRestrictions: ['workspace_only', 'no_system_dirs', 'max_file_size:10mb'], description: 'Read/write files in workspace' },
+  SHELL_EXEC:       { baseRisk: 0.8, defaultRestrictions: ['sandbox_only', 'no_sudo', 'timeout:30s', 'audit_required'], description: 'Execute shell commands' },
+  GIT:              { baseRisk: 0.4, defaultRestrictions: ['local_repo_only', 'no_force_push'], description: 'Git operations' },
+  PACKAGE_MANAGER:  { baseRisk: 0.6, defaultRestrictions: ['audit_required', 'no_global_install', 'lockfile_required'], description: 'npm/pip/cargo package management' },
+  BUILD_TOOL:       { baseRisk: 0.5, defaultRestrictions: ['workspace_only', 'timeout:120s'], description: 'Build and compilation' },
+  // --- Infrastructure / DevOps ---
+  DOCKER:           { baseRisk: 0.7, defaultRestrictions: ['no_privileged', 'no_host_network', 'audit_required'], description: 'Container operations' },
+  CLOUD_DEPLOY:     { baseRisk: 0.9, defaultRestrictions: ['staging_only', 'approval_required', 'rollback_ready'], description: 'Cloud deployment' },
+  DATABASE:         { baseRisk: 0.6, defaultRestrictions: ['read_only', 'max_records:1000', 'no_schema_changes'], description: 'Database access' },
+  // --- Communication / External ---
+  EXTERNAL_SERVICE: { baseRisk: 0.4, defaultRestrictions: ['rate_limit:10_per_minute'], description: 'External API calls' },
+  EMAIL:            { baseRisk: 0.5, defaultRestrictions: ['rate_limit:5_per_minute', 'no_attachments'], description: 'Email sending' },
+  WEBHOOK:          { baseRisk: 0.4, defaultRestrictions: ['allowed_domains_only', 'no_credentials'], description: 'Webhook dispatch' },
+};
+
+const DEFAULT_AGENT_TRUST: AgentTrustConfig[] = [
+  { agentId: 'orchestrator', trustLevel: 0.9, allowedNamespaces: ['*'], allowedResources: ['*'] },
+  { agentId: 'data_analyst', trustLevel: 0.8, allowedNamespaces: ['task:', 'analytics:', 'agent:'], allowedResources: ['SAP_API', 'DATABASE', 'DATA_EXPORT', 'EXTERNAL_SERVICE'] },
+  { agentId: 'strategy_advisor', trustLevel: 0.7, allowedNamespaces: ['task:', 'strategy:'], allowedResources: ['EXTERNAL_SERVICE', 'DATA_EXPORT'] },
+  { agentId: 'risk_assessor', trustLevel: 0.85, allowedNamespaces: ['task:', 'risk:', 'analytics:'], allowedResources: ['EXTERNAL_SERVICE', 'DATABASE'] },
+  // Coding agents
+  { agentId: 'code_writer', trustLevel: 0.75, allowedNamespaces: ['task:', 'code:', 'build:'], allowedResources: ['FILE_SYSTEM', 'GIT', 'BUILD_TOOL', 'PACKAGE_MANAGER'] },
+  { agentId: 'code_reviewer', trustLevel: 0.8, allowedNamespaces: ['task:', 'code:', 'review:'], allowedResources: ['FILE_SYSTEM', 'GIT'] },
+  { agentId: 'test_runner', trustLevel: 0.75, allowedNamespaces: ['task:', 'test:', 'build:'], allowedResources: ['FILE_SYSTEM', 'SHELL_EXEC', 'BUILD_TOOL'] },
+  { agentId: 'devops_agent', trustLevel: 0.7, allowedNamespaces: ['task:', 'deploy:', 'infra:'], allowedResources: ['DOCKER', 'SHELL_EXEC', 'CLOUD_DEPLOY', 'GIT'] },
+];
+
+// ============================================================================
+// BLACKBOARD MANAGEMENT -- Secured with LockedBlackboard, identity verification,
+// namespace scoping, value validation, and input sanitization
 // ============================================================================
 
 class SharedBlackboard {
-  private path: string;
-  private cache: Map<string, BlackboardEntry> = new Map();
+  private backend: LockedBlackboard;
+  private agentTokens: Map<string, string> = new Map(); // agentId -> verified token
+  private agentNamespaces: Map<string, string[]> = new Map(); // agentId -> allowed prefixes
 
   constructor(basePath: string) {
-    this.path = join(basePath, 'swarm-blackboard.md');
-    this.initialize();
+    this.backend = new LockedBlackboard(basePath);
   }
 
-  private initialize(): void {
-    if (!existsSync(this.path)) {
-      const initialContent = `# Swarm Blackboard
-Last Updated: ${new Date().toISOString()}
-
-## Active Tasks
-| TaskID | Agent | Status | Started | Description |
-|--------|-------|--------|---------|-------------|
-
-## Knowledge Cache
-<!-- Cached results from agent operations -->
-
-## Coordination Signals
-<!-- Agent availability status -->
-
-## Execution History
-<!-- Chronological log of completed tasks -->
-`;
-      writeFileSync(this.path, initialContent, 'utf-8');
-    }
-    this.loadFromDisk();
+  /**
+   * Register a verified agent identity. Only agents with registered tokens
+   * can write to the blackboard. The orchestrator registers agents after
+   * verifying their identity through the AuthGuardian.
+   */
+  registerAgent(agentId: string, verificationToken: string, allowedNamespaces: string[] = ['*']): void {
+    this.agentTokens.set(agentId, verificationToken);
+    this.agentNamespaces.set(agentId, allowedNamespaces);
   }
 
-  private loadFromDisk(): void {
+  /**
+   * Check if an agent is allowed to access a key based on namespace rules.
+   */
+  private canAccessKey(agentId: string, key: string): boolean {
+    const namespaces = this.agentNamespaces.get(agentId);
+    if (!namespaces) return false;
+    if (namespaces.includes('*')) return true;
+    return namespaces.some(ns => key.startsWith(ns));
+  }
+
+  /**
+   * Verify that the calling agent is who they claim to be.
+   */
+  private verifyAgent(agentId: string, token?: string): boolean {
+    const registeredToken = this.agentTokens.get(agentId);
+    // If no token system is configured for this agent, allow (backward compat)
+    if (!registeredToken) return true;
+    return token === registeredToken;
+  }
+
+  /**
+   * Validate value size and structure before writing.
+   * Prevents DoS via oversized writes and circular data.
+   */
+  private validateValue(value: unknown): { valid: boolean; reason?: string } {
     try {
-      const content = readFileSync(this.path, 'utf-8');
-      // Parse blackboard entries from markdown
-      const cacheSection = content.match(/## Knowledge Cache\n([\s\S]*?)(?=\n## |$)/);
-      if (cacheSection) {
-        const entries = cacheSection[1].matchAll(/### (\S+)\n([\s\S]*?)(?=\n### |$)/g);
-        for (const entry of entries) {
-          const key = entry[1];
-          try {
-            const metadata = JSON.parse(entry[2].trim());
-            this.cache.set(key, metadata);
-          } catch {
-            // Skip malformed entries
-          }
-        }
+      const serialized = JSON.stringify(value);
+      if (serialized.length > CONFIG.maxBlackboardValueSize) {
+        return { valid: false, reason: `Value exceeds max size (${serialized.length} > ${CONFIG.maxBlackboardValueSize} bytes)` };
       }
-    } catch (error) {
-      console.error('[Blackboard] Failed to load from disk:', error);
+      return { valid: true };
+    } catch {
+      return { valid: false, reason: 'Value cannot be serialized (circular reference or invalid structure)' };
     }
   }
 
-  private persistToDisk(): void {
-    const sections = [
-      `# Swarm Blackboard`,
-      `Last Updated: ${new Date().toISOString()}`,
-      ``,
-      `## Active Tasks`,
-      `| TaskID | Agent | Status | Started | Description |`,
-      `|--------|-------|--------|---------|-------------|`,
-      ``,
-      `## Knowledge Cache`,
-    ];
-
-    for (const [key, entry] of this.cache.entries()) {
-      if (entry.ttl && Date.now() > new Date(entry.timestamp).getTime() + entry.ttl * 1000) {
-        this.cache.delete(key);
-        continue;
-      }
-      sections.push(`### ${key}`);
-      sections.push(JSON.stringify(entry, null, 2));
-      sections.push('');
-    }
-
-    sections.push(`## Coordination Signals`);
-    sections.push(`## Execution History`);
-
-    writeFileSync(this.path, sections.join('\n'), 'utf-8');
+  /**
+   * Sanitize a key to prevent markdown injection.
+   */
+  private sanitizeKey(key: string): string {
+    // Keys must be safe for markdown headings -- no #, newlines, or markdown syntax
+    return key.replace(/[#\n\r|`]/g, '_').slice(0, 256);
   }
 
   read(key: string): BlackboardEntry | null {
-    const entry = this.cache.get(key);
+    const entry = this.backend.read(key);
     if (!entry) return null;
-
-    // Check TTL
-    if (entry.ttl) {
-      const expiresAt = new Date(entry.timestamp).getTime() + entry.ttl * 1000;
-      if (Date.now() > expiresAt) {
-        this.cache.delete(key);
-        this.persistToDisk();
-        return null;
-      }
-    }
-
-    return entry;
+    // Normalize field name for backward compatibility
+    return {
+      key: entry.key,
+      value: entry.value,
+      sourceAgent: (entry as any).source_agent ?? (entry as any).sourceAgent ?? 'unknown',
+      timestamp: entry.timestamp,
+      ttl: entry.ttl,
+    };
   }
 
-  write(key: string, value: unknown, sourceAgent: string, ttl?: number): BlackboardEntry {
-    const entry: BlackboardEntry = {
-      key,
-      value,
-      sourceAgent,
-      timestamp: new Date().toISOString(),
-      ttl: ttl ?? null,
-    };
+  /**
+   * Write to the blackboard with identity verification, namespace checks,
+   * value validation, and input sanitization. Uses LockedBlackboard for
+   * atomic file-system writes.
+   *
+   * @param key - The key to write
+   * @param value - The value (will be sanitized and size-checked)
+   * @param sourceAgent - Agent claiming to write (verified against registered token)
+   * @param ttl - Optional TTL in seconds
+   * @param agentToken - Optional verification token for identity check
+   */
+  write(key: string, value: unknown, sourceAgent: string, ttl?: number, agentToken?: string): BlackboardEntry {
+    // 1. Verify agent identity
+    if (!this.verifyAgent(sourceAgent, agentToken)) {
+      throw new Error(`[Blackboard] Identity verification failed for agent '${sourceAgent}'`);
+    }
 
-    this.cache.set(key, entry);
-    this.persistToDisk();
-    return entry;
+    // 2. Namespace check
+    if (!this.canAccessKey(sourceAgent, key)) {
+      throw new Error(`[Blackboard] Agent '${sourceAgent}' not allowed to write to key '${key}'`);
+    }
+
+    // 3. Sanitize key
+    const safeKey = this.sanitizeKey(key);
+
+    // 4. Validate value size/structure
+    const validation = this.validateValue(value);
+    if (!validation.valid) {
+      throw new Error(`[Blackboard] Value validation failed: ${validation.reason}`);
+    }
+
+    // 5. Sanitize value -- strip injection payloads from string content
+    let sanitizedValue: unknown;
+    try {
+      sanitizedValue = InputSanitizer.sanitizeObject(value);
+    } catch {
+      sanitizedValue = value; // Fall back to raw if sanitization can't handle it
+    }
+
+    // 6. Write through LockedBlackboard (atomic, file-locked)
+    const entry = this.backend.write(safeKey, sanitizedValue, sourceAgent, ttl);
+
+    // Normalize for backward compat
+    return {
+      key: entry.key,
+      value: entry.value,
+      sourceAgent: (entry as any).source_agent ?? sourceAgent,
+      timestamp: entry.timestamp,
+      ttl: entry.ttl,
+    };
   }
 
   exists(key: string): boolean {
     return this.read(key) !== null;
   }
 
+  /**
+   * Get a full snapshot of all blackboard entries.
+   */
   getSnapshot(): Record<string, BlackboardEntry> {
-    const snapshot: Record<string, BlackboardEntry> = {};
-    for (const [key, entry] of this.cache.entries()) {
-      if (this.read(key)) { // This checks TTL
-        snapshot[key] = entry;
+    const raw = this.backend.getSnapshot();
+    const normalized: Record<string, BlackboardEntry> = {};
+    for (const [key, entry] of Object.entries(raw)) {
+      normalized[key] = {
+        key: entry.key,
+        value: entry.value,
+        sourceAgent: (entry as any).source_agent ?? (entry as any).sourceAgent ?? 'unknown',
+        timestamp: entry.timestamp,
+        ttl: entry.ttl,
+      };
+    }
+    return normalized;
+  }
+
+  /**
+   * Get a namespace-scoped snapshot -- only returns keys an agent is allowed to see.
+   * Prevents data leakage between agents.
+   */
+  getScopedSnapshot(agentId: string): Record<string, BlackboardEntry> {
+    const full = this.getSnapshot();
+    const scoped: Record<string, BlackboardEntry> = {};
+    for (const [key, entry] of Object.entries(full)) {
+      if (this.canAccessKey(agentId, key)) {
+        scoped[key] = entry;
       }
     }
-    return snapshot;
+    return scoped;
+  }
+
+  /**
+   * Clear all entries (for testing).
+   */
+  clear(): void {
+    // Write an empty state through locked backend
+    const keys = this.backend.listKeys();
+    for (const key of keys) {
+      this.backend.delete(key);
+    }
   }
 }
 
 // ============================================================================
-// AUTH GUARDIAN - PERMISSION WALL IMPLEMENTATION
+// AUTH GUARDIAN - UNIVERSAL PERMISSION WALL IMPLEMENTATION
+// Now domain-agnostic: resource types, risk profiles, trust levels, and
+// restrictions are all configurable. Works for coding, finance, devops, etc.
+// Integrates with SecureSwarmGateway for HMAC tokens, rate limiting, 
+// input sanitization, and cryptographic audit logs.
 // ============================================================================
 
 class AuthGuardian {
   private activeGrants: Map<string, ActiveGrant> = new Map();
   private agentTrustLevels: Map<string, number> = new Map();
+  private agentTrustConfigs: Map<string, AgentTrustConfig> = new Map();
+  private resourceProfiles: Map<string, ResourceProfile> = new Map();
   private auditLog: Array<{ timestamp: string; action: string; details: unknown }> = [];
+  private auditLogPath: string;
+  private trustConfigPath: string;
 
-  constructor() {
-    // Initialize with default trust levels
-    this.agentTrustLevels.set('orchestrator', 0.9);
-    this.agentTrustLevels.set('data_analyst', 0.8);
-    this.agentTrustLevels.set('strategy_advisor', 0.7);
-    this.agentTrustLevels.set('risk_assessor', 0.85);
+  constructor(options?: {
+    trustLevels?: AgentTrustConfig[];
+    resourceProfiles?: Record<string, ResourceProfile>;
+    auditLogPath?: string;
+    trustConfigPath?: string;
+  }) {
+    this.auditLogPath = options?.auditLogPath ?? CONFIG.auditLogPath;
+    this.trustConfigPath = options?.trustConfigPath ?? CONFIG.trustConfigPath;
+
+    // Load resource profiles (user-provided + defaults)
+    const profiles = { ...DEFAULT_RESOURCE_PROFILES, ...(options?.resourceProfiles ?? {}) };
+    for (const [name, profile] of Object.entries(profiles)) {
+      this.resourceProfiles.set(name, profile);
+    }
+
+    // Load trust levels (try disk first, then user-provided, then defaults)
+    const trustConfigs = options?.trustLevels ?? this.loadTrustFromDisk() ?? DEFAULT_AGENT_TRUST;
+    for (const config of trustConfigs) {
+      this.agentTrustLevels.set(config.agentId, config.trustLevel);
+      this.agentTrustConfigs.set(config.agentId, config);
+    }
+
+    // Load existing audit log from disk
+    this.loadAuditFromDisk();
   }
 
+  /**
+   * Register a new resource type at runtime.
+   * Makes the system extensible for any domain.
+   */
+  registerResourceType(name: string, profile: ResourceProfile): void {
+    this.resourceProfiles.set(name, profile);
+  }
+
+  /**
+   * Register or update an agent's trust configuration at runtime.
+   */
+  registerAgentTrust(config: AgentTrustConfig): void {
+    this.agentTrustLevels.set(config.agentId, config.trustLevel);
+    this.agentTrustConfigs.set(config.agentId, config);
+    this.persistTrustToDisk();
+  }
+
+  /**
+   * Request permission to access a resource.
+   * resourceType is now a free string -- validated against registered profiles.
+   */
   async requestPermission(
     agentId: string,
-    resourceType: 'SAP_API' | 'FINANCIAL_API' | 'EXTERNAL_SERVICE' | 'DATA_EXPORT',
+    resourceType: string,
     justification: string,
     scope?: string
   ): Promise<PermissionGrant> {
-    this.log('permission_request', { agentId, resourceType, justification, scope });
+    // Sanitize inputs
+    let safeAgentId: string;
+    let safeJustification: string;
+    try {
+      safeAgentId = InputSanitizer.sanitizeAgentId(agentId);
+      safeJustification = InputSanitizer.sanitizeString(justification, 2000);
+    } catch {
+      safeAgentId = agentId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'unknown';
+      safeJustification = justification.slice(0, 2000);
+    }
+
+    this.log('permission_request', { agentId: safeAgentId, resourceType, justification: safeJustification, scope });
+
+    // Check if agent is allowed to access this resource type
+    const agentConfig = this.agentTrustConfigs.get(safeAgentId);
+    if (agentConfig && agentConfig.allowedResources && !agentConfig.allowedResources.includes('*')) {
+      if (!agentConfig.allowedResources.includes(resourceType)) {
+        this.log('permission_denied', { agentId: safeAgentId, resourceType, reason: 'resource_not_in_allowlist' });
+        return {
+          granted: false,
+          grantToken: null,
+          expiresAt: null,
+          restrictions: [],
+          reason: `Agent '${safeAgentId}' is not authorized to access '${resourceType}'. Allowed: ${agentConfig.allowedResources.join(', ')}`,
+        };
+      }
+    }
 
     // Evaluate the permission request
-    const evaluation = this.evaluateRequest(agentId, resourceType, justification, scope);
+    const evaluation = this.evaluateRequest(safeAgentId, resourceType, safeJustification, scope);
 
     if (!evaluation.approved) {
+      this.log('permission_denied', { agentId: safeAgentId, resourceType, reason: evaluation.reason });
       return {
         granted: false,
         grantToken: null,
@@ -295,12 +520,14 @@ class AuthGuardian {
     const grant: ActiveGrant = {
       grantToken,
       resourceType,
-      agentId,
+      agentId: safeAgentId,
       expiresAt,
+      restrictions: evaluation.restrictions,
+      scope,
     };
 
     this.activeGrants.set(grantToken, grant);
-    this.log('permission_granted', { grantToken, agentId, resourceType, expiresAt });
+    this.log('permission_granted', { grantToken, agentId: safeAgentId, resourceType, expiresAt, restrictions: evaluation.restrictions });
 
     return {
       granted: true,
@@ -322,6 +549,88 @@ class AuthGuardian {
     return true;
   }
 
+  /**
+   * Validate a token and return the bound restrictions and scope.
+   * Used to enforce restrictions at the point of use.
+   */
+  validateTokenWithGrant(token: string): ActiveGrant | null {
+    const grant = this.activeGrants.get(token);
+    if (!grant) return null;
+
+    if (new Date(grant.expiresAt) < new Date()) {
+      this.activeGrants.delete(token);
+      return null;
+    }
+
+    return grant;
+  }
+
+  /**
+   * Enforce restrictions on an operation. Returns an error string if
+   * the operation violates any restriction, or null if allowed.
+   */
+  enforceRestrictions(grantToken: string, operation: {
+    type?: string;       // 'read' | 'write' | 'delete' | 'execute'
+    recordCount?: number;
+    hasAttachments?: boolean;
+    targetPath?: string;
+    command?: string;
+  }): string | null {
+    const grant = this.validateTokenWithGrant(grantToken);
+    if (!grant) return 'Invalid or expired grant token';
+
+    for (const restriction of grant.restrictions) {
+      // Enforce read_only
+      if (restriction === 'read_only' && operation.type && operation.type !== 'read') {
+        return `Restriction 'read_only' violated: attempted '${operation.type}'`;
+      }
+
+      // Enforce max_records
+      const maxRecordsMatch = restriction.match(/^max_records:(\d+)$/);
+      if (maxRecordsMatch && operation.recordCount) {
+        const max = parseInt(maxRecordsMatch[1], 10);
+        if (operation.recordCount > max) {
+          return `Restriction '${restriction}' violated: requested ${operation.recordCount} records`;
+        }
+      }
+
+      // Enforce sandbox_only
+      if (restriction === 'sandbox_only' && operation.targetPath) {
+        if (/^\/|^[A-Z]:\\(?:Windows|Program)/i.test(operation.targetPath)) {
+          return `Restriction 'sandbox_only' violated: path '${operation.targetPath}' is outside sandbox`;
+        }
+      }
+
+      // Enforce no_sudo
+      if (restriction === 'no_sudo' && operation.command) {
+        if (/\bsudo\b/i.test(operation.command)) {
+          return `Restriction 'no_sudo' violated: command contains sudo`;
+        }
+      }
+
+      // Enforce workspace_only
+      if (restriction === 'workspace_only' && operation.targetPath) {
+        if (/\.\.[/\\]/.test(operation.targetPath)) {
+          return `Restriction 'workspace_only' violated: path traversal detected`;
+        }
+      }
+
+      // Enforce no_system_dirs
+      if (restriction === 'no_system_dirs' && operation.targetPath) {
+        if (/(?:\/etc|\/usr|\/var|\\Windows|\\System32)/i.test(operation.targetPath)) {
+          return `Restriction 'no_system_dirs' violated: system directory access`;
+        }
+      }
+
+      // Enforce no_attachments
+      if (restriction === 'no_attachments' && operation.hasAttachments) {
+        return `Restriction 'no_attachments' violated`;
+      }
+    }
+
+    return null; // All restrictions passed
+  }
+
   revokeToken(token: string): void {
     this.activeGrants.delete(token);
     this.log('permission_revoked', { token });
@@ -333,10 +642,8 @@ class AuthGuardian {
     justification: string,
     scope?: string
   ): { approved: boolean; reason?: string; restrictions: string[] } {
-    const restrictions: string[] = [];
-
-    // 1. Justification Quality (40% weight)
-    const justificationScore = this.scoreJustification(justification);
+    // 1. Justification Quality (40% weight) -- now includes resource-relevance
+    const justificationScore = this.scoreJustification(justification, resourceType);
     if (justificationScore < 0.3) {
       return {
         approved: false,
@@ -365,21 +672,11 @@ class AuthGuardian {
       };
     }
 
-    // Determine restrictions based on resource type
-    switch (resourceType) {
-      case 'SAP_API':
-        restrictions.push('read_only', 'max_records:100');
-        break;
-      case 'FINANCIAL_API':
-        restrictions.push('read_only', 'no_pii_fields', 'audit_required');
-        break;
-      case 'EXTERNAL_SERVICE':
-        restrictions.push('rate_limit:10_per_minute');
-        break;
-      case 'DATA_EXPORT':
-        restrictions.push('anonymize_pii', 'local_only');
-        break;
-    }
+    // Get restrictions from resource profile (data-driven, not hardcoded)
+    const profile = this.resourceProfiles.get(resourceType);
+    const restrictions = profile
+      ? [...profile.defaultRestrictions]
+      : ['audit_required']; // Unknown resources get audited by default
 
     // Calculate weighted approval
     const weightedScore = (justificationScore * 0.4) + (trustLevel * 0.3) + ((1 - riskScore) * 0.3);
@@ -392,36 +689,74 @@ class AuthGuardian {
     };
   }
 
-  private scoreJustification(justification: string): number {
-    // Simple heuristic scoring for justification quality
+  /**
+   * Improved justification scoring with resource-relevance checking.
+   * Prevents trivial gaming by verifying the justification mentions
+   * concepts relevant to the requested resource.
+   */
+  private scoreJustification(justification: string, resourceType?: string): number {
     let score = 0;
 
-    if (justification.length > 20) score += 0.2;
-    if (justification.length > 50) score += 0.2;
-    if (/task|purpose|need|require/i.test(justification)) score += 0.2;
-    if (/specific|particular|exact/i.test(justification)) score += 0.2;
-    if (!/test|debug|try/i.test(justification)) score += 0.2;
+    // Length scoring
+    if (justification.length > 20) score += 0.15;
+    if (justification.length > 50) score += 0.15;
 
-    return Math.min(score, 1);
+    // Intent keywords
+    if (/task|purpose|need|require|generate|analyze|process|build|deploy|test|review/i.test(justification)) score += 0.15;
+
+    // Specificity keywords
+    if (/specific|particular|exact|for\s+the|in\s+order\s+to|because|so\s+that/i.test(justification)) score += 0.15;
+
+    // Penalty for vague/test phrasing
+    if (/^test$|^debug$|^try$|^just\s+testing/i.test(justification.trim())) score -= 0.3;
+
+    // Resource-relevance check: does the justification mention anything related
+    // to the requested resource? (+0.2 bonus for relevant context)
+    if (resourceType) {
+      const relevancePatterns: Record<string, RegExp> = {
+        SAP_API: /sap|erp|invoice|procurement|purchase|material|vendor/i,
+        FINANCIAL_API: /financ|revenue|budget|accounting|payment|ledger|balance/i,
+        DATA_EXPORT: /export|report|csv|download|extract|migrate/i,
+        FILE_SYSTEM: /file|read|write|save|load|path|directory|workspace/i,
+        SHELL_EXEC: /command|script|compile|build|run|execute|terminal/i,
+        GIT: /git|commit|branch|merge|pull|push|repository|diff/i,
+        PACKAGE_MANAGER: /package|install|dependency|npm|pip|cargo|module/i,
+        BUILD_TOOL: /build|compile|webpack|tsc|make|gradle|cargo/i,
+        DOCKER: /container|docker|image|deploy|service|compose/i,
+        CLOUD_DEPLOY: /deploy|cloud|staging|production|release|infrastructure/i,
+        DATABASE: /database|query|sql|table|record|schema|migration/i,
+        EXTERNAL_SERVICE: /api|service|endpoint|webhook|request|fetch/i,
+        EMAIL: /email|mail|send|notification|alert|message/i,
+        WEBHOOK: /webhook|callback|notification|event|dispatch/i,
+      };
+
+      const pattern = relevancePatterns[resourceType];
+      if (pattern && pattern.test(justification)) {
+        score += 0.2;
+      } else if (pattern && !pattern.test(justification)) {
+        // Justification doesn't mention anything relevant -- small penalty
+        score -= 0.1;
+      }
+    }
+
+    // Bonus for mentioning a task/ticket ID
+    if (/(?:task|ticket|issue|jira|pr|bug)[_\-#]?\s*\d+/i.test(justification)) score += 0.1;
+
+    return Math.max(0, Math.min(score, 1));
   }
 
   private assessRisk(resourceType: string, scope?: string): number {
-    const baseRisks: Record<string, number> = {
-      'SAP_API': 0.5,
-      'FINANCIAL_API': 0.7,
-      'EXTERNAL_SERVICE': 0.4,
-      'DATA_EXPORT': 0.6,
-    };
-
-    let risk = baseRisks[resourceType] ?? 0.5;
+    // Look up base risk from registered profile (not hardcoded)
+    const profile = this.resourceProfiles.get(resourceType);
+    let risk = profile?.baseRisk ?? 0.5; // Unknown resources get medium risk
 
     // Broad scopes increase risk
     if (!scope || scope === '*' || scope === 'all') {
       risk += 0.2;
     }
 
-    // Write operations increase risk
-    if (scope && /write|delete|update|modify/i.test(scope)) {
+    // Write/delete operations increase risk
+    if (scope && /write|delete|update|modify|execute|deploy/i.test(scope)) {
       risk += 0.2;
     }
 
@@ -433,11 +768,23 @@ class AuthGuardian {
   }
 
   private log(action: string, details: unknown): void {
-    this.auditLog.push({
+    const entry = {
       timestamp: new Date().toISOString(),
       action,
       details,
-    });
+    };
+    this.auditLog.push(entry);
+
+    // Persist to disk
+    try {
+      const dir = join('.', 'data');
+      if (!existsSync(dir)) {
+        require('fs').mkdirSync(dir, { recursive: true });
+      }
+      appendFileSync(this.auditLogPath, JSON.stringify(entry) + '\n');
+    } catch {
+      // Non-fatal -- log is also in memory
+    }
   }
 
   getActiveGrants(): ActiveGrant[] {
@@ -450,6 +797,64 @@ class AuthGuardian {
     }
     return Array.from(this.activeGrants.values());
   }
+
+  getAuditLog(): typeof this.auditLog {
+    return [...this.auditLog];
+  }
+
+  /**
+   * Get all registered resource profiles.
+   */
+  getResourceProfiles(): Record<string, ResourceProfile> {
+    return Object.fromEntries(this.resourceProfiles);
+  }
+
+  /**
+   * Get the allowed namespaces for an agent (used by blackboard scoping).
+   */
+  getAgentNamespaces(agentId: string): string[] {
+    const config = this.agentTrustConfigs.get(agentId);
+    return config?.allowedNamespaces ?? ['task:'];
+  }
+
+  // ---- Persistence helpers ----
+
+  private loadTrustFromDisk(): AgentTrustConfig[] | null {
+    try {
+      if (existsSync(this.trustConfigPath)) {
+        const raw = readFileSync(this.trustConfigPath, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  private persistTrustToDisk(): void {
+    try {
+      const dir = join('.', 'data');
+      if (!existsSync(dir)) {
+        require('fs').mkdirSync(dir, { recursive: true });
+      }
+      const configs = Array.from(this.agentTrustConfigs.values());
+      writeFileSync(this.trustConfigPath, JSON.stringify(configs, null, 2));
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  private loadAuditFromDisk(): void {
+    try {
+      if (existsSync(this.auditLogPath)) {
+        const raw = readFileSync(this.auditLogPath, 'utf-8');
+        const lines = raw.trim().split('\n').filter(l => l);
+        for (const line of lines) {
+          try {
+            this.auditLog.push(JSON.parse(line));
+          } catch { /* skip malformed */ }
+        }
+      }
+    } catch { /* ignore */ }
+  }
 }
 
 // ============================================================================
@@ -459,10 +864,12 @@ class AuthGuardian {
 class TaskDecomposer {
   private blackboard: SharedBlackboard;
   private authGuardian: AuthGuardian;
+  private adapterRegistry: AdapterRegistry;
 
-  constructor(blackboard: SharedBlackboard, authGuardian: AuthGuardian) {
+  constructor(blackboard: SharedBlackboard, authGuardian: AuthGuardian, adapterRegistry: AdapterRegistry) {
     this.blackboard = blackboard;
     this.authGuardian = authGuardian;
+    this.adapterRegistry = adapterRegistry;
   }
 
   /**
@@ -567,19 +974,51 @@ class TaskDecomposer {
         },
       };
 
-      // Use OpenClaw's internal callSkill to invoke the target agent
-      const result = await callSkill(task.agentType, {
+      // Sanitize the instruction before sending to adapter
+      let sanitizedInstruction = task.taskPayload.instruction;
+      try {
+        sanitizedInstruction = InputSanitizer.sanitizeString(task.taskPayload.instruction, 10000);
+      } catch { /* use original if sanitization fails */ }
+
+      // Use namespace-scoped snapshot -- target agent only sees keys it's allowed to see
+      const scopedSnapshot = this.blackboard.getScopedSnapshot(task.agentType);
+
+      // Route through the adapter registry (framework-agnostic)
+      const agentPayload: AgentPayload = {
         action: 'execute',
-        handoff,
-        context: {
-          blackboardSnapshot: this.blackboard.getSnapshot(),
+        params: {},
+        handoff: {
+          handoffId: handoff.handoffId,
+          sourceAgent: handoff.sourceAgent,
+          targetAgent: handoff.targetAgent,
+          taskType: handoff.taskType,
+          instruction: sanitizedInstruction,
+          context: handoff.payload.context,
+          constraints: handoff.payload.constraints,
+          expectedOutput: handoff.payload.expectedOutput,
+          metadata: handoff.metadata as unknown as Record<string, unknown>,
         },
-      });
+        blackboardSnapshot: scopedSnapshot as Record<string, unknown>,
+      };
+
+      const agentContext: AgentContext = {
+        agentId: context.agentId,
+        taskId: context.taskId,
+        sessionId: context.sessionId,
+      };
+
+      const result = await this.adapterRegistry.executeAgent(task.agentType, agentPayload, agentContext);
+
+      // Sanitize adapter output before returning/caching
+      let sanitizedData = result.data;
+      try {
+        sanitizedData = InputSanitizer.sanitizeObject(result.data);
+      } catch { /* use raw if sanitization fails */ }
 
       return {
         agentType: task.agentType,
         success: true,
-        result: result.data,
+        result: sanitizedData,
         executionTime: Date.now() - taskStart,
       };
     } catch (error) {
@@ -681,49 +1120,118 @@ class TaskDecomposer {
 
 export class SwarmOrchestrator implements OpenClawSkill {
   name = 'SwarmOrchestrator';
-  version = '1.0.0';
+  version = '3.0.0';
 
   private blackboard: SharedBlackboard;
   private authGuardian: AuthGuardian;
   private taskDecomposer: TaskDecomposer;
   private agentRegistry: Map<string, AgentStatus> = new Map();
+  private gateway: SecureSwarmGateway;
+  private qualityGate: QualityGateAgent;
 
-  constructor(workspacePath: string = process.cwd()) {
+  /** The adapter registry -- routes requests to the right agent framework */
+  public readonly adapters: AdapterRegistry;
+
+  constructor(
+    workspacePath: string = process.cwd(),
+    adapterRegistry?: AdapterRegistry,
+    options?: {
+      trustLevels?: AgentTrustConfig[];
+      resourceProfiles?: Record<string, ResourceProfile>;
+      validationConfig?: Partial<ValidationConfig>;
+      qualityThreshold?: number;
+      aiReviewCallback?: AIReviewCallback;
+    }
+  ) {
     this.blackboard = new SharedBlackboard(workspacePath);
-    this.authGuardian = new AuthGuardian();
-    this.taskDecomposer = new TaskDecomposer(this.blackboard, this.authGuardian);
+    this.authGuardian = new AuthGuardian({
+      trustLevels: options?.trustLevels,
+      resourceProfiles: options?.resourceProfiles,
+    });
+    this.adapters = adapterRegistry ?? new AdapterRegistry();
+    this.taskDecomposer = new TaskDecomposer(this.blackboard, this.authGuardian, this.adapters);
+    this.gateway = new SecureSwarmGateway();
+    this.qualityGate = new QualityGateAgent({
+      validationConfig: options?.validationConfig,
+      qualityThreshold: options?.qualityThreshold,
+      aiReviewCallback: options?.aiReviewCallback,
+    });
+
+    // Register the orchestrator agent on the blackboard with full access
+    this.blackboard.registerAgent('orchestrator', 'system-orchestrator-token', ['*']);
   }
 
   /**
-   * Main entry point for the skill
+   * Add an agent framework adapter (LangChain, AutoGen, CrewAI, MCP, custom, etc.)
+   * This is the plug-and-play entry point.
+   */
+  async addAdapter(adapter: IAgentAdapter, config: AdapterConfig = {}): Promise<void> {
+    await this.adapters.addAdapter(adapter, config);
+  }
+
+  /**
+   * Main entry point for the skill.
+   * Now integrates SecureSwarmGateway: every request flows through
+   * input sanitization, rate limiting, and agent ID validation.
    */
   async execute(action: string, params: Record<string, unknown>, context: SkillContext): Promise<SkillResult> {
     const traceId = randomUUID();
 
+    // P0: Route through SecureSwarmGateway -- sanitization + rate limiting
+    const gatewayResult = await this.gateway.handleSecureRequest(
+      context.agentId,
+      action,
+      params,
+    );
+
+    if (!gatewayResult.allowed) {
+      return {
+        success: false,
+        error: {
+          code: 'GATEWAY_DENIED',
+          message: `Security gateway denied request: ${gatewayResult.reason}`,
+          recoverable: true,
+          suggestedAction: 'Check agent ID, rate limits, or input format',
+        },
+      };
+    }
+
+    // Use sanitized params from gateway
+    const safeParams = gatewayResult.sanitizedParams ?? params;
+
     if (CONFIG.enableTracing) {
-      this.blackboard.write(`trace:${traceId}`, {
-        action,
-        params,
-        startTime: new Date().toISOString(),
-      }, context.agentId);
+      try {
+        this.blackboard.write(`trace:${traceId}`, {
+          action,
+          startTime: new Date().toISOString(),
+        }, context.agentId);
+      } catch {
+        // Non-fatal -- tracing failure shouldn't block execution
+      }
     }
 
     try {
       switch (action) {
         case 'delegate_task':
-          return await this.delegateTask(params, context);
+          return await this.delegateTask(safeParams, context);
 
         case 'query_swarm_state':
-          return await this.querySwarmState(params);
+          return await this.querySwarmState(safeParams, context);
 
         case 'spawn_parallel_agents':
-          return await this.spawnParallelAgents(params, context);
+          return await this.spawnParallelAgents(safeParams, context);
 
         case 'request_permission':
-          return await this.handlePermissionRequest(params, context);
+          return await this.handlePermissionRequest(safeParams, context);
 
         case 'update_blackboard':
-          return this.handleBlackboardUpdate(params, context);
+          return await this.handleBlackboardUpdate(safeParams, context);
+
+        case 'quality_gate_status':
+          return this.handleQualityGateStatus();
+
+        case 'review_quarantine':
+          return this.handleQuarantineReview(safeParams);
 
         default:
           return {
@@ -758,12 +1266,14 @@ export class SwarmOrchestrator implements OpenClawSkill {
     const priority = (params.priority as string) ?? 'normal';
     const timeout = (params.timeout as number) ?? CONFIG.defaultTimeout;
     const requiresAuth = (params.requiresAuth as boolean) ?? false;
+    const resourceType = (params.resourceType as string) ?? 'EXTERNAL_SERVICE';
 
-    // Check permission wall if required
+    // Check permission wall if required -- now returns bound restrictions
+    let grantToken: string | null = null;
     if (requiresAuth) {
       const authResult = await this.authGuardian.requestPermission(
         context.agentId,
-        'EXTERNAL_SERVICE',
+        resourceType,
         `Delegating task to ${targetAgent}: ${taskPayload.instruction}`,
         'delegate'
       );
@@ -778,6 +1288,26 @@ export class SwarmOrchestrator implements OpenClawSkill {
             suggestedAction: 'Provide more specific justification or narrow scope',
           },
         };
+      }
+
+      grantToken = authResult.grantToken;
+
+      // Enforce restrictions at point of use
+      if (grantToken) {
+        const restrictionViolation = this.authGuardian.enforceRestrictions(grantToken, {
+          type: 'execute',
+        });
+        if (restrictionViolation) {
+          return {
+            success: false,
+            error: {
+              code: 'RESTRICTION_VIOLATED',
+              message: restrictionViolation,
+              recoverable: true,
+              suggestedAction: 'Request a grant with broader scope',
+            },
+          };
+        }
       }
     }
 
@@ -811,26 +1341,103 @@ export class SwarmOrchestrator implements OpenClawSkill {
       },
     };
 
-    // Execute via callSkill
+    // Execute via adapter registry (routes to the right framework)
     try {
+      // Sanitize instruction before sending to adapter
+      let sanitizedInstruction = taskPayload.instruction;
+      try {
+        sanitizedInstruction = InputSanitizer.sanitizeString(taskPayload.instruction, 10000);
+      } catch { /* use original if sanitization fails */ }
+
+      // P1: Namespace-scoped snapshot -- target agent only sees keys it's allowed to see
+      const scopedSnapshot = this.blackboard.getScopedSnapshot(targetAgent);
+
+      const agentPayload: AgentPayload = {
+        action: 'execute',
+        params: {},
+        handoff: {
+          handoffId: handoff.handoffId,
+          sourceAgent: handoff.sourceAgent,
+          targetAgent: handoff.targetAgent,
+          taskType: handoff.taskType,
+          instruction: sanitizedInstruction,
+          context: taskPayload.context,
+          constraints: taskPayload.constraints,
+          expectedOutput: taskPayload.expectedOutput,
+          metadata: handoff.metadata as unknown as Record<string, unknown>,
+        },
+        blackboardSnapshot: scopedSnapshot as Record<string, unknown>,
+      };
+
+      const agentContext: AgentContext = {
+        agentId: context.agentId,
+        taskId: context.taskId,
+        sessionId: context.sessionId,
+      };
+
       const result = await Promise.race([
-        callSkill(targetAgent, {
-          action: 'execute',
-          handoff,
-        }),
+        this.adapters.executeAgent(targetAgent, agentPayload, agentContext),
         this.timeoutPromise(timeout),
       ]);
 
-      // Cache result
-      this.blackboard.write(cacheKey, result, context.agentId, 1800); // 30 min TTL
+      // P1: Sanitize adapter output before caching
+      let sanitizedResult = result;
+      try {
+        sanitizedResult = InputSanitizer.sanitizeObject(result) as typeof result;
+      } catch { /* use raw if sanitization fails */ }
+
+      // Quality gate: validate result before committing to blackboard
+      const gateResult = await this.qualityGate.gate(cacheKey, sanitizedResult, targetAgent, {
+        taskInstruction: taskPayload.instruction,
+        expectedOutput: taskPayload.expectedOutput,
+      });
+
+      if (gateResult.decision === 'reject') {
+        return {
+          success: false,
+          error: {
+            code: 'QUALITY_REJECTED',
+            message: `Result from ${targetAgent} failed quality validation: ${gateResult.validation.issues.filter(i => i.severity === 'error').map(i => i.message).join('; ')}`,
+            recoverable: gateResult.validation.recoverable,
+            suggestedAction: gateResult.validation.issues.find(i => i.suggestion)?.suggestion,
+          },
+        };
+      }
+
+      if (gateResult.decision === 'quarantine') {
+        // Still return the result but flag it
+        return {
+          success: true,
+          data: {
+            taskId: handoff.handoffId,
+            status: 'quarantined',
+            result: sanitizedResult,
+            agentTrace: [context.agentId, targetAgent],
+            qualityGate: {
+              decision: 'quarantine',
+              quarantineKey: gateResult.quarantineKey,
+              score: gateResult.validation.score,
+              issues: gateResult.validation.issues,
+              reviewNotes: gateResult.reviewNotes,
+            },
+          },
+        };
+      }
+
+      // Approved -- cache result
+      this.blackboard.write(cacheKey, sanitizedResult, context.agentId, 1800); // 30 min TTL
 
       return {
         success: true,
         data: {
           taskId: handoff.handoffId,
           status: 'completed',
-          result,
+          result: sanitizedResult,
           agentTrace: [context.agentId, targetAgent],
+          qualityGate: {
+            decision: 'approve',
+            score: gateResult.validation.score,
+          },
         },
       };
     } catch (error) {
@@ -849,7 +1456,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
   // CAPABILITY: query_swarm_state
   // -------------------------------------------------------------------------
 
-  private async querySwarmState(params: Record<string, unknown>): Promise<SkillResult> {
+  private async querySwarmState(params: Record<string, unknown>, context: SkillContext): Promise<SkillResult> {
     const scope = (params.scope as string) ?? 'all';
     const agentFilter = params.agentFilter as string[] | undefined;
     const includeHistory = (params.includeHistory as boolean) ?? false;
@@ -867,7 +1474,8 @@ export class SwarmOrchestrator implements OpenClawSkill {
     }
 
     if (scope === 'all' || scope === 'blackboard') {
-      state.blackboardSnapshot = this.blackboard.getSnapshot();
+      // P1: Namespace-scoped -- agent only sees keys it's allowed to access
+      state.blackboardSnapshot = this.blackboard.getScopedSnapshot(context.agentId);
     }
 
     if (scope === 'all' || scope === 'permissions') {
@@ -875,8 +1483,8 @@ export class SwarmOrchestrator implements OpenClawSkill {
     }
 
     if (scope === 'all' || scope === 'tasks') {
-      // Extract tasks from blackboard
-      const snapshot = this.blackboard.getSnapshot();
+      // Extract tasks from scoped blackboard
+      const snapshot = this.blackboard.getScopedSnapshot(context.agentId);
       state.pendingTasks = Object.entries(snapshot)
         .filter(([key]) => key.startsWith('task:'))
         .map(([, entry]) => ({
@@ -943,7 +1551,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
     params: Record<string, unknown>,
     context: SkillContext
   ): Promise<SkillResult> {
-    const resourceType = params.resourceType as 'SAP_API' | 'FINANCIAL_API' | 'EXTERNAL_SERVICE' | 'DATA_EXPORT';
+    const resourceType = params.resourceType as string;
     const justification = params.justification as string;
     const scope = params.scope as string | undefined;
 
@@ -975,10 +1583,10 @@ export class SwarmOrchestrator implements OpenClawSkill {
   // CAPABILITY: update_blackboard
   // -------------------------------------------------------------------------
 
-  private handleBlackboardUpdate(
+  private async handleBlackboardUpdate(
     params: Record<string, unknown>,
     context: SkillContext
-  ): SkillResult {
+  ): Promise<SkillResult> {
     const key = params.key as string;
     const value = params.value;
     const ttl = params.ttl as number | undefined;
@@ -995,6 +1603,36 @@ export class SwarmOrchestrator implements OpenClawSkill {
     }
 
     const previousValue = this.blackboard.read(key)?.value ?? null;
+
+    // Quality gate: validate before writing to blackboard
+    const gateResult = await this.qualityGate.gate(key, value, context.agentId);
+
+    if (gateResult.decision === 'reject') {
+      return {
+        success: false,
+        error: {
+          code: 'QUALITY_REJECTED',
+          message: `Blackboard write rejected: ${gateResult.validation.issues.filter(i => i.severity === 'error').map(i => i.message).join('; ')}`,
+          recoverable: gateResult.validation.recoverable,
+          suggestedAction: gateResult.validation.issues.find(i => i.suggestion)?.suggestion,
+        },
+      };
+    }
+
+    if (gateResult.decision === 'quarantine') {
+      return {
+        success: true,
+        data: {
+          success: true,
+          quarantined: true,
+          quarantineKey: gateResult.quarantineKey,
+          qualityScore: gateResult.validation.score,
+          issues: gateResult.validation.issues,
+          previousValue,
+        },
+      };
+    }
+
     this.blackboard.write(key, value, context.agentId, ttl);
 
     return {
@@ -1002,8 +1640,67 @@ export class SwarmOrchestrator implements OpenClawSkill {
       data: {
         success: true,
         previousValue,
+        qualityScore: gateResult.validation.score,
       },
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // QUALITY GATE MANAGEMENT
+  // -------------------------------------------------------------------------
+
+  /** Returns quality gate metrics and quarantined entries */
+  private handleQualityGateStatus(): SkillResult {
+    return {
+      success: true,
+      data: {
+        metrics: this.qualityGate.getMetrics(),
+        quarantined: this.qualityGate.getQuarantined(),
+      },
+    };
+  }
+
+  /** Approve or reject a quarantined entry */
+  private handleQuarantineReview(params: Record<string, unknown>): SkillResult {
+    const quarantineId = params.quarantineId as string;
+    const decision = params.decision as 'approve' | 'reject';
+
+    if (!quarantineId || !decision) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_PARAMS',
+          message: 'quarantineId and decision ("approve" or "reject") are required',
+          recoverable: false,
+        },
+      };
+    }
+
+    let entry: unknown;
+    if (decision === 'approve') {
+      entry = this.qualityGate.approveQuarantined(quarantineId);
+      if (entry) {
+        // Write the approved entry to the blackboard
+        this.blackboard.write(`approved:${quarantineId}`, entry, 'orchestrator');
+      }
+    } else {
+      entry = this.qualityGate.rejectQuarantined(quarantineId);
+    }
+
+    return {
+      success: !!entry,
+      data: entry ? { quarantineId, decision, resolved: true } : undefined,
+      error: entry ? undefined : {
+        code: 'NOT_FOUND',
+        message: `Quarantine entry ${quarantineId} not found`,
+        recoverable: false,
+      },
+    };
+  }
+
+  /** Expose the quality gate for external configuration */
+  public getQualityGate(): QualityGateAgent {
+    return this.qualityGate;
   }
 
   // -------------------------------------------------------------------------
@@ -1055,11 +1752,33 @@ export class SwarmOrchestrator implements OpenClawSkill {
 // EXPORTS & MODULE INITIALIZATION
 // ============================================================================
 
-// Default export for OpenClaw skill loader
+// Default export for OpenClaw skill loader (backward compatible)
 export default SwarmOrchestrator;
 
 // Named exports for direct usage
 export { SharedBlackboard, AuthGuardian, TaskDecomposer };
+
+// Quality gate & validation exports
+export { BlackboardValidator, QualityGateAgent } from './lib/blackboard-validator';
+export type {
+  ValidationResult,
+  ValidationIssue,
+  ValidationConfig,
+  QualityGateResult,
+  GateDecision,
+  AIReviewCallback,
+  CustomValidationRule,
+} from './lib/blackboard-validator';
+
+// Adapter system re-exports for convenience
+export { AdapterRegistry } from './adapters/adapter-registry';
+export { BaseAdapter } from './adapters/base-adapter';
+export { OpenClawAdapter } from './adapters/openclaw-adapter';
+export { LangChainAdapter } from './adapters/langchain-adapter';
+export { AutoGenAdapter } from './adapters/autogen-adapter';
+export { CrewAIAdapter } from './adapters/crewai-adapter';
+export { MCPAdapter } from './adapters/mcp-adapter';
+export { CustomAdapter } from './adapters/custom-adapter';
 
 // Type exports
 export type {
@@ -1071,14 +1790,64 @@ export type {
   ParallelTask,
   ParallelExecutionResult,
   SynthesisStrategy,
+  ResourceProfile,
+  AgentTrustConfig,
 };
 
+export type {
+  IAgentAdapter,
+  AgentPayload,
+  AgentContext,
+  AgentResult,
+  AgentInfo,
+  AdapterConfig,
+  AdapterCapabilities,
+} from './types/agent-adapter';
+
+// Backward-compatible OpenClaw types
+export type { OpenClawSkill, SkillContext, SkillResult };
+
 /**
- * Factory function for creating a configured SwarmOrchestrator instance
+ * Factory function for creating a configured SwarmOrchestrator instance.
+ * 
+ * For plug-and-play with other agent systems, pass adapters:
+ * 
+ *   const orchestrator = createSwarmOrchestrator({
+ *     adapters: [{ adapter: new LangChainAdapter(), config: {} }],
+ *   });
  */
-export function createSwarmOrchestrator(config?: Partial<typeof CONFIG>): SwarmOrchestrator {
+export function createSwarmOrchestrator(config?: Partial<typeof CONFIG> & {
+  adapters?: Array<{ adapter: IAgentAdapter; config?: AdapterConfig }>;
+  adapterRegistry?: AdapterRegistry;
+  trustLevels?: AgentTrustConfig[];
+  resourceProfiles?: Record<string, ResourceProfile>;
+  validationConfig?: Partial<ValidationConfig>;
+  qualityThreshold?: number;
+  aiReviewCallback?: AIReviewCallback;
+}): SwarmOrchestrator {
   if (config) {
-    Object.assign(CONFIG, config);
+    const { adapters: adapterList, adapterRegistry, trustLevels, resourceProfiles, validationConfig, qualityThreshold, aiReviewCallback, ...rest } = config;
+    Object.assign(CONFIG, rest);
+
+    const registry = adapterRegistry ?? new AdapterRegistry();
+    const orchestrator = new SwarmOrchestrator(undefined, registry, {
+      trustLevels,
+      resourceProfiles,
+      validationConfig,
+      qualityThreshold,
+      aiReviewCallback,
+    });
+
+    // Initialize adapters if provided
+    if (adapterList) {
+      Promise.all(
+        adapterList.map(({ adapter, config: adapterConfig }) =>
+          orchestrator.addAdapter(adapter, adapterConfig ?? {})
+        )
+      ).catch(err => console.error('[SwarmOrchestrator] Adapter init error:', err));
+    }
+
+    return orchestrator;
   }
   return new SwarmOrchestrator();
 }

@@ -1,105 +1,263 @@
-# 🐝 Swarm Orchestrator
+# Network-AI: Multi-Agent Orchestration Framework
 
-**Multi-Agent Swarm Orchestration Skill for OpenClaw**
+**The plug-and-play AI agent orchestrator for TypeScript/Node.js -- connect 12 agent frameworks with zero glue code**
 
-[![Release](https://img.shields.io/badge/release-v2.0.0-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
-[![OpenClaw](https://img.shields.io/badge/OpenClaw-v2026.2.x-red.svg)](https://github.com/OpenClaw/openclaw)
+[![Release](https://img.shields.io/badge/release-v3.0.0-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
 [![Python](https://img.shields.io/badge/python-3.9+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-compatible-orange.svg)](https://agentskills.io)
+[![Tests](https://img.shields.io/badge/tests-251%20passing-brightgreen.svg)](#testing)
+[![Adapters](https://img.shields.io/badge/frameworks-12%20supported-blueviolet.svg)](#adapter-system)
 
-> 🦞 **Legacy Users:** This skill works with **Clawdbot** and **Moltbot** (now OpenClaw). If you're searching for *Moltbot Security*, *Clawdbot Swarm*, or *Moltbot multi-agent* — you're in the right place!
+> **Legacy Users:** This skill works with **Clawdbot** and **Moltbot** (now OpenClaw). If you're searching for *Moltbot Security*, *Clawdbot Swarm*, or *Moltbot multi-agent* -- you're in the right place!
 
-An [AgentSkills](https://agentskills.io)-compatible skill that enables multi-agent coordination, task delegation, and permission-controlled access to sensitive APIs (databases, payments, external services, etc.).
+Network-AI is a framework-agnostic multi-agent orchestrator that connects LLM agents across **12 frameworks** -- LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, and custom adapters. It provides shared blackboard coordination, built-in security (AES-256, HMAC tokens, rate limiting), content quality gates with hallucination detection, and agentic workflow patterns (parallel execution, voting, chaining). Zero dependencies per adapter -- bring your own framework SDK and start building multi-agent systems in minutes.
 
-## 🎯 Features
+**Why Network-AI?**
+- **Framework-agnostic** -- Not locked to one LLM provider or agent SDK
+- **Production security** -- Encryption, audit trails, rate limiting built in
+- **Swarm intelligence** -- Parallel execution, voting, chain-of-agents patterns
+- **Zero config** -- Works out of the box with `createSwarmOrchestrator()`
 
-- **Agent-to-Agent Handoffs** - Delegate tasks between sessions using OpenClaw's `sessions_send`
-- **Permission Wall (AuthGuardian)** - Gate access to sensitive APIs (databases, payments, emails) with justification-based approval
-- **Shared Blackboard** - Markdown-based coordination state for agent communication
-- **Parallel Execution Patterns** - Merge, vote, chain, and first-success synthesis strategies
-- **Swarm Guard** - Prevents "Handoff Tax" (wasted tokens) and detects silent agent failures
-- **Atomic Commits** - File-system mutexes prevent split-brain in concurrent writes
-- **Cost Awareness** - Token budget tracking with automatic SafetyShutdown
-- **Budget-Aware Handoffs** - `intercept-handoff` command wraps `sessions_send` with budget checks
+## Hello World -- Get Running in 60 Seconds
 
-## 📁 Skill Structure
+```typescript
+import { createSwarmOrchestrator, CustomAdapter } from './index';
 
-```
-swarm-orchestrator/
-├── SKILL.md              # OpenClaw skill definition (frontmatter + instructions)
-├── scripts/              # Executable helper scripts
-│   ├── check_permission.py   # AuthGuardian permission checker
-│   ├── validate_token.py     # Token validation
-│   ├── revoke_token.py       # Token revocation
-│   ├── blackboard.py         # Shared state management (with atomic commits)
-│   └── swarm_guard.py        # Handoff tax, failure prevention, & budget tracking
-├── references/           # Detailed documentation
-│   ├── auth-guardian.md      # Permission system details
-│   ├── blackboard-schema.md  # Data structure specs
-│   ├── trust-levels.md       # Agent trust configuration
-│   └── mcp-roadmap.md        # MCP networking implementation plan
-├── lib/                  # TypeScript utilities
-│   ├── swarm-utils.ts        # Node.js implementation
-│   └── locked-blackboard.ts  # Atomic commits with file-system mutexes
-└── data/                 # Runtime data (auto-created)
-    ├── active_grants.json    # Current permission grants
-    ├── budget_tracking.json  # Token budget per task
-    └── audit_log.jsonl       # Security audit trail
-```
+// 1. Create an adapter and register your agent
+const adapter = new CustomAdapter();
+adapter.registerHandler('greeter', async (payload) => {
+  return { result: `Hello, ${payload.params.name}! Your task: ${payload.action}` };
+});
 
-## 🚀 Installation
+// 2. Create the orchestrator
+const orchestrator = createSwarmOrchestrator({
+  adapters: [{ adapter }],
+});
 
-### For OpenClaw Users
+// 3. Use the blackboard to coordinate
+orchestrator.blackboard.write('status', { ready: true }, 'greeter');
 
-Copy this skill to your OpenClaw workspace:
+// 4. Execute your agent through the adapter
+const result = await adapter.executeAgent('greeter', {
+  action: 'welcome',
+  params: { name: 'World' },
+}, { agentId: 'greeter' });
 
-```bash
-cp -r swarm-orchestrator ~/.openclaw/workspace/skills/
+console.log(result.data); // "Hello, World! Your task: welcome"
 ```
 
-Or install via ClawHub (when available):
-```bash
-openclaw skills install swarm-orchestrator
+That's it. No config files, no setup wizards. Add more agents, swap frameworks, layer on security -- all optional.
+
+## Features
+
+### Core Orchestration (Multi-Agent Coordination)
+- **Agent-to-Agent Handoffs** -- Delegate tasks between sessions using OpenClaw's `sessions_send`
+- **Permission Wall (AuthGuardian)** -- Gate access to sensitive APIs with justification-based approval
+- **Shared Blackboard** -- Markdown-based coordination state for agent communication
+- **Parallel Execution Patterns** -- Merge, vote, chain, and first-success synthesis strategies
+- **Task Decomposition** -- Automatic breaking of complex tasks into parallel subtasks
+
+### Plug-and-Play Adapter System (v3.0) -- 12 AI Agent Frameworks
+- **AdapterRegistry** -- Route agents to the right framework automatically
+- **OpenClaw Adapter** -- Native OpenClaw skill execution via `callSkill`
+- **LangChain Adapter** -- Supports Runnables (`.invoke()`) and plain functions
+- **AutoGen Adapter** -- Supports `.run()` and `.generateReply()` agents
+- **CrewAI Adapter** -- Individual agents and full crew orchestration
+- **MCP Adapter** -- Model Context Protocol tool handlers
+- **LlamaIndex Adapter** -- Query engines, chat engines, and agent runners
+- **Semantic Kernel Adapter** -- Microsoft SK kernels, functions, and planners
+- **OpenAI Assistants Adapter** -- Assistants API with thread management
+- **Haystack Adapter** -- Pipelines, agents, and components
+- **DSPy Adapter** -- Modules, programs, and predictors
+- **Agno Adapter** -- Agents, teams, and functions (formerly Phidata)
+- **Custom Adapter** -- Register any function or HTTP endpoint as an agent
+- **BaseAdapter** -- Extend to write your own adapter in minutes
+
+### Content Quality Gate (AI Safety)
+- **BlackboardValidator (Layer 1)** -- Rule-based validation at ~159K-1M ops/sec
+- **QualityGateAgent (Layer 2)** -- AI-assisted review with quarantine system
+- **Hallucination Detection** -- Catches vague, unsupported, or fabricated content
+- **Dangerous Code Detection** -- Blocks `eval()`, `exec()`, `rm -rf`, and other risky patterns
+- **Placeholder Rejection** -- Rejects TODO/FIXME/stub content from entering the blackboard
+
+### Security Module (Defense-in-Depth)
+- **HMAC-Signed Tokens** -- Cryptographic token generation with expiration
+- **Input Sanitization** -- XSS, injection, path traversal, and prototype pollution prevention
+- **Rate Limiting** -- Per-agent request throttling with lockout on failed auth
+- **AES-256-GCM Encryption** -- Encrypt sensitive blackboard entries at rest
+- **Privilege Escalation Prevention** -- Trust-ceiling enforcement
+- **Cryptographic Audit Logs** -- Tamper-evident signed audit trail with chain continuation
+- **Secure Gateway** -- Integrated security layer wrapping all operations
+
+### Operational Safety
+- **Swarm Guard** -- Prevents "Handoff Tax" (wasted tokens) and detects silent agent failures
+- **Atomic Commits** -- File-system mutexes prevent split-brain in concurrent writes
+- **Cost Awareness** -- Token budget tracking with automatic SafetyShutdown
+- **Budget-Aware Handoffs** -- `intercept-handoff` command wraps `sessions_send` with budget checks
+
+## Project Structure
+
 ```
+Network-AI/
+|-- index.ts                  # Core orchestrator (SwarmOrchestrator, SharedBlackboard, AuthGuardian, TaskDecomposer)
+|-- security.ts               # Security module (tokens, encryption, rate limiting, audit)
+|-- setup.ts                  # Developer setup & installation checker
+|-- package.json              # NPM manifest & scripts
+|-- tsconfig.json             # TypeScript configuration
+|-- skill.json                # OpenClaw skill metadata
+|-- SKILL.md                  # OpenClaw skill definition (frontmatter + instructions)
+|-- QUICKSTART.md             # 5-minute getting-started guide
+|-- requirements.txt          # Python dependencies
+|-- swarm-blackboard.md       # Runtime blackboard state (auto-generated)
+|-- adapters/                 # Plug-and-play agent framework adapters (12 frameworks)
+|   |-- index.ts              # Barrel exports for all adapters
+|   |-- base-adapter.ts       # Abstract base class for adapters
+|   |-- adapter-registry.ts   # Multi-adapter routing & discovery
+|   |-- openclaw-adapter.ts   # OpenClaw skill adapter
+|   |-- langchain-adapter.ts  # LangChain adapter (Runnables & functions)
+|   |-- autogen-adapter.ts    # AutoGen adapter (.run() & .generateReply())
+|   |-- crewai-adapter.ts     # CrewAI adapter (agents & crews)
+|   |-- mcp-adapter.ts        # MCP tool handler adapter
+|   |-- custom-adapter.ts     # Custom function/HTTP agent adapter
+|   |-- llamaindex-adapter.ts # LlamaIndex adapter (query/chat engines, agent runners)
+|   |-- semantic-kernel-adapter.ts  # Microsoft Semantic Kernel adapter
+|   |-- openai-assistants-adapter.ts # OpenAI Assistants API adapter
+|   |-- haystack-adapter.ts   # deepset Haystack adapter (pipelines, agents)
+|   |-- dspy-adapter.ts       # Stanford DSPy adapter (modules, programs)
+|   |-- agno-adapter.ts       # Agno adapter (agents, teams -- formerly Phidata)
+|-- types/                    # TypeScript type definitions
+|   |-- agent-adapter.d.ts    # Universal adapter interfaces (IAgentAdapter, AgentPayload, etc.)
+|   |-- openclaw-core.d.ts    # OpenClaw-specific type stubs
+|-- lib/                      # TypeScript utilities
+|   |-- swarm-utils.ts        # Node.js helper functions
+|   |-- locked-blackboard.ts  # Atomic commits with file-system mutexes
+|   |-- blackboard-validator.ts # Content quality gate (BlackboardValidator + QualityGateAgent)
+|-- scripts/                  # Python helper scripts
+|   |-- check_permission.py   # AuthGuardian permission checker
+|   |-- validate_token.py     # Token validation
+|   |-- revoke_token.py       # Token revocation
+|   |-- blackboard.py         # Shared state management (with atomic commits)
+|   |-- swarm_guard.py        # Handoff tax, failure prevention, & budget tracking
+|-- references/               # Detailed documentation
+|   |-- adapter-system.md     # Adapter architecture & writing custom adapters
+|   |-- auth-guardian.md      # Permission system details
+|   |-- blackboard-schema.md  # Data structures
+|   |-- trust-levels.md       # Agent trust configuration
+|   |-- mcp-roadmap.md        # MCP networking implementation plan
+|-- test-standalone.ts        # Core orchestrator tests (79 tests)
+|-- test-security.ts          # Security module tests (33 tests)
+|-- test-adapters.ts          # Adapter system tests (139 tests)
+|-- test-ai-quality.ts        # AI quality gate demo
+|-- test.ts                   # Full integration test suite
+```
+
+## Quick Start
+
+See [QUICKSTART.md](QUICKSTART.md) for a 5-minute getting-started guide.
+
+## Installation
 
 ### For Development
 
 ```bash
 git clone https://github.com/jovanSAPFIONEER/Network-AI
-cd Network-AI/openclaw-swarm-skill
-npm install  # For TypeScript utilities (optional)
-pip install -r requirements.txt  # For Python scripts (optional - uses stdlib)
+cd Network-AI
+npm install                    # TypeScript dependencies
+pip install -r requirements.txt  # Python scripts (optional -- uses stdlib)
 ```
 
-### Quick Install for OpenClaw
+### Verify Installation
 
 ```bash
-# Clone directly into OpenClaw skills directory
-git clone https://github.com/jovanSAPFIONEER/Network-AI ~/.openclaw/workspace/skills/swarm-orchestrator --sparse
-cd ~/.openclaw/workspace/skills/swarm-orchestrator
-git sparse-checkout set openclaw-swarm-skill
-mv openclaw-swarm-skill/* . && rm -rf openclaw-swarm-skill
+npm run setup:check            # Check all files and dependencies
+npm run setup -- --list        # List all 12 available adapters
+npm run setup:example          # Generate a starter example.ts
 ```
 
-Or manually copy:
+### For OpenClaw Users
+
+Copy this skill into your OpenClaw workspace:
+
 ```bash
-cp -r /path/to/Network-AI/openclaw-swarm-skill ~/.openclaw/workspace/skills/swarm-orchestrator
+cp -r Network-AI ~/.openclaw/workspace/skills/swarm-orchestrator
 ```
 
-## 📖 Usage
+Or install via ClawHub (when available):
 
-### 1. Initialize Budget (First!)
+```bash
+openclaw skills install swarm-orchestrator
+```
 
-**Always start with a budget for cost control:**
+## Usage
+
+### TypeScript / Node.js API
+
+#### Basic Setup
+
+```typescript
+import {
+  SwarmOrchestrator,
+  SharedBlackboard,
+  AuthGuardian,
+  createSwarmOrchestrator,
+} from './index';
+
+// Quick start with defaults
+const orchestrator = createSwarmOrchestrator();
+```
+
+#### Using Adapters (Plug-and-Play)
+
+```typescript
+import {
+  createSwarmOrchestrator,
+  AdapterRegistry,
+  CustomAdapter,
+  LangChainAdapter,
+} from './index';
+
+// Create adapters
+const custom = new CustomAdapter();
+custom.registerHandler('my-agent', async (payload) => {
+  return { result: 'done' };
+});
+
+const langchain = new LangChainAdapter();
+langchain.registerRunnable('researcher', myLangChainRunnable);
+
+// Create orchestrator with adapters
+const orchestrator = createSwarmOrchestrator({
+  adapters: [
+    { adapter: custom },
+    { adapter: langchain },
+  ],
+});
+```
+
+#### Blackboard & Permissions
+
+```typescript
+const blackboard = new SharedBlackboard('.');
+blackboard.write('task:analysis', { status: 'running' }, 'orchestrator');
+const data = blackboard.read('task:analysis');
+
+const auth = new AuthGuardian();
+const grant = auth.requestPermission('data_analyst', 'DATABASE', 'read',
+  'Need customer order history for sales report');
+```
+
+### Python Scripts
+
+#### 1. Initialize Budget (First!)
 
 ```bash
 python scripts/swarm_guard.py budget-init --task-id "task_001" --budget 10000
 ```
 
-### 2. Budget-Aware Handoffs
-
-**Use `intercept-handoff` before every `sessions_send`:**
+#### 2. Budget-Aware Handoffs
 
 ```bash
 python scripts/swarm_guard.py intercept-handoff \
@@ -111,26 +269,14 @@ python scripts/swarm_guard.py intercept-handoff \
 
 Output (if allowed):
 ```
-✅ HANDOFF ALLOWED: orchestrator → data_analyst
+HANDOFF ALLOWED: orchestrator -> data_analyst
    Tokens spent: 156
    Budget remaining: 9,844
    Handoff #1 (remaining: 2)
-   → Proceed with sessions_send
+   -> Proceed with sessions_send
 ```
 
-### 3. Delegate Tasks
-
-Use OpenClaw's session tools to delegate work:
-
-```
-sessions_list    # See available agents
-sessions_send    # Send task to another session
-sessions_history # Check results
-```
-
-### 4. Check Permissions
-
-Before accessing sensitive APIs:
+#### 3. Check Permissions
 
 ```bash
 python scripts/check_permission.py \
@@ -141,13 +287,13 @@ python scripts/check_permission.py \
 
 Output:
 ```
-✅ GRANTED
+GRANTED
 Token: grant_85364b44d987...
 Expires: 2026-02-04T15:30:00Z
 Restrictions: read_only, max_records:100
 ```
 
-### 3. Use the Blackboard
+#### 4. Use the Blackboard
 
 ```bash
 # Write
@@ -165,14 +311,58 @@ python scripts/blackboard.py commit "chg_001"
 python scripts/blackboard.py list
 ```
 
-### 4. Check Budget Status
+#### 5. Check Budget Status
 
 ```bash
 python scripts/swarm_guard.py budget-check --task-id "task_001"
 python scripts/swarm_guard.py budget-report --task-id "task_001"
 ```
 
-## 🔐 Permission System
+## Adapter System
+
+The adapter system lets you plug any agent framework into the orchestrator. Each adapter implements the `IAgentAdapter` interface.
+
+| Adapter | Framework | Agent Registration | Dependencies |
+|---------|-----------|-------------------|-------------|
+| `OpenClawAdapter` | OpenClaw | `registerSkill(name, skillRef)` | openclaw-core |
+| `LangChainAdapter` | LangChain | `registerRunnable(name, runnable)` or `registerFunction(name, fn)` | None (BYOC) |
+| `AutoGenAdapter` | AutoGen | `registerAgent(name, agent)` -- supports `.run()` and `.generateReply()` | None (BYOC) |
+| `CrewAIAdapter` | CrewAI | `registerAgent(name, agent)` or `registerCrew(name, crew)` | None (BYOC) |
+| `MCPAdapter` | MCP | `registerTool(name, handler)` | None (BYOC) |
+| `LlamaIndexAdapter` | LlamaIndex | `registerQueryEngine()`, `registerChatEngine()`, `registerAgentRunner()` | None (BYOC) |
+| `SemanticKernelAdapter` | Semantic Kernel | `registerKernel()`, `registerFunction()` | None (BYOC) |
+| `OpenAIAssistantsAdapter` | OpenAI Assistants | `registerAssistant(name, config)` | None (BYOC) |
+| `HaystackAdapter` | Haystack | `registerPipeline()`, `registerAgent()`, `registerComponent()` | None (BYOC) |
+| `DSPyAdapter` | DSPy | `registerModule()`, `registerProgram()`, `registerPredictor()` | None (BYOC) |
+| `AgnoAdapter` | Agno | `registerAgent()`, `registerTeam()`, `registerFunction()` | None (BYOC) |
+| `CustomAdapter` | Any | `registerHandler(name, fn)` or `registerHttpAgent(name, config)` | None |
+
+> **BYOC** = Bring Your Own Client. All adapters (except OpenClaw) are self-contained with zero npm dependencies. You provide your framework's SDK objects and the adapter wraps them.
+
+### Writing a Custom Adapter
+
+Extend `BaseAdapter`:
+
+```typescript
+import { BaseAdapter } from './adapters/base-adapter';
+import type { AgentPayload, AgentResult } from './types/agent-adapter';
+
+class MyAdapter extends BaseAdapter {
+  readonly name = 'my-framework';
+
+  async executeAgent(agentId: string, payload: AgentPayload): Promise<AgentResult> {
+    // Your framework-specific logic here
+    return { success: true, output: 'result', metadata: { adapter: this.name } };
+  }
+
+  async listAgents() { return []; }
+  async isAgentAvailable(id: string) { return true; }
+}
+```
+
+See [references/adapter-system.md](references/adapter-system.md) for the full adapter architecture guide.
+
+## Permission System
 
 The AuthGuardian evaluates requests using:
 
@@ -193,7 +383,21 @@ The AuthGuardian evaluates requests using:
 | `EMAIL` | 0.4 | `rate_limit:10_per_minute` |
 | `FILE_EXPORT` | 0.6 | `anonymize_pii`, `local_only` |
 
-## 🤝 Agent Trust Levels
+## Security Module
+
+The security module ([security.ts](security.ts)) provides defense-in-depth protections:
+
+| Component | Class | Purpose |
+|-----------|-------|---------|
+| Token Manager | `SecureTokenManager` | HMAC-signed tokens with expiration |
+| Input Sanitizer | `InputSanitizer` | XSS, injection, traversal prevention |
+| Rate Limiter | `RateLimiter` | Per-agent request throttling + lockout |
+| Encryptor | `DataEncryptor` | AES-256-GCM encryption for sensitive data |
+| Permission Hardener | `PermissionHardener` | Trust-ceiling & privilege escalation prevention |
+| Audit Logger | `SecureAuditLogger` | Cryptographically signed audit entries |
+| Gateway | `SecureSwarmGateway` | Integrated security layer wrapping all ops |
+
+## Agent Trust Levels
 
 | Agent | Trust | Role |
 |-------|-------|------|
@@ -203,7 +407,7 @@ The AuthGuardian evaluates requests using:
 | `strategy_advisor` | 0.7 | Business strategy |
 | Unknown | 0.5 | Default |
 
-## 📋 Handoff Protocol
+## Handoff Protocol
 
 Format messages for delegation:
 
@@ -216,7 +420,28 @@ Expected Output: JSON summary with category, revenue, growth_pct
 [/HANDOFF]
 ```
 
-## 🧪 Testing
+## Testing
+
+Run all test suites:
+
+```bash
+# All tests at once
+npm run test:all
+
+# Core orchestrator tests (79 tests)
+npm test
+
+# Security module tests (33 tests)
+npm run test:security
+
+# Adapter system tests (139 tests)
+npm run test:adapters
+
+# Full integration tests
+npx ts-node test.ts
+```
+
+Test Python scripts:
 
 ```bash
 # Test permission system
@@ -230,34 +455,30 @@ python scripts/blackboard.py read "test:key"
 # Test TTL cleanup
 python scripts/revoke_token.py --list-expired
 python scripts/revoke_token.py --cleanup
-
-# TypeScript tests (optional)
-npm test
 ```
 
-## 📋 Audit Trail
+**Test results (251 total):**
+- `test-standalone.ts` -- 79 passed (blackboard, auth, integration, persistence, parallelization, coding domain, quality gate)
+- `test-security.ts` -- 33 passed (tokens, sanitization, rate limiting, encryption, permissions, audit)
+- `test-adapters.ts` -- 139 passed (12 adapters: Custom, LangChain, AutoGen, CrewAI, MCP, LlamaIndex, Semantic Kernel, OpenAI Assistants, Haystack, DSPy, Agno + registry routing, integration, edge cases)
 
-All sensitive actions are logged to `data/audit_log.jsonl`:
-
-```bash
-# View recent audit entries
-tail -10 data/audit_log.jsonl
-
-# Search for specific agent
-grep "data_analyst" data/audit_log.jsonl
-```
+## Audit Trail
 
 Logged events: `permission_granted`, `permission_denied`, `permission_revoked`, `ttl_cleanup`, `result_validated`
 
-## 📚 Documentation
+The security module's `SecureAuditLogger` produces cryptographically signed entries that can be verified for tamper detection.
 
-- [SKILL.md](SKILL.md) - Main skill instructions (includes Orchestrator protocol)
-- [references/auth-guardian.md](references/auth-guardian.md) - Permission system details
-- [references/blackboard-schema.md](references/blackboard-schema.md) - Data structures
-- [references/trust-levels.md](references/trust-levels.md) - Trust configuration
-- [references/mcp-roadmap.md](references/mcp-roadmap.md) - MCP networking implementation plan
+## Documentation
 
-## 🔧 Configuration
+- [QUICKSTART.md](QUICKSTART.md) -- 5-minute getting-started guide
+- [SKILL.md](SKILL.md) -- Main skill instructions (includes Orchestrator protocol)
+- [references/adapter-system.md](references/adapter-system.md) -- Adapter architecture & writing custom adapters
+- [references/auth-guardian.md](references/auth-guardian.md) -- Permission system details
+- [references/blackboard-schema.md](references/blackboard-schema.md) -- Data structures
+- [references/trust-levels.md](references/trust-levels.md) -- Trust configuration
+- [references/mcp-roadmap.md](references/mcp-roadmap.md) -- MCP networking implementation plan
+
+## Configuration
 
 ### Modify Trust Levels
 
@@ -276,26 +497,72 @@ DEFAULT_TRUST_LEVELS = {
 GRANT_TOKEN_TTL_MINUTES = 5  # Change as needed
 ```
 
-## 📄 License
+## Exports
 
-MIT License - See [LICENSE](LICENSE)
+The module exports everything needed for programmatic use:
 
-## 🙏 Contributing
+```typescript
+// Core classes
+import SwarmOrchestrator, { SharedBlackboard, AuthGuardian, TaskDecomposer } from './index';
+import { BlackboardValidator, QualityGateAgent } from './index';
+
+// Factory
+import { createSwarmOrchestrator } from './index';
+
+// Adapters (all 12)
+import {
+  AdapterRegistry, BaseAdapter,
+  OpenClawAdapter, LangChainAdapter, AutoGenAdapter,
+  CrewAIAdapter, MCPAdapter, CustomAdapter,
+  LlamaIndexAdapter, SemanticKernelAdapter, OpenAIAssistantsAdapter,
+  HaystackAdapter, DSPyAdapter, AgnoAdapter,
+} from './index';
+
+// Types
+import type {
+  IAgentAdapter, AgentPayload, AgentContext, AgentResult, AgentInfo,
+  AdapterConfig, AdapterCapabilities,
+  TaskPayload, HandoffMessage, PermissionGrant, SwarmState,
+  AgentStatus, ParallelTask, ParallelExecutionResult, SynthesisStrategy,
+} from './index';
+```
+
+## License
+
+MIT License -- See [LICENSE](LICENSE)
+
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Submit a pull request
+4. Run all tests (`npm run test:all`)
+5. Submit a pull request
 
 ---
 
-**Compatible with OpenClaw 2026.2.x and AgentSkills specification**
+**Compatible with 12 agent frameworks: OpenClaw, LangChain, AutoGen, CrewAI, MCP, LlamaIndex, Semantic Kernel, OpenAI Assistants, Haystack, DSPy, Agno, and any custom adapter**
+
+## Related Concepts
+
+Network-AI fits into the broader AI agent ecosystem:
+
+- **Multi-Agent Systems** -- Coordinate multiple AI agents working together on complex tasks
+- **Agentic AI** -- Build autonomous agents that reason, plan, and execute using LLMs
+- **Swarm Intelligence** -- Parallel execution patterns with voting, merging, and chain strategies
+- **Model Context Protocol (MCP)** -- Standard protocol support for LLM tool integration
+- **Agent-to-Agent (A2A)** -- Inter-agent communication via shared blackboard and handoff protocol
+- **Context Engineering** -- Manage and share context across agent boundaries
+- **Agentic Workflows** -- Task decomposition, parallel processing, and synthesis pipelines
+- **LLM Orchestration** -- Route tasks to the right agent framework automatically
+
+If you're using LangGraph, Dify, Flowise, PraisonAI, AutoGen/AG2, CrewAI, or any other agent framework, Network-AI can integrate with it through the adapter system.
 
 ---
 
 <details>
-<summary>🔍 Keywords (for search)</summary>
+<summary>Keywords (for search)</summary>
 
-OpenClaw, Clawdbot, Moltbot, Clawdbot Swarm, Moltbot Security, Moltbot multi-agent, OpenClaw skills, multi-agent orchestration, agent coordination, swarm intelligence, AI agents, token permissions, agent handoffs, blackboard pattern, agent budget tracking, cost awareness, atomic commits, AgentSkills, Clawdbot plugins, Moltbot extensions
+ai-agents, agentic-ai, multi-agent, multi-agent-systems, multi-agent-system, agent-framework, ai-agent-framework, agentic-framework, agentic-workflow, llm, llm-agents, llm-agent, large-language-models, generative-ai, genai, orchestration, ai-orchestration, swarm, swarm-intelligence, autonomous-agents, agents, ai, typescript, nodejs, mcp, model-context-protocol, a2a, agent-to-agent, function-calling, tool-integration, context-engineering, rag, ai-safety, multi-agents-collaboration, multi-agents, aiagents, aiagentframework, plug-and-play, adapter-registry, blackboard-pattern, agent-coordination, agent-handoffs, token-permissions, budget-tracking, cost-awareness, atomic-commits, hallucination-detection, content-quality-gate, OpenClaw, Clawdbot, Moltbot, Clawdbot Swarm, Moltbot Security, Moltbot multi-agent, OpenClaw skills, AgentSkills, LangChain adapter, LangGraph, AutoGen adapter, AG2, CrewAI adapter, MCP adapter, LlamaIndex adapter, Semantic Kernel adapter, OpenAI Assistants adapter, Haystack adapter, DSPy adapter, Agno adapter, Phidata adapter, Dify, Flowise, PraisonAI, custom-adapter, AES-256 encryption, HMAC tokens, rate limiting, input sanitization, privilege escalation prevention, agentic-rag, deep-research, workflow-orchestration, ai-assistant, ai-tools, developer-tools, open-source
 
 </details>
