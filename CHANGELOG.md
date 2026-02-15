@@ -5,6 +5,23 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.3] - 2026-02-15
+
+### Security Fix
+- Resolved 3 High + 1 Medium findings from [Snyk](https://snyk.io) security scan (CWE-547, CWE-798)
+
+### Fixed
+- **Hardcoded cryptographic salt** in `DataEncryptor` -- now generates a random 16-byte salt per instance via `crypto.randomBytes()` (was `'swarm-salt'`)
+- **Agent token enforcement** -- all internal `blackboard.write()` calls now pass the orchestrator's verification token
+- **Test registration** -- core test suite registers agents with proper tokens and namespace access
+
+### Not Real Vulnerabilities (marked as ignore)
+- Test file fake secrets (`test-secret-key-for-testing-only`, `sk-1234567890`, `password: 'secret123'`) -- intentional test data, not real credentials
+
+### Stats
+- 251 tests passing (79 + 33 + 139)
+- 0 compile errors
+
 ## [3.0.0] - 2026-02-13
 
 ### Added
