@@ -2,7 +2,7 @@
 
 **The plug-and-play AI agent orchestrator for TypeScript/Node.js -- connect 12 agent frameworks with zero glue code**
 
-[![Release](https://img.shields.io/badge/release-v3.0.0-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v3.0.3-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
 [![Python](https://img.shields.io/badge/python-3.9+-green.svg)](https://python.org)
@@ -247,7 +247,7 @@ import {
   SharedBlackboard,
   AuthGuardian,
   createSwarmOrchestrator,
-} from './index';
+} from 'network-ai';
 
 // Quick start with defaults
 const orchestrator = createSwarmOrchestrator();
@@ -261,7 +261,7 @@ import {
   AdapterRegistry,
   CustomAdapter,
   LangChainAdapter,
-} from './index';
+} from 'network-ai';
 
 // Create adapters
 const custom = new CustomAdapter();
