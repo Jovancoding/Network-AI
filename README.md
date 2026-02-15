@@ -569,11 +569,22 @@ MIT License -- See [LICENSE](LICENSE)
 
 ## Contributing
 
+If you find Network-AI useful, **give it a star** -- it helps others discover the project and motivates development:
+
+[![Star on GitHub](https://img.shields.io/github/stars/jovanSAPFIONEER/Network-AI?style=social)](https://github.com/jovanSAPFIONEER/Network-AI)
+
+**Want to contribute code?**
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Run all tests (`npm run test:all`)
 5. Submit a pull request
+
+**Other ways to help:**
+- Report bugs or suggest features via [Issues](https://github.com/jovanSAPFIONEER/Network-AI/issues)
+- Share Network-AI with your team or on social media
+- Write about your experience using it
 
 ---
 
