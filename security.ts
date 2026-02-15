@@ -584,10 +584,22 @@ export class SecureAuditLogger {
 export class DataEncryptor {
   private key: Buffer;
   private algorithm = 'aes-256-gcm' as const;
+  private salt: Buffer;
   
-  constructor(encryptionKey: string) {
-    // Derive a proper key from the provided key
-    this.key = scryptSync(encryptionKey, 'swarm-salt', 32);
+  constructor(encryptionKey: string, salt?: string | Buffer) {
+    // Use provided salt or generate a random one
+    this.salt = salt 
+      ? (typeof salt === 'string' ? Buffer.from(salt, 'hex') : salt)
+      : randomBytes(16);
+    // Derive a proper key from the provided key with unique salt
+    this.key = scryptSync(encryptionKey, this.salt, 32);
+  }
+  
+  /**
+   * Get the salt (needed to recreate the same encryptor for decryption)
+   */
+  getSalt(): string {
+    return this.salt.toString('hex');
   }
   
   /**

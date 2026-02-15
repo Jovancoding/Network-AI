@@ -62,8 +62,9 @@ function fail(test: string, error?: string) {
 async function testSecureTokenManager() {
   header('TEST 1: Secure Token Manager');
   
+  // Intentional test-only values -- not real secrets
   const tokenManager = new SecureTokenManager({
-    tokenSecret: 'test-secret-key-for-testing-only',
+    tokenSecret: 'test-secret-key-for-testing-only', // nosemgrep, snyk:ignore
     maxTokenAge: 5000, // 5 seconds for testing
   });
   
@@ -529,7 +530,8 @@ async function testSecureSwarmGateway() {
   
   // Test: Data encryption through gateway
   log('\n  [SEC] Testing gateway encryption...', 'blue');
-  const sensitiveData = { apiKey: 'sk-1234567890', password: 'secret123' };
+  // Intentional fake test data -- not real credentials
+  const sensitiveData = { apiKey: 'sk-1234567890', password: 'secret123' }; // nosemgrep, snyk:ignore
   const encrypted = gateway.encryptSensitiveData(sensitiveData);
   const decrypted = gateway.decryptSensitiveData<typeof sensitiveData>(encrypted);
   
