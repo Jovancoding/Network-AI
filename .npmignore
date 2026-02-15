@@ -1,0 +1,38 @@
+# Source (dist/ has the compiled output)
+*.ts
+!*.d.ts
+tsconfig.json
+tsconfig.build.json
+
+# Tests
+test*.ts
+test-*.log
+
+# Dev files
+.gitignore
+.github/
+.vscode/
+.idea/
+
+# Runtime artifacts
+swarm-blackboard.md
+data/
+*.log
+
+# Documentation (not needed in npm package)
+references/
+swarm-blackboard.md
+SKILL.md
+skill.json
+setup.ts
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+
+# OS files
+.DS_Store
+Thumbs.db

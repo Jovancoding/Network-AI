@@ -1,10 +1,14 @@
 {
-  "name": "swarm-orchestrator",
+  "name": "network-ai",
   "version": "3.0.0",
   "description": "AI agent orchestration framework for TypeScript/Node.js - plug-and-play multi-agent coordination with 12 frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw). Built-in security, swarm intelligence, and agentic workflow patterns.",
-  "main": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
+    "build:all": "tsc",
+    "prebuild": "node -e \"const fs=require('fs');if(fs.existsSync('dist'))fs.rmSync('dist',{recursive:true})\"",
+    "prepublishOnly": "npm run build && npm run test:all",
     "test": "npx ts-node test-standalone.ts",
     "test:security": "npx ts-node test-security.ts",
     "test:adapters": "npx ts-node test-adapters.ts",
@@ -69,15 +73,12 @@
     "typescript": "^5.9.3"
   },
   "files": [
-    "index.ts",
-    "SKILL.md",
-    "QUICKSTART.md",
-    "setup.ts",
-    "lib/",
-    "adapters/",
+    "dist/",
     "types/",
     "scripts/",
-    "references/",
-    "README.md"
+    "README.md",
+    "QUICKSTART.md",
+    "SKILL.md",
+    "LICENSE"
   ]
 }
