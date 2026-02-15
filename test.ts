@@ -83,8 +83,13 @@ async function testBlackboard() {
   
   const blackboard = new SharedBlackboard(process.cwd());
   
+  // Register test agent with wildcard namespace access
+  blackboard.registerAgent('test-agent', 'test-token', ['*']);
+  blackboard.registerAgent('agent1', 'token1', ['*']);
+  blackboard.registerAgent('agent2', 'token2', ['*']);
+  
   // Test write
-  const entry = blackboard.write('test:key1', { data: 'hello world' }, 'test-agent');
+  const entry = blackboard.write('test:key1', { data: 'hello world' }, 'test-agent', undefined, 'test-token');
   if (entry.key === 'test:key1' && (entry.value as any).data === 'hello world') {
     pass('Write to blackboard');
   } else {
@@ -107,7 +112,7 @@ async function testBlackboard() {
   }
   
   // Test TTL expiration
-  blackboard.write('test:expiring', { temp: true }, 'test-agent', 1); // 1 second TTL
+  blackboard.write('test:expiring', { temp: true }, 'test-agent', 1, 'test-token'); // 1 second TTL
   if (blackboard.read('test:expiring')) {
     pass('TTL entry created');
   } else {
@@ -123,8 +128,8 @@ async function testBlackboard() {
   }
   
   // Test snapshot
-  blackboard.write('test:snap1', { a: 1 }, 'agent1');
-  blackboard.write('test:snap2', { b: 2 }, 'agent2');
+  blackboard.write('test:snap1', { a: 1 }, 'agent1', undefined, 'token1');
+  blackboard.write('test:snap2', { b: 2 }, 'agent2', undefined, 'token2');
   const snapshot = blackboard.getSnapshot();
   if (Object.keys(snapshot).length >= 2) {
     pass('Snapshot retrieval');

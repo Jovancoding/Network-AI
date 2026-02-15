@@ -931,7 +931,7 @@ class TaskDecomposer {
         // Cache successful results
         if (result.success) {
           const cacheKey = `task:${task.agentType}:${this.hashPayload(task.taskPayload)}`;
-          this.blackboard.write(cacheKey, result.result, context.agentId, 3600); // 1 hour TTL
+          this.blackboard.write(cacheKey, result.result, context.agentId, 3600, 'system-orchestrator-token'); // 1 hour TTL
         }
       }
     }
@@ -1204,7 +1204,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
         this.blackboard.write(`trace:${traceId}`, {
           action,
           startTime: new Date().toISOString(),
-        }, context.agentId);
+        }, context.agentId, undefined, 'system-orchestrator-token');
       } catch {
         // Non-fatal -- tracing failure shouldn't block execution
       }
@@ -1425,7 +1425,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
       }
 
       // Approved -- cache result
-      this.blackboard.write(cacheKey, sanitizedResult, context.agentId, 1800); // 30 min TTL
+      this.blackboard.write(cacheKey, sanitizedResult, context.agentId, 1800, 'system-orchestrator-token'); // 30 min TTL
 
       return {
         success: true,
@@ -1633,7 +1633,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
       };
     }
 
-    this.blackboard.write(key, value, context.agentId, ttl);
+    this.blackboard.write(key, value, context.agentId, ttl, 'system-orchestrator-token');
 
     return {
       success: true,
@@ -1681,7 +1681,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
       entry = this.qualityGate.approveQuarantined(quarantineId);
       if (entry) {
         // Write the approved entry to the blackboard
-        this.blackboard.write(`approved:${quarantineId}`, entry, 'orchestrator');
+        this.blackboard.write(`approved:${quarantineId}`, entry, 'orchestrator', undefined, 'system-orchestrator-token');
       }
     } else {
       entry = this.qualityGate.rejectQuarantined(quarantineId);
