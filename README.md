@@ -24,7 +24,7 @@ Network-AI is a framework-agnostic multi-agent orchestrator that connects LLM ag
 ## Hello World -- Get Running in 60 Seconds
 
 ```typescript
-import { createSwarmOrchestrator, CustomAdapter } from './index';
+import { createSwarmOrchestrator, CustomAdapter } from 'network-ai';
 
 // 1. Create an adapter and register your agent
 const adapter = new CustomAdapter();
@@ -196,16 +196,24 @@ See [QUICKSTART.md](QUICKSTART.md) for a 5-minute getting-started guide.
 
 ## Installation
 
-### For Development
+### As a Dependency (recommended)
+
+```bash
+npm install network-ai
+```
+
+That's it. No native dependencies, no build step.
+
+### For Development (contributing / running tests)
 
 ```bash
 git clone https://github.com/jovanSAPFIONEER/Network-AI
 cd Network-AI
-npm install                    # TypeScript dependencies
-pip install -r requirements.txt  # Python scripts (optional -- uses stdlib)
+npm install                    # TypeScript dev dependencies
+pip install -r requirements.txt  # Optional: mypy, pytest, filelock for Python script development
 ```
 
-### Verify Installation
+### Verify Development Setup
 
 ```bash
 npm run setup:check            # Check all files and dependencies
@@ -380,8 +388,8 @@ The adapter system lets you plug any agent framework into the orchestrator. Each
 Extend `BaseAdapter`:
 
 ```typescript
-import { BaseAdapter } from './adapters/base-adapter';
-import type { AgentPayload, AgentResult } from './types/agent-adapter';
+import { BaseAdapter } from 'network-ai';
+import type { AgentPayload, AgentResult } from 'network-ai';
 
 class MyAdapter extends BaseAdapter {
   readonly name = 'my-framework';
@@ -539,11 +547,11 @@ The module exports everything needed for programmatic use:
 
 ```typescript
 // Core classes
-import SwarmOrchestrator, { SharedBlackboard, AuthGuardian, TaskDecomposer } from './index';
-import { BlackboardValidator, QualityGateAgent } from './index';
+import SwarmOrchestrator, { SharedBlackboard, AuthGuardian, TaskDecomposer } from 'network-ai';
+import { BlackboardValidator, QualityGateAgent } from 'network-ai';
 
 // Factory
-import { createSwarmOrchestrator } from './index';
+import { createSwarmOrchestrator } from 'network-ai';
 
 // Adapters (all 12)
 import {
@@ -552,7 +560,7 @@ import {
   CrewAIAdapter, MCPAdapter, CustomAdapter,
   LlamaIndexAdapter, SemanticKernelAdapter, OpenAIAssistantsAdapter,
   HaystackAdapter, DSPyAdapter, AgnoAdapter,
-} from './index';
+} from 'network-ai';
 
 // Types
 import type {
@@ -560,7 +568,7 @@ import type {
   AdapterConfig, AdapterCapabilities,
   TaskPayload, HandoffMessage, PermissionGrant, SwarmState,
   AgentStatus, ParallelTask, ParallelExecutionResult, SynthesisStrategy,
-} from './index';
+} from 'network-ai';
 ```
 
 ## License
