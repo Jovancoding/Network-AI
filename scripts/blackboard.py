@@ -307,7 +307,38 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
     # ========================================================================
     # ATOMIC COMMIT WORKFLOW: propose → validate → commit
     # ========================================================================
-    
+
+    @staticmethod
+    def _sanitize_change_id(change_id: str) -> str:
+        """
+        Sanitize change_id to prevent path traversal attacks.
+        Only allows alphanumeric characters, hyphens, underscores, and dots.
+        Rejects any path separators or parent directory references.
+        """
+        if not change_id or not isinstance(change_id, str):
+            raise ValueError("change_id must be a non-empty string")
+        # Strip whitespace
+        sanitized = change_id.strip()
+        # Reject path separators and parent directory traversal
+        if any(c in sanitized for c in ('/', '\\', '..')):
+            raise ValueError(
+                f"Invalid change_id '{change_id}': must not contain path separators or '..'"
+            )
+        # Only allow safe characters: alphanumeric, hyphen, underscore, dot
+        if not re.match(r'^[a-zA-Z0-9_\-\.]+$', sanitized):
+            raise ValueError(
+                f"Invalid change_id '{change_id}': only alphanumeric, hyphen, underscore, and dot allowed"
+            )
+        return sanitized
+
+    def _safe_pending_path(self, change_id: str, suffix: str = ".pending.json") -> Path:
+        """Build a pending-file path and verify it stays inside pending_dir."""
+        safe_id = self._sanitize_change_id(change_id)
+        target = (self.pending_dir / f"{safe_id}{suffix}").resolve()
+        if not str(target).startswith(str(self.pending_dir.resolve())):
+            raise ValueError(f"Path traversal blocked for change_id '{change_id}'")
+        return target
+
     def propose_change(self, change_id: str, key: str, value: Any, 
                        source_agent: str = "unknown", ttl: Optional[int] = None,
                        operation: str = "write") -> dict[str, Any]:
@@ -317,7 +348,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         The change is written to a .pending file and must be validated
         and committed by the orchestrator before it takes effect.
         """
-        pending_file = self.pending_dir / f"{change_id}.pending.json"
+        pending_file = self._safe_pending_path(change_id)
         
         # Check for duplicate change_id
         if pending_file.exists():
@@ -365,7 +396,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         - No conflicting changes to the same key
         - Base hash matches (data hasn't changed since proposal)
         """
-        pending_file = self.pending_dir / f"{change_id}.pending.json"
+        pending_file = self._safe_pending_path(change_id)
         
         if not pending_file.exists():
             return {
@@ -439,7 +470,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         """
         Apply a validated change atomically (Step 3 of atomic commit).
         """
-        pending_file = self.pending_dir / f"{change_id}.pending.json"
+        pending_file = self._safe_pending_path(change_id)
         
         if not pending_file.exists():
             return {
@@ -479,9 +510,10 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         change_set["status"] = "committed"
         change_set["committed_at"] = datetime.now(timezone.utc).isoformat()
         
+        safe_id = self._sanitize_change_id(change_id)
         archive_dir = self.pending_dir / "archive"
         archive_dir.mkdir(exist_ok=True)
-        archive_file = archive_dir / f"{change_id}.committed.json"
+        archive_file = archive_dir / f"{safe_id}.committed.json"
         archive_file.write_text(json.dumps(change_set, indent=2))
         
         # Remove pending file
@@ -497,7 +529,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
     
     def abort_change(self, change_id: str) -> dict[str, Any]:
         """Abort a pending change without applying it."""
-        pending_file = self.pending_dir / f"{change_id}.pending.json"
+        pending_file = self._safe_pending_path(change_id)
         
         if not pending_file.exists():
             return {
@@ -510,9 +542,10 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         change_set["aborted_at"] = datetime.now(timezone.utc).isoformat()
         
         # Archive the aborted change
+        safe_id = self._sanitize_change_id(change_id)
         archive_dir = self.pending_dir / "archive"
         archive_dir.mkdir(exist_ok=True)
-        archive_file = archive_dir / f"{change_id}.aborted.json"
+        archive_file = archive_dir / f"{safe_id}.aborted.json"
         archive_file.write_text(json.dumps(change_set, indent=2))
         
         pending_file.unlink()
