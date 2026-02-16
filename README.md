@@ -2,7 +2,8 @@
 
 **The plug-and-play AI agent orchestrator for TypeScript/Node.js -- connect 12 agent frameworks with zero glue code**
 
-[![Release](https://img.shields.io/badge/release-v3.1.0-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v3.1.2-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
 [![Python](https://img.shields.io/badge/python-3.9+-green.svg)](https://python.org)
@@ -122,6 +123,7 @@ Network-AI wraps your agent swarm with **file-system mutexes**, **atomic commits
 ### Security Module (Defense-in-Depth)
 - **HMAC-Signed Tokens** -- Cryptographic token generation with expiration
 - **Input Sanitization** -- XSS, injection, path traversal, and prototype pollution prevention
+- **Blackboard Path Safety** -- Change ID sanitization prevents directory traversal in atomic commits
 - **Rate Limiting** -- Per-agent request throttling with lockout on failed auth
 - **AES-256-GCM Encryption** -- Encrypt sensitive blackboard entries at rest
 - **Privilege Escalation Prevention** -- Trust-ceiling enforcement
@@ -229,10 +231,10 @@ Copy this skill into your OpenClaw workspace:
 cp -r Network-AI ~/.openclaw/workspace/skills/swarm-orchestrator
 ```
 
-Or install via ClawHub (when available):
+Or install via ClawHub:
 
 ```bash
-openclaw skills install swarm-orchestrator
+clawhub install network-ai
 ```
 
 ## Usage
@@ -618,6 +620,6 @@ If you're using LangGraph, Dify, Flowise, PraisonAI, AutoGen/AG2, CrewAI, or any
 <details>
 <summary>Keywords (for search)</summary>
 
-ai-agents, agentic-ai, multi-agent, multi-agent-systems, multi-agent-system, agent-framework, ai-agent-framework, agentic-framework, agentic-workflow, llm, llm-agents, llm-agent, large-language-models, generative-ai, genai, orchestration, ai-orchestration, swarm, swarm-intelligence, autonomous-agents, agents, ai, typescript, nodejs, mcp, model-context-protocol, a2a, agent-to-agent, function-calling, tool-integration, context-engineering, rag, ai-safety, multi-agents-collaboration, multi-agents, aiagents, aiagentframework, plug-and-play, adapter-registry, blackboard-pattern, agent-coordination, agent-handoffs, token-permissions, budget-tracking, cost-awareness, atomic-commits, hallucination-detection, content-quality-gate, OpenClaw, Clawdbot, Moltbot, Clawdbot Swarm, Moltbot Security, Moltbot multi-agent, OpenClaw skills, AgentSkills, LangChain adapter, LangGraph, AutoGen adapter, AG2, CrewAI adapter, MCP adapter, LlamaIndex adapter, Semantic Kernel adapter, OpenAI Assistants adapter, Haystack adapter, DSPy adapter, Agno adapter, Phidata adapter, Dify, Flowise, PraisonAI, custom-adapter, AES-256 encryption, HMAC tokens, rate limiting, input sanitization, privilege escalation prevention, agentic-rag, deep-research, workflow-orchestration, ai-assistant, ai-tools, developer-tools, open-source
+ai-agents, agentic-ai, multi-agent, multi-agent-systems, multi-agent-system, agent-framework, ai-agent-framework, agentic-framework, agentic-workflow, llm, llm-agents, llm-agent, large-language-models, generative-ai, genai, orchestration, ai-orchestration, swarm, swarm-intelligence, autonomous-agents, agents, ai, typescript, nodejs, mcp, model-context-protocol, a2a, agent-to-agent, function-calling, tool-integration, context-engineering, rag, ai-safety, multi-agents-collaboration, multi-agents, aiagents, aiagentframework, plug-and-play, adapter-registry, blackboard-pattern, agent-coordination, agent-handoffs, token-permissions, budget-tracking, cost-awareness, atomic-commits, hallucination-detection, content-quality-gate, OpenClaw, Clawdbot, Moltbot, Clawdbot Swarm, Moltbot Security, Moltbot multi-agent, OpenClaw skills, AgentSkills, LangChain adapter, LangGraph, AutoGen adapter, AG2, CrewAI adapter, MCP adapter, LlamaIndex adapter, Semantic Kernel adapter, OpenAI Assistants adapter, Haystack adapter, DSPy adapter, Agno adapter, Phidata adapter, Dify, Flowise, PraisonAI, custom-adapter, AES-256 encryption, HMAC tokens, rate limiting, input sanitization, privilege escalation prevention, ClawHub, clawhub, agentic-rag, deep-research, workflow-orchestration, ai-assistant, ai-tools, developer-tools, open-source
 
 </details>
