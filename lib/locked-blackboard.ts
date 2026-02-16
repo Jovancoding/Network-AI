@@ -29,6 +29,11 @@ import {
 } from 'fs';
 import { join, dirname } from 'path';
 import { randomUUID, createHash } from 'crypto';
+import { Logger } from './logger';
+import { LockAcquisitionError } from './errors';
+import type { SecureAuditLogger } from '../security';
+
+const log = Logger.create('LockedBlackboard');
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -126,7 +131,7 @@ export class FileLock {
           
           // If lock is stale, force release it
           if (lockAge > CONFIG.staleLockThresholdMs) {
-            console.warn(`[FileLock] Stale lock detected (${lockAge}ms old), force releasing`);
+            log.warn('Stale lock detected, force releasing', { lockAgeMs: lockAge });
             this.forceRelease();
           } else {
             // Lock is held by someone else, wait and retry
@@ -189,7 +194,7 @@ export class FileLock {
       this.lockHolder = null;
       return true;
     } catch (error) {
-      console.error('[FileLock] Failed to release lock:', error);
+      log.error('Failed to release lock', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }
@@ -250,7 +255,11 @@ export class FileLock {
 // ============================================================================
 
 /**
- * LockedBlackboard - Thread-safe blackboard with atomic commits.
+ * LockedBlackboard - Thread-safe blackboard with atomic commits and audit trail.
+ * 
+ * Every mutating operation (write, delete, commit) records an audit entry
+ * capturing the lock holder, operation duration, and change details when
+ * an optional {@link SecureAuditLogger} is provided.
  * 
  * Usage:
  * ```typescript
@@ -274,13 +283,15 @@ export class LockedBlackboard {
   private lock: FileLock;
   private cache: Map<string, BlackboardEntry> = new Map();
   private pendingChanges: Map<string, PendingChange> = new Map();
+  private auditLogger?: SecureAuditLogger;
 
-  constructor(basePath: string = '.') {
+  constructor(basePath: string = '.', auditLogger?: SecureAuditLogger) {
     this.basePath = basePath;
     this.blackboardPath = join(basePath, 'swarm-blackboard.md');
     this.lockPath = join(basePath, 'data', '.blackboard.lock');
     this.pendingDir = join(basePath, 'data', 'pending_changes');
     this.lock = new FileLock(this.lockPath);
+    this.auditLogger = auditLogger;
     
     this.initialize();
   }
@@ -347,7 +358,7 @@ Content Hash: ${this.computeHash('')}
         }
       }
     } catch (error) {
-      console.error('[LockedBlackboard] Failed to load from disk:', error);
+      log.error('Failed to load from disk', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -374,11 +385,11 @@ Content Hash: ${this.computeHash('')}
 
       // Enforce max pending changes limit
       if (this.pendingChanges.size > CONFIG.maxPendingChanges) {
-        console.warn(`[LockedBlackboard] Too many pending changes (${this.pendingChanges.size}), cleaning up old ones`);
+        log.warn('Too many pending changes, cleaning up old ones', { count: this.pendingChanges.size });
         this.cleanupOldPendingChanges();
       }
     } catch (error) {
-      console.error('[LockedBlackboard] Failed to load pending changes:', error);
+      log.error('Failed to load pending changes', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -397,7 +408,7 @@ Content Hash: ${this.computeHash('')}
     const holderId = `writer-${randomUUID().substring(0, 8)}`;
     
     if (!this.lock.acquire(holderId)) {
-      throw new Error('Failed to acquire lock for writing to blackboard');
+      throw new LockAcquisitionError('writing to blackboard');
     }
 
     try {
@@ -455,7 +466,7 @@ ${cacheContent}
         unlinkSync(sourcePath);
       }
     } catch (error) {
-      console.error('[LockedBlackboard] Failed to archive change:', error);
+      log.error('Failed to archive change', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -502,12 +513,12 @@ ${cacheContent}
     const change = this.pendingChanges.get(changeId);
     
     if (!change) {
-      console.error(`[LockedBlackboard] Change ${changeId} not found`);
+      log.error('Change not found', { changeId });
       return false;
     }
 
     if (change.status !== 'pending') {
-      console.error(`[LockedBlackboard] Change ${changeId} is ${change.status}, cannot validate`);
+      log.error('Change cannot be validated', { changeId, status: change.status });
       return false;
     }
 
@@ -518,8 +529,7 @@ ${cacheContent}
       : null;
 
     if (change.previous_hash !== currentHash) {
-      console.warn(`[LockedBlackboard] CONFLICT DETECTED for ${change.key}: ` +
-        `expected hash ${change.previous_hash}, got ${currentHash}`);
+      log.warn('CONFLICT DETECTED', { key: change.key, expectedHash: change.previous_hash, actualHash: currentHash });
       return false;
     }
 
@@ -540,6 +550,7 @@ ${cacheContent}
    */
   commit(changeId: string): CommitResult {
     const change = this.pendingChanges.get(changeId);
+    const lockStart = Date.now();
 
     if (!change) {
       return {
@@ -561,6 +572,9 @@ ${cacheContent}
     const holderId = `commit-${changeId}`;
     
     if (!this.lock.acquire(holderId)) {
+      this.audit('BLACKBOARD_COMMIT', change.source_agent, 'commit', 'failure', {
+        changeId, key: change.key, reason: 'lock_timeout', lockHolder: holderId,
+      });
       return {
         success: false,
         change_id: changeId,
@@ -580,6 +594,11 @@ ${cacheContent}
         this.savePendingChange(change);
         this.archivePendingChange(change);
         this.pendingChanges.delete(changeId);
+
+        this.audit('BLACKBOARD_COMMIT', change.source_agent, 'commit', 'failure', {
+          changeId, key: change.key, reason: 'conflict',
+          lockHolder: holderId, lockDurationMs: Date.now() - lockStart,
+        });
         
         return {
           success: false,
@@ -608,6 +627,12 @@ ${cacheContent}
       // Archive the change
       this.archivePendingChange(change);
       this.pendingChanges.delete(changeId);
+
+      this.audit('BLACKBOARD_COMMIT', change.source_agent, 'commit', 'success', {
+        changeId, key: change.key, version: newVersion,
+        lockHolder: holderId, lockDurationMs: Date.now() - lockStart,
+        validatedBy: change.validation?.validated_by,
+      });
 
       return {
         success: true,
@@ -689,9 +714,13 @@ ${cacheContent}
    */
   write(key: string, value: unknown, sourceAgent: string, ttl?: number): BlackboardEntry {
     const holderId = `write-${randomUUID().substring(0, 8)}`;
+    const lockStart = Date.now();
     
     if (!this.lock.acquire(holderId)) {
-      throw new Error('Failed to acquire lock for write');
+      this.audit('BLACKBOARD_WRITE', sourceAgent, 'write', 'failure', {
+        key, reason: 'lock_timeout', lockHolder: holderId,
+      });
+      throw new LockAcquisitionError('write');
     }
 
     try {
@@ -709,6 +738,12 @@ ${cacheContent}
 
       this.cache.set(key, entry);
       this.persistToDiskInternal();
+
+      this.audit('BLACKBOARD_WRITE', sourceAgent, 'write', 'success', {
+        key, version: newVersion, lockHolder: holderId,
+        lockDurationMs: Date.now() - lockStart,
+        hadPreviousValue: !!currentEntry,
+      });
       
       return entry;
     } finally {
@@ -721,15 +756,23 @@ ${cacheContent}
    */
   delete(key: string): boolean {
     const holderId = `delete-${randomUUID().substring(0, 8)}`;
+    const lockStart = Date.now();
     
     if (!this.lock.acquire(holderId)) {
-      throw new Error('Failed to acquire lock for delete');
+      this.audit('BLACKBOARD_DELETE', 'system', 'delete', 'failure', {
+        key, reason: 'lock_timeout', lockHolder: holderId,
+      });
+      throw new LockAcquisitionError('delete');
     }
 
     try {
       if (this.cache.has(key)) {
         this.cache.delete(key);
         this.persistToDiskInternal();
+        this.audit('BLACKBOARD_DELETE', 'system', 'delete', 'success', {
+          key, lockHolder: holderId,
+          lockDurationMs: Date.now() - lockStart,
+        });
         return true;
       }
       return false;
@@ -773,6 +816,35 @@ ${cacheContent}
    */
   getLockStatus(): LockInfo {
     return this.lock.getStatus();
+  }
+
+  /**
+   * Attach an audit logger at runtime (useful when the logger is created
+   * after the blackboard, e.g., in the orchestrator constructor).
+   */
+  setAuditLogger(logger: SecureAuditLogger): void {
+    this.auditLogger = logger;
+  }
+
+  // ---------- Internal audit helper ----------
+
+  /**
+   * Log an audit entry if an audit logger is attached.
+   * Non-fatal: failures are swallowed so auditing never blocks operations.
+   */
+  private audit(
+    eventType: string,
+    agentId: string,
+    action: string,
+    outcome: 'success' | 'failure' | 'denied',
+    details: Record<string, unknown>,
+  ): void {
+    if (!this.auditLogger) return;
+    try {
+      this.auditLogger.log(eventType, agentId, action, outcome, details);
+    } catch {
+      // Audit logging must never block blackboard operations
+    }
   }
 }
 

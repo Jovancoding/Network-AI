@@ -15,6 +15,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { randomUUID, createHmac, createCipheriv, createDecipheriv, randomBytes, CipherGCM, DecipherGCM } from 'crypto';
+import { Logger } from './logger';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -175,7 +176,8 @@ Last Updated: ${new Date().toISOString()}
         }
       }
     } catch (error) {
-      console.error('[Blackboard] Failed to load from disk:', error);
+      const log = Logger.create('Blackboard');
+      log.error('Failed to load from disk', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 

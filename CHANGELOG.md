@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-02-16
+
+### Added -- Phase 2: Trust
+- **Structured Logging** -- `Logger` class with 4 severity levels (DEBUG/INFO/WARN/ERROR) + SILENT, module-scoped instances via `Logger.create()`, pluggable transports
+- **Typed Error Hierarchy** -- `NetworkAIError` base class + 10 specific error subclasses (`AdapterError`, `BlackboardError`, `SecurityError`, `ValidationError`, `LockError`, `TimeoutError`, `PermissionError`, `ConfigurationError`, `AgentError`, `OrchestratorError`)
+- **Runtime API Input Validation** -- Guards on 20+ public entry points (`SwarmOrchestrator`, `SharedBlackboard`, `AuthGuardian`, `TaskDecomposer`, `AdapterRegistry`) with descriptive `ValidationError` throws
+- **Comprehensive JSDoc** -- Documentation on all exported interfaces (12+), classes (13+), and public methods (8+) with `@example`, `@param`, `@returns`, `@throws` tags
+- **Unified Lock + Audit Integration** -- `LockedBlackboard` now accepts an optional `SecureAuditLogger`; `write()` and `delete()` emit structured audit events (lock holder, duration, key, version, success/failure)
+
+### Stats
+- 251 tests passing (79 + 33 + 139)
+- 0 compile errors
+
 ## [3.0.3] - 2026-02-15
 
 ### Security Fix

@@ -78,6 +78,19 @@ interface SecureToken {
   signature: string;
 }
 
+/**
+ * Cryptographically signed token manager using HMAC.
+ *
+ * Generates, validates, and revokes tokens with configurable expiration.
+ * Uses constant-time comparison to prevent timing attacks.
+ *
+ * @example
+ * ```typescript
+ * const mgr = new SecureTokenManager({ maxTokenAge: 60000 });
+ * const token = mgr.generateToken('agent-1', 'DATABASE', 'read');
+ * const { valid } = mgr.validateToken(token);
+ * ```
+ */
 export class SecureTokenManager {
   private config: SecurityConfig;
   private revokedTokens: Set<string> = new Set();
@@ -170,6 +183,20 @@ export class SecureTokenManager {
 // 2. INPUT SANITIZER
 // ============================================================================
 
+/**
+ * Static utility for sanitizing user-supplied strings, objects, agent IDs,
+ * and file paths. Strips XSS payloads, template injection, command injection
+ * characters, and prototype pollution attempts.
+ *
+ * All methods are static — no instantiation required.
+ *
+ * @example
+ * ```typescript
+ * const safe = InputSanitizer.sanitizeString(userInput, 2000);
+ * const safeObj = InputSanitizer.sanitizeObject(payload);
+ * const safeId = InputSanitizer.sanitizeAgentId(rawId);
+ * ```
+ */
 export class InputSanitizer {
   // Dangerous patterns that could indicate injection attempts
   private static DANGEROUS_PATTERNS = [
@@ -306,6 +333,17 @@ interface RateLimitEntry {
   lockedUntil: number | null;
 }
 
+/**
+ * Per-agent rate limiter with sliding window and lockout on repeated
+ * authentication failures. Prevents DoS from rogue agents.
+ *
+ * @example
+ * ```typescript
+ * const limiter = new RateLimiter({ maxRequestsPerMinute: 50 });
+ * const { limited } = limiter.isRateLimited('agent-1');
+ * if (limited) { /* back off *\/ }
+ * ```
+ */
 export class RateLimiter {
   private limits: Map<string, RateLimitEntry> = new Map();
   private config: SecurityConfig;
@@ -422,6 +460,20 @@ interface AuditEntry {
   signature?: string;
 }
 
+/**
+ * Append-only audit logger with HMAC-chained integrity verification.
+ *
+ * Each entry is signed with a hash that includes the previous entry's
+ * signature, forming a tamper-evident chain. Supports verification
+ * across process restarts.
+ *
+ * @example
+ * ```typescript
+ * const logger = new SecureAuditLogger();
+ * logger.log('ACCESS', 'agent-1', 'read_file', 'success', { path: '/data' });
+ * const { valid } = logger.verifyLogIntegrity();
+ * ```
+ */
 export class SecureAuditLogger {
   private config: SecurityConfig;
   private previousHash: string = '';
@@ -581,6 +633,19 @@ export class SecureAuditLogger {
 // 5. DATA ENCRYPTION
 // ============================================================================
 
+/**
+ * AES-256-GCM encryptor for sensitive blackboard entries.
+ *
+ * Uses `scryptSync` key derivation with a unique salt per instance.
+ * The salt is required for decryption and can be retrieved via {@link getSalt}.
+ *
+ * @example
+ * ```typescript
+ * const enc = new DataEncryptor('my-secret-key');
+ * const cipher = enc.encrypt('sensitive data');
+ * const plain = enc.decrypt(cipher);
+ * ```
+ */
 export class DataEncryptor {
   private key: Buffer;
   private algorithm = 'aes-256-gcm' as const;
@@ -668,6 +733,20 @@ interface TrustPolicy {
   immutable: boolean;
 }
 
+/**
+ * Trust-policy-based permission hardener with privilege escalation prevention.
+ *
+ * Manages per-agent trust policies that control which resources and scopes
+ * an agent can access. Prevents agents from granting trust levels higher
+ * than their own.
+ *
+ * @example
+ * ```typescript
+ * const hardener = new PermissionHardener(auditLogger);
+ * hardener.registerPolicy({ agentId: 'bot', trustLevel: 0.6, allowedResources: ['DATABASE'] });
+ * const { allowed } = hardener.canAccess('bot', 'DATABASE', 'read');
+ * ```
+ */
 export class PermissionHardener {
   private trustPolicies: Map<string, TrustPolicy> = new Map();
   private auditLogger: SecureAuditLogger;
@@ -836,6 +915,11 @@ export class PermissionHardener {
 // 7. SECURITY ERROR CLASS
 // ============================================================================
 
+/**
+ * Custom error class for security-related failures.
+ *
+ * Includes a machine-readable `code` field for programmatic handling.
+ */
 export class SecurityError extends Error {
   code: string;
   
@@ -850,6 +934,22 @@ export class SecurityError extends Error {
 // 8. SECURE SWARM GATEWAY (Integration Point)
 // ============================================================================
 
+/**
+ * Unified security gateway that integrates all security modules:
+ * token management, rate limiting, input sanitization, audit logging,
+ * permission hardening, and data encryption.
+ *
+ * The SwarmOrchestrator routes every request through this gateway
+ * before processing.
+ *
+ * @example
+ * ```typescript
+ * const gw = new SecureSwarmGateway();
+ * const { allowed, sanitizedParams } = await gw.handleSecureRequest(
+ *   'agent-1', 'delegate_task', { targetAgent: 'bot' }
+ * );
+ * ```
+ */
 export class SecureSwarmGateway {
   private tokenManager: SecureTokenManager;
   private rateLimiter: RateLimiter;

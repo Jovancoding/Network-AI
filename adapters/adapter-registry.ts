@@ -22,7 +22,29 @@ import type {
   AdapterEventHandler,
   AdapterEventType,
 } from '../types/agent-adapter';
+import { AdapterAlreadyRegisteredError, AdapterNotFoundError, ValidationError } from '../lib/errors';
 
+/**
+ * Central registry that manages multiple agent framework adapters and
+ * routes execution requests to the correct one.
+ *
+ * Supports pattern-based routing, automatic prefix detection, default
+ * adapter fallback, agent caching, unified discovery, and lifecycle events.
+ *
+ * @example
+ * ```typescript
+ * import { AdapterRegistry, LangChainAdapter, CustomAdapter } from 'network-ai';
+ *
+ * const registry = new AdapterRegistry();
+ * await registry.addAdapter(new LangChainAdapter());
+ * await registry.addAdapter(new CustomAdapter());
+ *
+ * // Route by prefix: "lc:research" -> LangChainAdapter
+ * registry.addRoute({ pattern: 'lc:*', adapterName: 'langchain' });
+ *
+ * const result = await registry.executeAgent('lc:research', payload, context);
+ * ```
+ */
 export class AdapterRegistry {
   private adapters: Map<string, IAgentAdapter> = new Map();
   private routes: AdapterRoute[] = [];
@@ -46,8 +68,14 @@ export class AdapterRegistry {
    * Call this for each agent framework you want to support.
    */
   registerAdapter(adapter: IAgentAdapter): void {
+    if (!adapter || typeof adapter !== 'object') {
+      throw new ValidationError('adapter is required and must be an object');
+    }
+    if (typeof adapter.name !== 'string' || adapter.name.trim() === '') {
+      throw new ValidationError('adapter.name must be a non-empty string');
+    }
     if (this.adapters.has(adapter.name)) {
-      throw new Error(`Adapter "${adapter.name}" is already registered`);
+      throw new AdapterAlreadyRegisteredError(adapter.name);
     }
     this.adapters.set(adapter.name, adapter);
     this.emit('adapter:registered', adapter.name);
@@ -57,9 +85,12 @@ export class AdapterRegistry {
    * Initialize a registered adapter with its configuration
    */
   async initializeAdapter(adapterName: string, config: AdapterConfig = {}): Promise<void> {
+    if (!adapterName || typeof adapterName !== 'string') {
+      throw new ValidationError('adapterName must be a non-empty string');
+    }
     const adapter = this.adapters.get(adapterName);
     if (!adapter) {
-      throw new Error(`Adapter "${adapterName}" is not registered`);
+      throw new AdapterNotFoundError(adapterName);
     }
     await adapter.initialize(config);
     this.emit('adapter:initialized', adapterName);
@@ -112,7 +143,7 @@ export class AdapterRegistry {
    */
   setDefaultAdapter(adapterName: string): void {
     if (!this.adapters.has(adapterName)) {
-      throw new Error(`Adapter "${adapterName}" is not registered`);
+      throw new AdapterNotFoundError(adapterName);
     }
     this.defaultAdapterName = adapterName;
   }

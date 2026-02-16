@@ -5,7 +5,7 @@
  * task decomposition, permission management, and shared blackboard coordination.
  * 
  * @module SwarmOrchestrator
- * @version 3.0.0
+ * @version 3.1.0
  * @license MIT
  */
 
@@ -16,8 +16,18 @@ import { AdapterRegistry } from './adapters/adapter-registry';
 import { InputSanitizer, SecureSwarmGateway, RateLimiter, SecureAuditLogger, DataEncryptor, SecurityError } from './security';
 import { LockedBlackboard } from './lib/locked-blackboard';
 import { BlackboardValidator, QualityGateAgent } from './lib/blackboard-validator';
+import { Logger } from './lib/logger';
+import {
+  IdentityVerificationError,
+  NamespaceViolationError,
+  ValidationError,
+  ParallelLimitError,
+  TimeoutError as NetworkAITimeoutError,
+} from './lib/errors';
 import type { ValidationResult, QualityGateResult, ValidationConfig, AIReviewCallback, CustomValidationRule } from './lib/blackboard-validator';
 import type { IAgentAdapter, AgentPayload, AgentContext, AgentResult, AdapterConfig } from './types/agent-adapter';
+
+const log = Logger.create('SwarmOrchestrator');
 
 // Backward-compatible re-exports: OpenClaw types still work
 // but are now optional -- the system works without openclaw-core
@@ -27,21 +37,41 @@ type OpenClawSkill = {
   execute(action: string, params: Record<string, unknown>, context: SkillContext): Promise<SkillResult>;
 };
 
+/**
+ * Execution context passed to every skill invocation.
+ * Identifies the calling agent and associates the call with a task/session.
+ */
 interface SkillContext {
+  /** The agent initiating the request */
   agentId: string;
+  /** Unique task identifier (optional) */
   taskId?: string;
+  /** Session identifier for multi-turn interactions */
   sessionId?: string;
+  /** Arbitrary metadata from the host system */
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Unified result shape returned by every skill action.
+ * Includes structured error information with recovery hints.
+ */
 interface SkillResult {
+  /** Whether the action completed successfully */
   success: boolean;
+  /** Result data (shape varies by action) */
   data?: unknown;
+  /** Structured error when `success` is false */
   error?: {
+    /** Machine-readable error code (e.g., `'AUTH_DENIED'`, `'GATEWAY_DENIED'`) */
     code: string;
+    /** Human-readable error description */
     message: string;
+    /** Whether the caller can retry or adjust and succeed */
     recoverable: boolean;
+    /** Suggested remediation step */
     suggestedAction?: string;
+    /** Trace metadata for debugging */
     trace?: Record<string, unknown>;
   };
 }
@@ -50,46 +80,96 @@ interface SkillResult {
 // TYPE DEFINITIONS
 // ============================================================================
 
+/**
+ * A task to be delegated to an agent.
+ *
+ * @example
+ * ```typescript
+ * const payload: TaskPayload = {
+ *   instruction: 'Analyze Q4 revenue trends',
+ *   context: { department: 'finance' },
+ *   constraints: ['read_only', 'no_pii'],
+ *   expectedOutput: 'JSON summary with top-line metrics',
+ * };
+ * ```
+ */
 interface TaskPayload {
+  /** Natural-language instruction for the agent */
   instruction: string;
+  /** Additional context data relevant to the task */
   context?: Record<string, unknown>;
+  /** Restrictions or guardrails the agent must respect */
   constraints?: string[];
+  /** Description of the expected output format */
   expectedOutput?: string;
 }
 
+/**
+ * Internal message structure for agent-to-agent task handoffs.
+ * The orchestrator creates these when delegating work between agents.
+ */
 interface HandoffMessage {
+  /** Unique handoff identifier */
   handoffId: string;
+  /** Agent initiating the handoff */
   sourceAgent: string;
+  /** Agent receiving the task */
   targetAgent: string;
+  /** How the target agent should process the task */
   taskType: 'delegate' | 'collaborate' | 'validate';
+  /** The task to execute */
   payload: TaskPayload;
+  /** Scheduling and priority metadata */
   metadata: {
+    /** Priority level (0=low, 3=critical) */
     priority: number;
+    /** Unix timestamp deadline */
     deadline: number;
+    /** Parent task for sub-task tracking */
     parentTaskId: string | null;
   };
 }
 
+/**
+ * Result of a permission request through the AuthGuardian.
+ * Contains the grant token (if approved) and any restrictions.
+ */
 interface PermissionGrant {
+  /** Whether permission was granted */
   granted: boolean;
+  /** Opaque token to present when using the granted resource */
   grantToken: string | null;
+  /** ISO 8601 expiration timestamp */
   expiresAt: string | null;
+  /** Restrictions applied to this grant (e.g., `'read_only'`, `'max_records:100'`) */
   restrictions: string[];
+  /** Human-readable denial reason (when `granted` is false) */
   reason?: string;
 }
 
+/** Full snapshot of the swarm's runtime state. */
 interface SwarmState {
+  /** ISO 8601 timestamp when the snapshot was taken */
   timestamp: string;
+  /** All registered agents and their current status */
   activeAgents: AgentStatus[];
+  /** Tasks currently pending or in progress */
   pendingTasks: TaskRecord[];
+  /** Namespace-scoped blackboard entries visible to the querying agent */
   blackboardSnapshot: Record<string, BlackboardEntry>;
+  /** Active permission grants */
   permissionGrants: ActiveGrant[];
 }
 
+/** Runtime status of a registered agent. */
 interface AgentStatus {
+  /** Unique agent identifier */
   agentId: string;
+  /** Current operational state */
   status: 'available' | 'busy' | 'waiting_auth' | 'offline';
+  /** ID of the task currently being executed, or null */
   currentTask: string | null;
+  /** ISO 8601 timestamp of the last heartbeat */
   lastHeartbeat: string;
 }
 
@@ -101,20 +181,33 @@ interface TaskRecord {
   description: string;
 }
 
+/** A single entry stored on the shared blackboard. */
 interface BlackboardEntry {
+  /** Entry key (namespace-prefixed, e.g., `'task:analyze'`) */
   key: string;
+  /** Stored value (any serializable data) */
   value: unknown;
+  /** Agent that wrote this entry */
   sourceAgent: string;
+  /** ISO 8601 timestamp of the write */
   timestamp: string;
+  /** Time-to-live in seconds, or null for no expiry */
   ttl: number | null;
 }
 
+/** An active permission grant held by an agent. */
 interface ActiveGrant {
+  /** Opaque grant token */
   grantToken: string;
+  /** Resource type this grant covers (e.g., `'FILE_SYSTEM'`, `'DATABASE'`) */
   resourceType: string;
+  /** Agent holding the grant */
   agentId: string;
+  /** ISO 8601 expiration timestamp */
   expiresAt: string;
+  /** Restrictions bound to this grant */
   restrictions: string[];
+  /** Optional scope narrowing (e.g., `'read'`, `'staging_only'`) */
   scope?: string;
 }
 
@@ -144,26 +237,44 @@ interface AgentTrustConfig {
   allowedResources?: string[];
 }
 
+/** A single task within a parallel execution batch. */
 interface ParallelTask {
+  /** Agent type or adapter-prefixed ID to route the task to */
   agentType: string;
+  /** The task payload to execute */
   taskPayload: TaskPayload;
 }
 
+/** Result of a parallel execution batch, including synthesis and metrics. */
 interface ParallelExecutionResult {
+  /** Combined result produced by the synthesis strategy */
   synthesizedResult: unknown;
+  /** Per-agent results with timing */
   individualResults: Array<{
     agentType: string;
     success: boolean;
     result: unknown;
+    /** Wall-clock execution time in milliseconds */
     executionTime: number;
   }>;
+  /** Aggregate execution metrics */
   executionMetrics: {
+    /** Total wall-clock time in milliseconds */
     totalTime: number;
+    /** Fraction of tasks that succeeded (0-1) */
     successRate: number;
+    /** Strategy used to combine results */
     synthesisStrategy: string;
   };
 }
 
+/**
+ * Strategy for combining results from parallel agent executions.
+ * - `'merge'`  — Combine all successful results into one object
+ * - `'vote'`   — Pick the result with the highest confidence/size
+ * - `'chain'`  — Use the final result in sequence
+ * - `'first-success'` — Return the first successful result
+ */
 type SynthesisStrategy = 'merge' | 'vote' | 'chain' | 'first-success';
 
 // ============================================================================
@@ -224,12 +335,30 @@ const DEFAULT_AGENT_TRUST: AgentTrustConfig[] = [
 // namespace scoping, value validation, and input sanitization
 // ============================================================================
 
+/**
+ * Namespace-scoped, identity-verified shared state for multi-agent coordination.
+ *
+ * Every write is identity-verified (agent token), namespace-checked,
+ * size-validated, input-sanitized, and atomically persisted through
+ * {@link LockedBlackboard}.
+ *
+ * @example
+ * ```typescript
+ * const bb = new SharedBlackboard('./workspace');
+ * bb.registerAgent('analyst', 'secret-token', ['task:', 'analytics:']);
+ * bb.write('task:revenue', { q4: 42_000 }, 'analyst', 3600, 'secret-token');
+ * const entry = bb.read('task:revenue');
+ * ```
+ */
 class SharedBlackboard {
   private backend: LockedBlackboard;
   private agentTokens: Map<string, string> = new Map(); // agentId -> verified token
   private agentNamespaces: Map<string, string[]> = new Map(); // agentId -> allowed prefixes
 
   constructor(basePath: string) {
+    if (!basePath || typeof basePath !== 'string' || basePath.trim() === '') {
+      throw new ValidationError('basePath must be a non-empty string');
+    }
     this.backend = new LockedBlackboard(basePath);
   }
 
@@ -239,6 +368,15 @@ class SharedBlackboard {
    * verifying their identity through the AuthGuardian.
    */
   registerAgent(agentId: string, verificationToken: string, allowedNamespaces: string[] = ['*']): void {
+    if (!agentId || typeof agentId !== 'string' || agentId.trim() === '') {
+      throw new ValidationError('agentId must be a non-empty string');
+    }
+    if (!verificationToken || typeof verificationToken !== 'string') {
+      throw new ValidationError('verificationToken must be a non-empty string');
+    }
+    if (!Array.isArray(allowedNamespaces)) {
+      throw new ValidationError('allowedNamespaces must be an array of strings');
+    }
     this.agentTokens.set(agentId, verificationToken);
     this.agentNamespaces.set(agentId, allowedNamespaces);
   }
@@ -287,7 +425,17 @@ class SharedBlackboard {
     return key.replace(/[#\n\r|`]/g, '_').slice(0, 256);
   }
 
+  /**
+   * Read an entry from the blackboard by key.
+   *
+   * @param key - The entry key to look up
+   * @returns The entry, or `null` if not found or expired
+   * @throws {@link ValidationError} if `key` is not a non-empty string
+   */
   read(key: string): BlackboardEntry | null {
+    if (!key || typeof key !== 'string') {
+      throw new ValidationError('key must be a non-empty string');
+    }
     const entry = this.backend.read(key);
     if (!entry) return null;
     // Normalize field name for backward compatibility
@@ -314,12 +462,12 @@ class SharedBlackboard {
   write(key: string, value: unknown, sourceAgent: string, ttl?: number, agentToken?: string): BlackboardEntry {
     // 1. Verify agent identity
     if (!this.verifyAgent(sourceAgent, agentToken)) {
-      throw new Error(`[Blackboard] Identity verification failed for agent '${sourceAgent}'`);
+      throw new IdentityVerificationError(sourceAgent);
     }
 
     // 2. Namespace check
     if (!this.canAccessKey(sourceAgent, key)) {
-      throw new Error(`[Blackboard] Agent '${sourceAgent}' not allowed to write to key '${key}'`);
+      throw new NamespaceViolationError(sourceAgent, key);
     }
 
     // 3. Sanitize key
@@ -328,7 +476,7 @@ class SharedBlackboard {
     // 4. Validate value size/structure
     const validation = this.validateValue(value);
     if (!validation.valid) {
-      throw new Error(`[Blackboard] Value validation failed: ${validation.reason}`);
+      throw new ValidationError(validation.reason!);
     }
 
     // 5. Sanitize value -- strip injection payloads from string content
@@ -352,6 +500,10 @@ class SharedBlackboard {
     };
   }
 
+  /**
+   * Check whether a key exists on the blackboard (not expired).
+   * @param key - The entry key to check
+   */
   exists(key: string): boolean {
     return this.read(key) !== null;
   }
@@ -379,6 +531,9 @@ class SharedBlackboard {
    * Prevents data leakage between agents.
    */
   getScopedSnapshot(agentId: string): Record<string, BlackboardEntry> {
+    if (!agentId || typeof agentId !== 'string') {
+      throw new ValidationError('agentId must be a non-empty string');
+    }
     const full = this.getSnapshot();
     const scoped: Record<string, BlackboardEntry> = {};
     for (const [key, entry] of Object.entries(full)) {
@@ -409,6 +564,29 @@ class SharedBlackboard {
 // input sanitization, and cryptographic audit logs.
 // ============================================================================
 
+/**
+ * Universal permission wall for multi-agent systems.
+ *
+ * Evaluates permission requests using a weighted formula of justification
+ * quality (40%), agent trust level (30%), and risk score (30%).
+ * Resource types, risk profiles, trust levels, and restrictions are all
+ * configurable — works for coding, finance, DevOps, or any domain.
+ *
+ * @example
+ * ```typescript
+ * const guardian = new AuthGuardian({
+ *   trustLevels: [{ agentId: 'analyst', trustLevel: 0.8 }],
+ *   resourceProfiles: { CUSTOM_API: { baseRisk: 0.5, defaultRestrictions: ['audit_required'] } },
+ * });
+ *
+ * const grant = await guardian.requestPermission(
+ *   'analyst', 'CUSTOM_API', 'Need to fetch Q4 revenue data for report', 'read'
+ * );
+ * if (grant.granted) {
+ *   // Use grant.grantToken to prove authorization
+ * }
+ * ```
+ */
 class AuthGuardian {
   private activeGrants: Map<string, ActiveGrant> = new Map();
   private agentTrustLevels: Map<string, number> = new Map();
@@ -449,6 +627,18 @@ class AuthGuardian {
    * Makes the system extensible for any domain.
    */
   registerResourceType(name: string, profile: ResourceProfile): void {
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      throw new ValidationError('resource name must be a non-empty string');
+    }
+    if (!profile || typeof profile !== 'object' || typeof profile.baseRisk !== 'number') {
+      throw new ValidationError('profile must be an object with a numeric baseRisk');
+    }
+    if (profile.baseRisk < 0 || profile.baseRisk > 1) {
+      throw new ValidationError('profile.baseRisk must be between 0 and 1');
+    }
+    if (!Array.isArray(profile.defaultRestrictions)) {
+      throw new ValidationError('profile.defaultRestrictions must be an array');
+    }
     this.resourceProfiles.set(name, profile);
   }
 
@@ -456,6 +646,15 @@ class AuthGuardian {
    * Register or update an agent's trust configuration at runtime.
    */
   registerAgentTrust(config: AgentTrustConfig): void {
+    if (!config || typeof config !== 'object') {
+      throw new ValidationError('config must be an object');
+    }
+    if (!config.agentId || typeof config.agentId !== 'string' || config.agentId.trim() === '') {
+      throw new ValidationError('config.agentId must be a non-empty string');
+    }
+    if (typeof config.trustLevel !== 'number' || config.trustLevel < 0 || config.trustLevel > 1) {
+      throw new ValidationError('config.trustLevel must be a number between 0 and 1');
+    }
     this.agentTrustLevels.set(config.agentId, config.trustLevel);
     this.agentTrustConfigs.set(config.agentId, config);
     this.persistTrustToDisk();
@@ -471,6 +670,15 @@ class AuthGuardian {
     justification: string,
     scope?: string
   ): Promise<PermissionGrant> {
+    if (!agentId || typeof agentId !== 'string') {
+      throw new ValidationError('agentId must be a non-empty string');
+    }
+    if (!resourceType || typeof resourceType !== 'string') {
+      throw new ValidationError('resourceType must be a non-empty string');
+    }
+    if (!justification || typeof justification !== 'string') {
+      throw new ValidationError('justification must be a non-empty string');
+    }
     // Sanitize inputs
     let safeAgentId: string;
     let safeJustification: string;
@@ -537,7 +745,14 @@ class AuthGuardian {
     };
   }
 
+  /**
+   * Validate a grant token and return `true` if it is active and not expired.
+   *
+   * @param token - The grant token to validate
+   * @returns `true` if the token is valid, `false` otherwise
+   */
   validateToken(token: string): boolean {
+    if (!token || typeof token !== 'string') return false;
     const grant = this.activeGrants.get(token);
     if (!grant) return false;
 
@@ -553,7 +768,15 @@ class AuthGuardian {
    * Validate a token and return the bound restrictions and scope.
    * Used to enforce restrictions at the point of use.
    */
+  /**
+   * Validate a token and return the full grant object (including restrictions
+   * and scope) for point-of-use enforcement.
+   *
+   * @param token - The grant token to validate
+   * @returns The grant details, or `null` if invalid/expired
+   */
   validateTokenWithGrant(token: string): ActiveGrant | null {
+    if (!token || typeof token !== 'string') return null;
     const grant = this.activeGrants.get(token);
     if (!grant) return null;
 
@@ -569,6 +792,14 @@ class AuthGuardian {
    * Enforce restrictions on an operation. Returns an error string if
    * the operation violates any restriction, or null if allowed.
    */
+  /**
+   * Enforce restrictions on an operation. Returns an error string if
+   * the operation violates any restriction, or `null` if all restrictions pass.
+   *
+   * @param grantToken  - The grant token authorizing the operation
+   * @param operation   - Description of the operation to check against restrictions
+   * @returns Error message string if a restriction is violated, or `null` if allowed
+   */
   enforceRestrictions(grantToken: string, operation: {
     type?: string;       // 'read' | 'write' | 'delete' | 'execute'
     recordCount?: number;
@@ -576,6 +807,9 @@ class AuthGuardian {
     targetPath?: string;
     command?: string;
   }): string | null {
+    if (!grantToken || typeof grantToken !== 'string') {
+      return 'Invalid or expired grant token';
+    }
     const grant = this.validateTokenWithGrant(grantToken);
     if (!grant) return 'Invalid or expired grant token';
 
@@ -631,6 +865,12 @@ class AuthGuardian {
     return null; // All restrictions passed
   }
 
+  /**
+   * Revoke a grant token, immediately invalidating it.
+   * Silently no-ops if the token doesn't exist.
+   *
+   * @param token - The grant token to revoke
+   */
   revokeToken(token: string): void {
     this.activeGrants.delete(token);
     this.log('permission_revoked', { token });
@@ -787,6 +1027,10 @@ class AuthGuardian {
     }
   }
 
+  /**
+   * Get all active (non-expired) permission grants.
+   * Automatically cleans up expired grants before returning.
+   */
   getActiveGrants(): ActiveGrant[] {
     // Clean expired grants
     const now = new Date();
@@ -798,6 +1042,10 @@ class AuthGuardian {
     return Array.from(this.activeGrants.values());
   }
 
+  /**
+   * Get the full audit log of permission decisions.
+   * Returns a defensive copy.
+   */
   getAuditLog(): typeof this.auditLog {
     return [...this.auditLog];
   }
@@ -813,6 +1061,7 @@ class AuthGuardian {
    * Get the allowed namespaces for an agent (used by blackboard scoping).
    */
   getAgentNamespaces(agentId: string): string[] {
+    if (!agentId || typeof agentId !== 'string') return ['task:'];
     const config = this.agentTrustConfigs.get(agentId);
     return config?.allowedNamespaces ?? ['task:'];
   }
@@ -861,12 +1110,29 @@ class AuthGuardian {
 // TASK DECOMPOSITION ENGINE
 // ============================================================================
 
+/**
+ * Decomposes complex tasks into parallel sub-agent executions.
+ *
+ * Supports four synthesis strategies (`merge`, `vote`, `chain`, `first-success`)
+ * and caches results on the blackboard to avoid redundant work.
+ * Routes each sub-task through the {@link AdapterRegistry} so any
+ * registered framework can participate.
+ */
 class TaskDecomposer {
   private blackboard: SharedBlackboard;
   private authGuardian: AuthGuardian;
   private adapterRegistry: AdapterRegistry;
 
   constructor(blackboard: SharedBlackboard, authGuardian: AuthGuardian, adapterRegistry: AdapterRegistry) {
+    if (!blackboard || !(blackboard instanceof SharedBlackboard)) {
+      throw new ValidationError('blackboard must be an instance of SharedBlackboard');
+    }
+    if (!authGuardian || !(authGuardian instanceof AuthGuardian)) {
+      throw new ValidationError('authGuardian must be an instance of AuthGuardian');
+    }
+    if (!adapterRegistry || !(adapterRegistry instanceof AdapterRegistry)) {
+      throw new ValidationError('adapterRegistry must be an instance of AdapterRegistry');
+    }
     this.blackboard = blackboard;
     this.authGuardian = authGuardian;
     this.adapterRegistry = adapterRegistry;
@@ -882,12 +1148,18 @@ class TaskDecomposer {
     synthesisStrategy: SynthesisStrategy = 'merge',
     context: SkillContext
   ): Promise<ParallelExecutionResult> {
+    if (!tasks || !Array.isArray(tasks)) {
+      throw new ValidationError('tasks must be an array');
+    }
+    if (tasks.length === 0) {
+      throw new ValidationError('tasks array must not be empty');
+    }
+    if (!context || typeof context !== 'object' || !context.agentId) {
+      throw new ValidationError('context is required and must include agentId');
+    }
     // Enforce maximum parallel agent limit
     if (tasks.length > CONFIG.maxParallelAgents) {
-      throw new Error(
-        `Cannot spawn ${tasks.length} agents. Maximum is ${CONFIG.maxParallelAgents}. ` +
-        `Decompose further or use 'chain' strategy.`
-      );
+      throw new ParallelLimitError(tasks.length, CONFIG.maxParallelAgents);
     }
 
     const startTime = Date.now();
@@ -1118,9 +1390,31 @@ class TaskDecomposer {
 // SWARM ORCHESTRATOR - MAIN SKILL IMPLEMENTATION
 // ============================================================================
 
+/**
+ * The main orchestrator class — coordinates agents, permissions, blackboard,
+ * quality gates, and adapter routing in a single entry point.
+ *
+ * Implements the OpenClaw skill interface for backward compatibility and
+ * can also be used standalone via {@link createSwarmOrchestrator}.
+ *
+ * @example
+ * ```typescript
+ * import { createSwarmOrchestrator, LangChainAdapter } from 'network-ai';
+ *
+ * const orchestrator = createSwarmOrchestrator({
+ *   adapters: [{ adapter: new LangChainAdapter() }],
+ *   trustLevels: [{ agentId: 'my-agent', trustLevel: 0.8 }],
+ * });
+ *
+ * const result = await orchestrator.execute('delegate_task', {
+ *   targetAgent: 'my-agent',
+ *   taskPayload: { instruction: 'Summarize the quarterly report' },
+ * }, { agentId: 'orchestrator' });
+ * ```
+ */
 export class SwarmOrchestrator implements OpenClawSkill {
   name = 'SwarmOrchestrator';
-  version = '3.0.0';
+  version = '3.1.0';
 
   private blackboard: SharedBlackboard;
   private authGuardian: AuthGuardian;
@@ -1143,6 +1437,12 @@ export class SwarmOrchestrator implements OpenClawSkill {
       aiReviewCallback?: AIReviewCallback;
     }
   ) {
+    if (workspacePath !== undefined && typeof workspacePath !== 'string') {
+      throw new ValidationError('workspacePath must be a string');
+    }
+    if (workspacePath !== undefined && workspacePath.trim() === '') {
+      throw new ValidationError('workspacePath must not be empty');
+    }
     this.blackboard = new SharedBlackboard(workspacePath);
     this.authGuardian = new AuthGuardian({
       trustLevels: options?.trustLevels,
@@ -1166,6 +1466,12 @@ export class SwarmOrchestrator implements OpenClawSkill {
    * This is the plug-and-play entry point.
    */
   async addAdapter(adapter: IAgentAdapter, config: AdapterConfig = {}): Promise<void> {
+    if (!adapter || typeof adapter !== 'object') {
+      throw new ValidationError('adapter is required and must be an object');
+    }
+    if (typeof adapter.name !== 'string' || adapter.name.trim() === '') {
+      throw new ValidationError('adapter.name must be a non-empty string');
+    }
     await this.adapters.addAdapter(adapter, config);
   }
 
@@ -1175,6 +1481,36 @@ export class SwarmOrchestrator implements OpenClawSkill {
    * input sanitization, rate limiting, and agent ID validation.
    */
   async execute(action: string, params: Record<string, unknown>, context: SkillContext): Promise<SkillResult> {
+    if (!action || typeof action !== 'string') {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_PARAMS',
+          message: 'action is required and must be a non-empty string',
+          recoverable: false,
+        },
+      };
+    }
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_PARAMS',
+          message: 'params is required and must be a plain object',
+          recoverable: false,
+        },
+      };
+    }
+    if (!context || typeof context !== 'object' || !context.agentId || typeof context.agentId !== 'string') {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_PARAMS',
+          message: 'context is required and must include a non-empty agentId string',
+          recoverable: false,
+        },
+      };
+    }
     const traceId = randomUUID();
 
     // P0: Route through SecureSwarmGateway -- sanitization + rate limiting
@@ -1719,7 +2055,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
 
   private timeoutPromise(ms: number): Promise<never> {
     return new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms);
+      setTimeout(() => reject(new NetworkAITimeoutError(ms)), ms);
     });
   }
 
@@ -1727,6 +2063,13 @@ export class SwarmOrchestrator implements OpenClawSkill {
    * Register an agent with the swarm
    */
   registerAgent(agentId: string, status: AgentStatus['status'] = 'available'): void {
+    if (!agentId || typeof agentId !== 'string' || agentId.trim() === '') {
+      throw new ValidationError('agentId must be a non-empty string');
+    }
+    const validStatuses = ['available', 'busy', 'waiting_auth', 'offline'] as const;
+    if (!validStatuses.includes(status as any)) {
+      throw new ValidationError(`status must be one of: ${validStatuses.join(', ')}`);
+    }
     this.agentRegistry.set(agentId, {
       agentId,
       status,
@@ -1739,6 +2082,9 @@ export class SwarmOrchestrator implements OpenClawSkill {
    * Update agent status
    */
   updateAgentStatus(agentId: string, status: AgentStatus['status'], currentTask?: string): void {
+    if (!agentId || typeof agentId !== 'string' || agentId.trim() === '') {
+      throw new ValidationError('agentId must be a non-empty string');
+    }
     const existing = this.agentRegistry.get(agentId);
     if (existing) {
       existing.status = status;
@@ -1807,6 +2153,25 @@ export type {
 // Backward-compatible OpenClaw types
 export type { OpenClawSkill, SkillContext, SkillResult };
 
+// Logger
+export { Logger, LogLevel } from './lib/logger';
+export type { LogEntry, LogTransport, LoggerConfig } from './lib/logger';
+
+// Typed errors
+export {
+  NetworkAIError,
+  IdentityVerificationError,
+  NamespaceViolationError,
+  ValidationError,
+  LockAcquisitionError,
+  ConflictError,
+  AdapterAlreadyRegisteredError,
+  AdapterNotFoundError,
+  AdapterNotInitializedError,
+  ParallelLimitError,
+  TimeoutError,
+} from './lib/errors';
+
 /**
  * Factory function for creating a configured SwarmOrchestrator instance.
  * 
@@ -1815,6 +2180,30 @@ export type { OpenClawSkill, SkillContext, SkillResult };
  *   const orchestrator = createSwarmOrchestrator({
  *     adapters: [{ adapter: new LangChainAdapter(), config: {} }],
  *   });
+ */
+/**
+ * Factory function for creating a fully configured {@link SwarmOrchestrator}.
+ *
+ * Accepts optional configuration for adapters, trust levels, resource profiles,
+ * quality gate settings, and runtime overrides.
+ *
+ * @param config - Optional configuration object. Pass `undefined` for all defaults.
+ * @returns A ready-to-use SwarmOrchestrator instance.
+ *
+ * @example
+ * ```typescript
+ * import { createSwarmOrchestrator, LangChainAdapter } from 'network-ai';
+ *
+ * // Minimal
+ * const orc = createSwarmOrchestrator();
+ *
+ * // With adapters and trust
+ * const orc2 = createSwarmOrchestrator({
+ *   adapters: [{ adapter: new LangChainAdapter() }],
+ *   trustLevels: [{ agentId: 'analyst', trustLevel: 0.8 }],
+ *   qualityThreshold: 0.7,
+ * });
+ * ```
  */
 export function createSwarmOrchestrator(config?: Partial<typeof CONFIG> & {
   adapters?: Array<{ adapter: IAgentAdapter; config?: AdapterConfig }>;
@@ -1825,6 +2214,9 @@ export function createSwarmOrchestrator(config?: Partial<typeof CONFIG> & {
   qualityThreshold?: number;
   aiReviewCallback?: AIReviewCallback;
 }): SwarmOrchestrator {
+  if (config !== undefined && (typeof config !== 'object' || config === null || Array.isArray(config))) {
+    throw new ValidationError('config must be a plain object');
+  }
   if (config) {
     const { adapters: adapterList, adapterRegistry, trustLevels, resourceProfiles, validationConfig, qualityThreshold, aiReviewCallback, ...rest } = config;
     Object.assign(CONFIG, rest);
@@ -1844,7 +2236,7 @@ export function createSwarmOrchestrator(config?: Partial<typeof CONFIG> & {
         adapterList.map(({ adapter, config: adapterConfig }) =>
           orchestrator.addAdapter(adapter, adapterConfig ?? {})
         )
-      ).catch(err => console.error('[SwarmOrchestrator] Adapter init error:', err));
+      ).catch(err => log.error('Adapter init error', { error: err instanceof Error ? err.message : String(err) }));
     }
 
     return orchestrator;

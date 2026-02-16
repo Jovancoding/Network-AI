@@ -17,6 +17,7 @@ import type {
   AgentResult,
   AgentInfo,
 } from '../types/agent-adapter';
+import { AdapterNotInitializedError } from '../lib/errors';
 
 export abstract class BaseAdapter implements IAgentAdapter {
   abstract readonly name: string;
@@ -135,7 +136,7 @@ export abstract class BaseAdapter implements IAgentAdapter {
    */
   protected ensureReady(): void {
     if (!this.ready) {
-      throw new Error(`Adapter "${this.name}" is not initialized. Call initialize() first.`);
+      throw new AdapterNotInitializedError(this.name);
     }
   }
 }
