@@ -2,7 +2,7 @@
 
 **The plug-and-play AI agent orchestrator for TypeScript/Node.js -- connect 12 agent frameworks with zero glue code**
 
-[![Release](https://img.shields.io/badge/release-v3.1.2-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v3.1.3-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
