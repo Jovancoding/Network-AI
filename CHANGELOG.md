@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Priority-Based Conflict Resolution** -- `'priority-wins'` strategy for `LockedBlackboard` commit step; higher-priority agents preempt lower-priority pending writes on same-key conflicts (0=low, 3=critical)
 - **`ConflictResolutionStrategy` option** -- Choose between `'first-commit-wins'` (default, current behavior) and `'priority-wins'` (new)
 - **Priority-aware `validate()` / `commit()`** -- Wire `HandoffMessage.metadata.priority` into the atomic commit pipeline
+
+## [Future] -- Phase 4: Distributed Blackboard
+
+### Planned
+- **CRDT-Based Synchronization** -- Conflict-free replicated data types with vector clocks for eventual consistency across machines
+- **Redis Blackboard Backend** -- Optional Redis pub/sub + distributed locks for multi-process / multi-machine agent coordination
+- **Configurable Consistency Levels** -- `eventual` (async replication), `session` (read-your-writes), `strong` (synchronous quorum)
+- **Federated Budget Tracking** -- Token spending tracked across distributed agent swarms
 - **MCP Networking** -- Cross-machine agent communication (see [references/mcp-roadmap.md](references/mcp-roadmap.md))
 
 ## [3.1.0] - 2026-02-16
