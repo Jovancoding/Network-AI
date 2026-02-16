@@ -1,7 +1,15 @@
 ---
 name: swarm-orchestrator
 description: Multi-agent swarm orchestration for complex workflows. Use when coordinating multiple agents, delegating tasks between sessions, managing shared state via blackboard, or enforcing permission walls for DATABASE/PAYMENTS/EMAIL access. Triggers on: agent coordination, task delegation, parallel execution, permission requests, blackboard state management.
-metadata: { "openclaw": { "emoji": "🐝", "homepage": "https://github.com/jovanSAPFIONEER/Network-AI" } }
+version: "3.1.0"
+metadata:
+  openclaw:
+    emoji: "\U0001F41D"
+    homepage: https://github.com/jovanSAPFIONEER/Network-AI
+    requires:
+      bins:
+        - python3
+        - node
 ---
 
 # Swarm Orchestrator Skill
