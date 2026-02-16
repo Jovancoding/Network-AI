@@ -1,7 +1,6 @@
 ---
-name: swarm-orchestrator
-description: Multi-agent swarm orchestration for complex workflows. Use when coordinating multiple agents, delegating tasks between sessions, managing shared state via blackboard, or enforcing permission walls for DATABASE/PAYMENTS/EMAIL access. Triggers on: agent coordination, task delegation, parallel execution, permission requests, blackboard state management.
-version: "3.1.0"
+name: Network-AI
+description: Multi-agent swarm orchestration for complex workflows. Coordinates multiple agents, decomposes tasks, manages shared state via a local blackboard file, and enforces permission walls before sensitive operations. All execution is local and sandboxed.
 metadata:
   openclaw:
     emoji: "\U0001F41D"

@@ -1,0 +1,39 @@
+# Only ship SKILL.md + supporting scripts + blackboard template
+# Exclude everything else
+
+# TypeScript source & build
+*.ts
+dist/
+lib/
+adapters/
+types/
+
+# Config & tooling
+tsconfig.json
+tsconfig.build.json
+package.json
+package-lock.json
+node_modules/
+
+# Tests
+test.ts
+test-*.ts
+
+# Docs (not needed for the skill)
+README.md
+QUICKSTART.md
+CHANGELOG.md
+LICENSE
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+
+# CI/CD
+.github/
+
+# Other
+.gitignore
+.npmignore
+*.json
+setup.ts
+references/
