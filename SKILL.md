@@ -8,7 +8,6 @@ metadata:
     requires:
       bins:
         - python3
-        - node
 ---
 
 # Swarm Orchestrator Skill
@@ -370,11 +369,12 @@ Sequential processing - output of one feeds into next.
 
 ## Security Considerations
 
-1. **Never bypass the permission wall** for DATABASE/PAYMENTS APIs
+1. **Never bypass the permission wall** for gated resources
 2. **Always include justification** explaining the business need
 3. **Use minimal scope** - request only what you need
 4. **Check token expiry** - tokens are valid for 5 minutes
-5. **Audit trail** - all permission requests are logged
+5. **Validate tokens** - use `python {baseDir}/scripts/validate_token.py TOKEN` to verify grant tokens before use
+6. **Audit trail** - all permission requests are logged
 
 ## 📝 Audit Trail Requirements (MANDATORY)
 
@@ -446,6 +446,9 @@ with open(audit_file, "a") as f:
 Expired permission tokens are automatically tracked. Run periodic cleanup:
 
 ```bash
+# Validate a grant token
+python {baseDir}/scripts/validate_token.py grant_a1b2c3d4e5f6
+
 # List expired tokens (without removing)
 python {baseDir}/scripts/revoke_token.py --list-expired
 
