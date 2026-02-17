@@ -46,11 +46,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 315 tests passing (79 + 33 + 139 + 64)
 - 0 compile errors
 
-## [Future] -- Phase 4: Distributed Blackboard
+## [Future] -- Phase 4: Behavioral Control Plane (Enterprise Governance)
+
+### Planned
+- **FSM Journey Layer** -- Define state machines (e.g. INTAKE -> VALIDATE -> RESEARCH -> DELIVER) with per-state agent authorization; agents can only act in their designated states
+- **Inline Compliance Blocking** -- Middleware that blocks agent actions *before* execution if not authorized in current workflow state (vs. post-hoc audit)
+- **Tool Authorization Matrix** -- Configurable matrix defining which agent can call which tool in which state
+- **Real-Time Compliance Monitor** -- Async loop checking turn-taking violations, response timeouts, journey adherence, tool usage anomalies
+- **`--active-grants` Command** -- Show which agents currently hold access to which APIs with expiry times
+- **`--audit-summary` Command** -- Summarize recent requests, grants, and denials by agent
+- **Behavioral Vocabulary in README** -- Reframe marketing around "behavioral control plane," "compliance enforcement," "governance layer"
+
+## [Future] -- Phase 5: Distributed Blackboard
 
 ### Planned
 - **CRDT-Based Synchronization** -- Conflict-free replicated data types with vector clocks for eventual consistency across machines
-- **Redis Blackboard Backend** -- Optional Redis pub/sub + distributed locks for multi-process / multi-machine agent coordination
+- **Redis Blackboard Backend** -- Optional Redis pub/sub + distributed locks for multi-process / multi-machine agent coordination (peer dependency, not bundled -- zero-dep default unchanged)
 - **Configurable Consistency Levels** -- `eventual` (async replication), `session` (read-your-writes), `strong` (synchronous quorum)
 - **Federated Budget Tracking** -- Token spending tracked across distributed agent swarms
 - **MCP Networking** -- Cross-machine agent communication (see [references/mcp-roadmap.md](references/mcp-roadmap.md))
