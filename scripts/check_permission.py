@@ -61,31 +61,135 @@ def ensure_data_dir():
     return data_dir
 
 
+def detect_injection(justification: str) -> bool:
+    """
+    Detect prompt-injection and manipulation patterns in justifications.
+
+    Returns True if the justification looks like a prompt-injection attempt.
+    """
+    injection_patterns = [
+        r'ignore\s+(previous|above|prior|all)',
+        r'override\s+(policy|restriction|rule|permission|security)',
+        r'system\s*prompt',
+        r'you\s+are\s+(now|a)',
+        r'act\s+as\s+(if|a|an)',
+        r'pretend\s+(to|that|you)',
+        r'bypass\s+(security|check|restriction|auth)',
+        r'grant\s+(me|access|permission)\s+(anyway|regardless|now)',
+        r'disregard\s+(policy|rule|restriction|previous)',
+        r'admin\s+(mode|access|override)',
+        r'sudo\b',
+        r'jailbreak',
+        r'do\s+not\s+(check|verify|validate|restrict)',
+        r'skip\s+(validation|verification|check)',
+        r'trust\s+level\s*[:=]',
+        r'score\s*[:=]+\s*[\d.]',
+    ]
+    text = justification.lower()
+    for pattern in injection_patterns:
+        if re.search(pattern, text):
+            return True
+    return False
+
+
 def score_justification(justification: str) -> float:
     """
-    Score the quality of a justification.
-    
-    Criteria:
-    - Length (more detail = better)
-    - Contains task-related keywords
-    - Contains specificity keywords
-    - Doesn't contain test/debug keywords
+    Score the quality of a justification with hardened validation.
+
+    Defenses against prompt injection and keyword stuffing:
+    - Injection pattern detection (immediate reject)
+    - Maximum length cap (prevents obfuscation in long text)
+    - Keyword-stuffing detection (penalises unnatural keyword density)
+    - Unique-word ratio check (catches copy-paste padding)
+    - Structural coherence (requires natural sentence structure)
+
+    Criteria (after safety checks):
+    - Length (more detail = better, but capped)
+    - Contains task-related keywords (capped contribution)
+    - Contains specificity keywords (capped contribution)
+    - No test/debug keywords
+    - Structural coherence bonus
     """
+    # ----- Hard reject: injection patterns -----
+    if detect_injection(justification):
+        return 0.0
+
+    # ----- Hard reject: empty or whitespace-only -----
+    stripped = justification.strip()
+    if not stripped:
+        return 0.0
+
+    # ----- Hard cap: excessively long justifications are suspicious -----
+    MAX_JUSTIFICATION_LENGTH = 500
+    if len(stripped) > MAX_JUSTIFICATION_LENGTH:
+        return 0.1  # Suspiciously long — allow re-submission with concise text
+
+    words = stripped.split()
+    word_count = len(words)
+
+    # ----- Hard reject: too few words to be meaningful -----
+    if word_count < 3:
+        return 0.1
+
+    # ----- Repetition / padding detection -----
+    unique_words = set(w.lower() for w in words)
+    unique_ratio = len(unique_words) / word_count if word_count > 0 else 0
+    if unique_ratio < 0.4:
+        return 0.1  # More than 60% repeated words — likely padding
+
+    # ----- Keyword-stuffing detection -----
+    task_keywords = re.findall(
+        r'\b(task|purpose|need|require|generate|analyze|create|process)\b',
+        stripped, re.IGNORECASE,
+    )
+    specificity_keywords = re.findall(
+        r'\b(specific|particular|exact|quarterly|annual|report|summary)\b',
+        stripped, re.IGNORECASE,
+    )
+    total_matched = len(task_keywords) + len(specificity_keywords)
+    keyword_density = total_matched / word_count if word_count > 0 else 0
+    if keyword_density > 0.5:
+        return 0.1  # More than half the words are scoring keywords — stuffing
+
+    # ----- Scoring (defensive caps per category) -----
     score = 0.0
-    
-    if len(justification) > 20:
-        score += 0.2
-    if len(justification) > 50:
-        score += 0.2
-    if re.search(r'\b(task|purpose|need|require|generate|analyze|create|process)\b', 
-                 justification, re.IGNORECASE):
-        score += 0.2
-    if re.search(r'\b(specific|particular|exact|quarterly|annual|report|summary)\b',
-                 justification, re.IGNORECASE):
-        score += 0.2
-    if not re.search(r'\b(test|debug|try|experiment)\b', justification, re.IGNORECASE):
-        score += 0.2
-    
+
+    # Length contribution (max 0.25)
+    if len(stripped) > 20:
+        score += 0.15
+    if len(stripped) > 50:
+        score += 0.10
+
+    # Task keyword presence (max 0.20, but only first match counts)
+    if task_keywords:
+        score += 0.20
+
+    # Specificity keyword presence (max 0.20, but only first match counts)
+    if specificity_keywords:
+        score += 0.20
+
+    # No test/debug markers (max 0.15)
+    if not re.search(r'\b(test|debug|try|experiment)\b', stripped, re.IGNORECASE):
+        score += 0.15
+
+    # Structural coherence: sentence-like structure (max 0.20)
+    # Must contain at least one verb-like pattern and read like prose
+    has_verb = bool(re.search(
+        r'\b(is|are|was|were|need|needs|require|requires|must|should|will|'
+        r'generate|generating|analyze|analyzing|create|creating|process|processing|'
+        r'prepare|preparing|compile|compiling|review|reviewing|access|accessing|'
+        r'retrieve|retrieving|export|exporting|send|sending|run|running)\b',
+        stripped, re.IGNORECASE,
+    ))
+    has_noun_object = bool(re.search(
+        r'\b(data|report|records|invoices?|orders?|customers?|accounts?|'
+        r'transactions?|files?|emails?|results?|metrics?|statistics?|'
+        r'analysis|documents?|exports?|payments?|entries|logs?|summaries)\b',
+        stripped, re.IGNORECASE,
+    ))
+    if has_verb and has_noun_object:
+        score += 0.20
+
     return min(score, 1.0)
 
 

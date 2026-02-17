@@ -5,6 +5,21 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] - 2026-02-17
+
+### Security
+- **Hardened `score_justification()` in `check_permission.py`** -- Fixed prompt-injection bypass vulnerability flagged by ClawHub scanner; simplistic keyword matching replaced with multi-layered defense
+- **Added `detect_injection()` function** -- 16 regex patterns detect prompt-injection attempts (ignore previous, override policy, bypass security, admin mode, sudo, jailbreak, etc.)
+- **Keyword-stuffing detection** -- Penalizes justifications where >50% of words are scoring keywords
+- **Repetition/padding detection** -- Rejects justifications with <40% unique words
+- **Maximum length cap (500 chars)** -- Prevents obfuscation in excessively long justifications
+- **Minimum word count (3)** -- Rejects trivially short justifications
+- **Structural coherence scoring** -- Requires verb + noun-object structure for full score; prevents keyword-only strings from scoring high
+
+### Fixed
+- **Security test isolation** -- Gateway audit integrity test (Test 7) now uses isolated log file, preventing cross-run HMAC signature mismatches that caused false failures
+- **All 315 tests now pass pristine** -- 0 failures across all 4 suites
+
 ## [3.2.0] - 2026-02-17
 
 ### Added -- Phase 3: Priority & Preemption

@@ -424,8 +424,13 @@ async function testPermissionHardening() {
 async function testSecureAuditLogger() {
   header('TEST 6: Secure Audit Logger');
   
+  // Clean stale log to avoid cross-run integrity mismatches
+  const auditLogPath = './test-security-audit.log';
+  if (require('fs').existsSync(auditLogPath)) {
+    require('fs').unlinkSync(auditLogPath);
+  }
   const auditLogger = new SecureAuditLogger({
-    auditLogPath: './test-security-audit.log',
+    auditLogPath,
     signAuditLogs: true,
     tokenSecret: 'audit-secret-key',
   });
@@ -464,10 +469,17 @@ async function testSecureAuditLogger() {
 async function testSecureSwarmGateway() {
   header('TEST 7: Secure Swarm Gateway (Integration)');
   
+  // Use isolated audit log so stale entries from prior runs don't
+  // break integrity verification (different tokenSecret = different HMAC).
+  const gatewayLogPath = './test-gateway-audit.log';
+  if (require('fs').existsSync(gatewayLogPath)) {
+    require('fs').unlinkSync(gatewayLogPath);
+  }
   const gateway = new SecureSwarmGateway({
     maxRequestsPerMinute: 10,
     maxFailedAuthAttempts: 3,
     tokenSecret: 'gateway-test-secret',
+    auditLogPath: gatewayLogPath,
   });
   
   // Test: Valid request processing
