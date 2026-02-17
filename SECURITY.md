@@ -4,8 +4,9 @@
 
 | Version | Supported |
 |---------|-----------|
-| 3.1.x   | Yes       |
-| 3.0.x   | Security fixes only |
+| 3.2.x   | Yes (latest) |
+| 3.1.x   | Security fixes only |
+| 3.0.x   | No        |
 | < 3.0   | No        |
 
 ## Reporting a Vulnerability
@@ -30,11 +31,13 @@ Network-AI includes built-in security features:
 - **Path traversal protection** in the Python blackboard (regex + resolved-path boundary checks)
 - **Input validation** on all 20+ public API entry points
 - **Secure audit logging** with tamper-resistant event trails
+- **Justification hardening** (v3.2.1) -- prompt-injection detection (16 patterns), keyword-stuffing defense, repetition/padding detection, structural coherence validation
 
 ## Security Scan Results
 
 - **VirusTotal**: Benign (0/64 engines)
 - **OpenClaw Scanner**: Benign, HIGH CONFIDENCE
+- **ClawHub Scanner**: v3.2.1 -- justification bypass vulnerability resolved
 - **Snyk**: All High/Medium findings resolved in v3.0.3
 
 ## Disclosure Policy

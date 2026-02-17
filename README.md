@@ -441,7 +441,7 @@ The AuthGuardian evaluates requests using:
 
 | Factor | Weight | Description |
 |--------|--------|-------------|
-| Justification | 40% | Quality of business reason |
+| Justification | 40% | Quality of business reason (hardened against prompt injection) |
 | Trust Level | 30% | Agent's established trust |
 | Risk Assessment | 30% | Resource sensitivity + scope |
 
@@ -530,10 +530,11 @@ python scripts/revoke_token.py --list-expired
 python scripts/revoke_token.py --cleanup
 ```
 
-**Test results (251 total):**
+**Test results (315 total):**
 - `test-standalone.ts` -- 79 passed (blackboard, auth, integration, persistence, parallelization, coding domain, quality gate)
 - `test-security.ts` -- 33 passed (tokens, sanitization, rate limiting, encryption, permissions, audit)
 - `test-adapters.ts` -- 139 passed (12 adapters: Custom, LangChain, AutoGen, CrewAI, MCP, LlamaIndex, Semantic Kernel, OpenAI Assistants, Haystack, DSPy, Agno + registry routing, integration, edge cases)
+- `test-priority.ts` -- 64 passed (priority-based preemption, conflict resolution, constructor overloads, backward compatibility)
 
 ## Audit Trail
 
