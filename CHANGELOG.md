@@ -5,12 +5,26 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] -- Phase 3: Priority & Preemption
+## [3.2.0] - 2026-02-17
 
-### Planned
-- **Priority-Based Conflict Resolution** -- `'priority-wins'` strategy for `LockedBlackboard` commit step; higher-priority agents preempt lower-priority pending writes on same-key conflicts (0=low, 3=critical)
-- **`ConflictResolutionStrategy` option** -- Choose between `'first-commit-wins'` (default, current behavior) and `'priority-wins'` (new)
-- **Priority-aware `validate()` / `commit()`** -- Wire `HandoffMessage.metadata.priority` into the atomic commit pipeline
+### Added -- Phase 3: Priority & Preemption
+- **Priority-Based Conflict Resolution** -- `'priority-wins'` strategy for `LockedBlackboard` commit step; higher-priority agents preempt lower-priority pending/committed writes on same-key conflicts (0=low, 3=critical)
+- **`ConflictResolutionStrategy` type** -- Choose between `'first-commit-wins'` (default, current behavior) and `'priority-wins'` (new)
+- **`AgentPriority` type** -- `0 | 1 | 2 | 3` typed priority levels
+- **`LockedBlackboardOptions` interface** -- Configuration object for LockedBlackboard constructor
+- **Priority-aware `propose()`** -- Optional 5th parameter for agent priority
+- **Priority-aware `validate()`** -- In `priority-wins` mode, higher-priority changes preempt lower-priority pending changes and override committed values from lower-priority agents
+- **Priority-aware `commit()`** -- Under-lock double-check respects priority in `priority-wins` mode
+- **`findConflictingPendingChanges()`** -- Public helper to list pending/validated changes targeting the same key
+- **`getConflictResolution()`** -- Query the active conflict resolution strategy
+- **Preemption audit events** -- `BLACKBOARD_PREEMPT` events logged when changes are preempted
+- **Priority validation** -- Invalid priority values clamped to 0-3 range; non-integers default to 0
+- **Backward-compatible constructor** -- Supports both `new LockedBlackboard(path, auditLogger, options)` and `new LockedBlackboard(path, options)`
+- **64 new priority tests** -- 13 test groups covering default behavior regression, preemption, same-priority fallback, metadata, constructor overloads, TTL interaction, backward compatibility
+
+### Stats
+- 315 tests passing (79 + 33 + 139 + 64)
+- 0 compile errors
 
 ## [Future] -- Phase 4: Distributed Blackboard
 

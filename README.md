@@ -2,14 +2,14 @@
 
 **The plug-and-play AI agent orchestrator for TypeScript/Node.js -- connect 12 agent frameworks with zero glue code**
 
-[![Release](https://img.shields.io/badge/release-v3.1.3-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v3.2.0-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
 [![Python](https://img.shields.io/badge/python-3.9+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-compatible-orange.svg)](https://agentskills.io)
-[![Tests](https://img.shields.io/badge/tests-251%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-315%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-12%20supported-blueviolet.svg)](#adapter-system)
 [![RSS Feed](https://img.shields.io/badge/RSS-releases-orange?logo=rss)](https://github.com/jovanSAPFIONEER/Network-AI/releases.atom)
 
@@ -134,6 +134,7 @@ Network-AI wraps your agent swarm with **file-system mutexes**, **atomic commits
 ### Operational Safety
 - **Swarm Guard** -- Prevents "Handoff Tax" (wasted tokens) and detects silent agent failures
 - **Atomic Commits** -- File-system mutexes prevent split-brain in concurrent writes
+- **Priority-Based Preemption** -- Higher-priority agents preempt lower-priority writes on same-key conflicts (`priority-wins` strategy)
 - **Cost Awareness** -- Token budget tracking with automatic SafetyShutdown
 - **Budget-Aware Handoffs** -- `intercept-handoff` command wraps `sessions_send` with budget checks
 
@@ -358,7 +359,32 @@ python scripts/blackboard.py commit "chg_001"
 python scripts/blackboard.py list
 ```
 
-#### 5. Check Budget Status
+#### 5. Priority-Based Conflict Resolution (Phase 3)
+
+```typescript
+import { LockedBlackboard } from 'network-ai';
+
+// Enable priority-wins strategy
+const board = new LockedBlackboard('.', { conflictResolution: 'priority-wins' });
+
+// Low-priority worker proposes a change
+const lowId = board.propose('shared:config', { mode: 'draft' }, 'worker', undefined, 1);
+
+// High-priority supervisor proposes to same key
+const highId = board.propose('shared:config', { mode: 'final' }, 'supervisor', undefined, 3);
+
+// Worker commits first
+board.validate(lowId, 'orchestrator');
+board.commit(lowId);
+
+// Supervisor validates -- higher priority wins despite stale hash
+board.validate(highId, 'orchestrator'); // true (preempts worker's value)
+board.commit(highId);                   // success
+
+board.read('shared:config'); // { mode: 'final' } -- supervisor wins
+```
+
+#### 6. Check Budget Status
 
 ```bash
 python scripts/swarm_guard.py budget-check --task-id "task_001"

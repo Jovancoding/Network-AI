@@ -15,6 +15,7 @@ import { randomUUID, createHmac } from 'crypto';
 import { AdapterRegistry } from './adapters/adapter-registry';
 import { InputSanitizer, SecureSwarmGateway, RateLimiter, SecureAuditLogger, DataEncryptor, SecurityError } from './security';
 import { LockedBlackboard } from './lib/locked-blackboard';
+import type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions } from './lib/locked-blackboard';
 import { BlackboardValidator, QualityGateAgent } from './lib/blackboard-validator';
 import { Logger } from './lib/logger';
 import {
@@ -2152,6 +2153,9 @@ export type {
 
 // Backward-compatible OpenClaw types
 export type { OpenClawSkill, SkillContext, SkillResult };
+
+// Phase 3: Priority & Preemption types
+export type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions };
 
 // Logger
 export { Logger, LogLevel } from './lib/logger';

@@ -39,6 +39,21 @@ const log = Logger.create('LockedBlackboard');
 // TYPE DEFINITIONS
 // ============================================================================
 
+/** Conflict resolution strategy for concurrent writes to the same key. */
+export type ConflictResolutionStrategy = 'first-commit-wins' | 'priority-wins';
+
+/** Agent priority level (0=low, 1=normal, 2=high, 3=critical). */
+export type AgentPriority = 0 | 1 | 2 | 3;
+
+/** Configuration options for LockedBlackboard. */
+export interface LockedBlackboardOptions {
+  /** How to resolve conflicts when multiple agents write to the same key.
+   *  - `'first-commit-wins'` (default): The first validated+committed change wins; later ones are aborted.
+   *  - `'priority-wins'`: Higher-priority changes preempt lower-priority pending/committed writes on the same key.
+   */
+  conflictResolution?: ConflictResolutionStrategy;
+}
+
 export interface BlackboardEntry {
   key: string;
   value: unknown;
@@ -57,10 +72,14 @@ export interface PendingChange {
   ttl: number | null;
   status: 'pending' | 'validated' | 'committed' | 'aborted';
   previous_hash: string | null;
+  /** Agent priority (0=low, 1=normal, 2=high, 3=critical). Defaults to 0. */
+  priority: AgentPriority;
   validation?: {
     validated_at: string;
     validated_by: string;
   };
+  /** Set when this change was preempted by a higher-priority change. */
+  preempted_by?: string;
 }
 
 export interface LockInfo {
@@ -284,14 +303,24 @@ export class LockedBlackboard {
   private cache: Map<string, BlackboardEntry> = new Map();
   private pendingChanges: Map<string, PendingChange> = new Map();
   private auditLogger?: SecureAuditLogger;
+  private conflictResolution: ConflictResolutionStrategy;
 
-  constructor(basePath: string = '.', auditLogger?: SecureAuditLogger) {
+  constructor(basePath: string = '.', auditLoggerOrOptions?: SecureAuditLogger | LockedBlackboardOptions, options?: LockedBlackboardOptions) {
     this.basePath = basePath;
     this.blackboardPath = join(basePath, 'swarm-blackboard.md');
     this.lockPath = join(basePath, 'data', '.blackboard.lock');
     this.pendingDir = join(basePath, 'data', 'pending_changes');
     this.lock = new FileLock(this.lockPath);
-    this.auditLogger = auditLogger;
+
+    // Support both signatures:
+    //   new LockedBlackboard(path, auditLogger, options)
+    //   new LockedBlackboard(path, options)
+    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && 'conflictResolution' in auditLoggerOrOptions) {
+      this.conflictResolution = auditLoggerOrOptions.conflictResolution ?? 'first-commit-wins';
+    } else {
+      this.auditLogger = auditLoggerOrOptions as SecureAuditLogger | undefined;
+      this.conflictResolution = options?.conflictResolution ?? 'first-commit-wins';
+    }
     
     this.initialize();
   }
@@ -476,10 +505,18 @@ ${cacheContent}
 
   /**
    * STEP 1: Propose a change (does NOT modify blackboard yet).
+   * @param key Blackboard key to write
+   * @param value Value to store
+   * @param sourceAgent Agent proposing the change
+   * @param ttl Optional time-to-live in seconds
+   * @param priority Agent priority (0=low, 1=normal, 2=high, 3=critical). Defaults to 0.
    * @returns change_id for use in validate/commit/abort
    */
-  propose(key: string, value: unknown, sourceAgent: string, ttl?: number): string {
+  propose(key: string, value: unknown, sourceAgent: string, ttl?: number, priority?: AgentPriority): string {
     const changeId = `chg_${randomUUID().substring(0, 8)}`;
+
+    // Validate priority
+    const resolvedPriority = this.validatePriority(priority);
     
     // Get current hash for conflict detection
     const currentEntry = this.cache.get(key);
@@ -495,7 +532,8 @@ ${cacheContent}
       proposed_at: new Date().toISOString(),
       ttl: ttl ?? null,
       status: 'pending',
-      previous_hash: previousHash
+      previous_hash: previousHash,
+      priority: resolvedPriority
     };
 
     this.pendingChanges.set(changeId, change);
@@ -505,8 +543,21 @@ ${cacheContent}
   }
 
   /**
+   * Validate and clamp priority to the AgentPriority range.
+   */
+  private validatePriority(priority?: number): AgentPriority {
+    if (priority === undefined || priority === null) return 0;
+    if (typeof priority !== 'number' || !Number.isInteger(priority)) return 0;
+    return Math.max(0, Math.min(3, priority)) as AgentPriority;
+  }
+
+  /**
    * STEP 2: Validate a proposed change (check for conflicts).
-   * Typically called by the orchestrator before committing.
+   * 
+   * In `'first-commit-wins'` mode (default): fails if the key was modified since proposal.
+   * In `'priority-wins'` mode: allows higher-priority changes to preempt lower-priority
+   * pending/validated changes on the same key.
+   * 
    * @returns true if change can be safely committed
    */
   validate(changeId: string, validatorAgent: string): boolean {
@@ -529,8 +580,50 @@ ${cacheContent}
       : null;
 
     if (change.previous_hash !== currentHash) {
-      log.warn('CONFLICT DETECTED', { key: change.key, expectedHash: change.previous_hash, actualHash: currentHash });
-      return false;
+      // Conflict detected — check if priority-wins can resolve it
+      if (this.conflictResolution === 'priority-wins') {
+        const conflicting = this.findConflictingPendingChanges(change.key, changeId);
+        
+        // Preempt any lower-priority pending changes
+        const lowerPriorityPending = conflicting.filter(c => c.priority < change.priority);
+        for (const victim of lowerPriorityPending) {
+          this.preempt(victim.change_id, changeId, change.priority, victim.priority);
+        }
+
+        // Check if any equal-or-higher-priority pending changes remain
+        const blockers = conflicting.filter(c => c.priority >= change.priority);
+
+        if (blockers.length > 0) {
+          // Blocked by equal/higher priority pending changes
+          log.warn('CONFLICT DETECTED (blocked by equal/higher priority pending)', {
+            key: change.key, priority: change.priority,
+            blockerPriorities: blockers.map(b => b.priority),
+          });
+          return false;
+        }
+
+        // No pending blockers — check against last committed priority
+        const lastCommittedPriority = this.getLastCommittedPriority(change.key);
+        if (change.priority > lastCommittedPriority) {
+          // Higher priority wins over committed value
+          change.previous_hash = currentHash;
+          log.info('Priority preemption during validate', {
+            changeId, key: change.key, priority: change.priority,
+            preemptedPending: lowerPriorityPending.length,
+            lastCommittedPriority,
+          });
+        } else {
+          // Same or lower priority cannot overwrite committed value
+          log.warn('CONFLICT DETECTED (priority insufficient vs committed)', {
+            key: change.key, incomingPriority: change.priority,
+            committedPriority: lastCommittedPriority,
+          });
+          return false;
+        }
+      } else {
+        log.warn('CONFLICT DETECTED', { key: change.key, expectedHash: change.previous_hash, actualHash: currentHash });
+        return false;
+      }
     }
 
     // Mark as validated
@@ -590,21 +683,59 @@ ${cacheContent}
         : null;
 
       if (change.previous_hash !== currentHash) {
-        change.status = 'aborted';
-        this.savePendingChange(change);
-        this.archivePendingChange(change);
-        this.pendingChanges.delete(changeId);
+        // Conflict under lock — check priority-wins
+        if (this.conflictResolution === 'priority-wins') {
+          // Check if the current entry was written by a lower-priority agent
+          const currentPriority = this.getLastCommittedPriority(change.key);
+          if (change.priority > currentPriority) {
+            // Higher priority wins — update hash and proceed
+            log.info('Priority preemption during commit (under lock)', {
+              changeId, key: change.key,
+              incomingPriority: change.priority,
+              existingPriority: currentPriority
+            });
+            this.audit('BLACKBOARD_PREEMPT', change.source_agent, 'preempt_commit', 'success', {
+              changeId, key: change.key,
+              winnerPriority: change.priority,
+              loserPriority: currentPriority,
+              lockHolder: holderId, lockDurationMs: Date.now() - lockStart,
+            });
+          } else {
+            // Same or lower priority — abort
+            change.status = 'aborted';
+            this.savePendingChange(change);
+            this.archivePendingChange(change);
+            this.pendingChanges.delete(changeId);
 
-        this.audit('BLACKBOARD_COMMIT', change.source_agent, 'commit', 'failure', {
-          changeId, key: change.key, reason: 'conflict',
-          lockHolder: holderId, lockDurationMs: Date.now() - lockStart,
-        });
-        
-        return {
-          success: false,
-          change_id: changeId,
-          message: `CONFLICT: Key ${change.key} was modified since validation`
-        };
+            this.audit('BLACKBOARD_COMMIT', change.source_agent, 'commit', 'failure', {
+              changeId, key: change.key, reason: 'conflict_priority_insufficient',
+              incomingPriority: change.priority, existingPriority: currentPriority,
+              lockHolder: holderId, lockDurationMs: Date.now() - lockStart,
+            });
+
+            return {
+              success: false,
+              change_id: changeId,
+              message: `CONFLICT: Key ${change.key} was modified by equal/higher priority agent`
+            };
+          }
+        } else {
+          change.status = 'aborted';
+          this.savePendingChange(change);
+          this.archivePendingChange(change);
+          this.pendingChanges.delete(changeId);
+
+          this.audit('BLACKBOARD_COMMIT', change.source_agent, 'commit', 'failure', {
+            changeId, key: change.key, reason: 'conflict',
+            lockHolder: holderId, lockDurationMs: Date.now() - lockStart,
+          });
+          
+          return {
+            success: false,
+            change_id: changeId,
+            message: `CONFLICT: Key ${change.key} was modified since validation`
+          };
+        }
       }
 
       // Apply the change
@@ -660,6 +791,83 @@ ${cacheContent}
     this.pendingChanges.delete(changeId);
 
     return true;
+  }
+
+  // ==========================================================================
+  // PRIORITY & PREEMPTION HELPERS
+  // ==========================================================================
+
+  /**
+   * Find all pending/validated changes targeting the same key, excluding the given changeId.
+   */
+  findConflictingPendingChanges(key: string, excludeChangeId: string): PendingChange[] {
+    return Array.from(this.pendingChanges.values()).filter(
+      c => c.key === key && c.change_id !== excludeChangeId && (c.status === 'pending' || c.status === 'validated')
+    );
+  }
+
+  /**
+   * Preempt a lower-priority change: abort it and emit an audit event.
+   */
+  private preempt(victimChangeId: string, winnerChangeId: string, winnerPriority: AgentPriority, victimPriority: AgentPriority): void {
+    const victim = this.pendingChanges.get(victimChangeId);
+    if (!victim) return;
+
+    victim.status = 'aborted';
+    victim.preempted_by = winnerChangeId;
+    this.savePendingChange(victim);
+    this.archivePendingChange(victim);
+    this.pendingChanges.delete(victimChangeId);
+
+    log.info('Change preempted', {
+      victimChangeId, winnerChangeId, key: victim.key,
+      victimPriority, winnerPriority
+    });
+
+    this.audit('BLACKBOARD_PREEMPT', victim.source_agent, 'preempted', 'failure', {
+      victimChangeId, winnerChangeId, key: victim.key,
+      victimPriority, winnerPriority,
+      victimAgent: victim.source_agent,
+    });
+  }
+
+  /**
+   * Get the priority of the last committed change to a key.
+   * Falls back to 0 if unknown (legacy data without priority).
+   */
+  private getLastCommittedPriority(key: string): AgentPriority {
+    // Check archived committed changes for this key (most recent first)
+    try {
+      const archiveDir = join(this.pendingDir, 'archive');
+      if (!existsSync(archiveDir)) return 0;
+
+      const files = readdirSync(archiveDir)
+        .filter(f => f.endsWith('.committed.json'))
+        .sort()
+        .reverse();
+
+      for (const file of files) {
+        try {
+          const content = readFileSync(join(archiveDir, file), 'utf-8');
+          const archived: PendingChange = JSON.parse(content);
+          if (archived.key === key) {
+            return this.validatePriority(archived.priority);
+          }
+        } catch {
+          // Skip corrupted archive files
+        }
+      }
+    } catch {
+      // Archive dir doesn't exist or read error
+    }
+    return 0;
+  }
+
+  /**
+   * Get the current conflict resolution strategy.
+   */
+  getConflictResolution(): ConflictResolutionStrategy {
+    return this.conflictResolution;
   }
 
   // Internal persist without acquiring lock (called when already holding lock)
