@@ -144,7 +144,7 @@ adapter.registerTool('calculator', {
   name: 'calculator',
   description: 'Basic math operations',
   inputSchema: { type: 'object', properties: { expression: { type: 'string' } } },
-}, async (args) => \`Result: \${eval(args.expression)}\`);
+}, async (args) => \`Result: \${String(args.expression)}\`);
 
 const registry = new AdapterRegistry();
 await registry.addAdapter(adapter);
