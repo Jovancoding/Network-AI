@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.4] - 2026-02-18
+
+### Fixed
+- **Removed redundant `isinstance` check in `blackboard.py`** -- `_sanitize_change_id()` had unnecessary `isinstance(change_id, str)` when the parameter is already typed as `str`; flagged by Pylance
+- **Re-release of v3.2.3** -- Ensures all registries (npm, ClawHub, GitHub) contain identical code
+
 ## [3.2.3] - 2026-02-18
 
 ### Added -- Phase 4 (Partial): Observability & Governance Vocabulary
