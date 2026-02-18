@@ -12,7 +12,7 @@
  * @license MIT
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { randomUUID, createHmac, createCipheriv, createDecipheriv, randomBytes, CipherGCM, DecipherGCM } from 'crypto';
 import { Logger } from './logger';
@@ -109,17 +109,14 @@ const CONFIG = {
 
 function ensureDataDir(basePath: string = '.'): string {
   const dataDir = join(basePath, 'data');
-  if (!existsSync(dataDir)) {
-    mkdirSync(dataDir, { recursive: true });
-  }
+  // recursive:true is a no-op if dir already exists — no existsSync check needed
+  mkdirSync(dataDir, { recursive: true });
   return dataDir;
 }
 
 function ensureDir(filePath: string): void {
   const dir = dirname(filePath);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
+  mkdirSync(dir, { recursive: true });
 }
 
 // ============================================================================
@@ -137,8 +134,8 @@ export class SharedBlackboard {
 
   private initialize(): void {
     ensureDir(this.path);
-    if (!existsSync(this.path)) {
-      const initialContent = `# Swarm Blackboard
+    // Use 'wx' flag: creates exclusively — atomic, no TOCTOU
+    const initialContent = `# Swarm Blackboard
 Last Updated: ${new Date().toISOString()}
 
 ## Active Tasks
@@ -154,8 +151,7 @@ Last Updated: ${new Date().toISOString()}
 ## Execution History
 <!-- Chronological log of completed tasks -->
 `;
-      writeFileSync(this.path, initialContent, 'utf-8');
-    }
+    try { writeFileSync(this.path, initialContent, { flag: 'wx', encoding: 'utf-8' }); } catch { /* already exists */ }
     this.loadFromDisk();
   }
 
@@ -319,10 +315,9 @@ export class AuthGuardian {
     const line = JSON.stringify(entry) + '\n';
     
     try {
-      const existing = existsSync(this.auditLog) ? readFileSync(this.auditLog, 'utf-8') : '';
-      writeFileSync(this.auditLog, existing + line, 'utf-8');
+      appendFileSync(this.auditLog, line, 'utf-8');
     } catch {
-      writeFileSync(this.auditLog, line, 'utf-8');
+      // ignore audit log failures
     }
   }
 

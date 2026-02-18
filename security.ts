@@ -201,7 +201,7 @@ export class InputSanitizer {
   // Dangerous patterns that could indicate injection attempts
   private static DANGEROUS_PATTERNS = [
     /\$\{.*\}/g,           // Template injection
-    /<script.*?>.*?<\/script>/gi, // XSS
+    /<script[\s\S]*?>[\s\S]*?<\/script>/gi, // XSS
     /javascript:/gi,        // JavaScript protocol
     /on\w+\s*=/gi,         // Event handlers
     /\.\.\//g,             // Path traversal
@@ -485,24 +485,22 @@ export class SecureAuditLogger {
   
   private initializeLog(): void {
     const logPath = this.config.auditLogPath;
-    if (!existsSync(logPath)) {
-      writeFileSync(logPath, '');
-    } else {
-      // Continue the hash chain from the last entry so integrity
-      // verification works across process restarts.
-      try {
-        const content = readFileSync(logPath, 'utf-8').trim();
-        if (content) {
-          const lines = content.split('\n').filter((l: string) => l);
-          const lastLine = lines[lines.length - 1];
-          const lastEntry = JSON.parse(lastLine) as AuditEntry;
-          if (lastEntry.signature) {
-            this.previousHash = lastEntry.signature;
-          }
+    // appendFileSync creates the file if it doesn't exist — atomic, no TOCTOU
+    appendFileSync(logPath, '');
+    // Continue the hash chain from the last entry so integrity
+    // verification works across process restarts.
+    try {
+      const content = readFileSync(logPath, 'utf-8').trim();
+      if (content) {
+        const lines = content.split('\n').filter((l: string) => l);
+        const lastLine = lines[lines.length - 1];
+        const lastEntry = JSON.parse(lastLine) as AuditEntry;
+        if (lastEntry.signature) {
+          this.previousHash = lastEntry.signature;
         }
-      } catch {
-        // If we can't read the last entry, start fresh chain
       }
+    } catch {
+      // If we can't read the last entry, start fresh chain
     }
   }
   

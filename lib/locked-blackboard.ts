@@ -24,6 +24,7 @@ import {
   unlinkSync,
   openSync,
   closeSync,
+  writeSync,
   statSync,
   readdirSync
 } from 'fs';
@@ -175,7 +176,8 @@ export class FileLock {
           pid: process.pid
         };
         
-        writeFileSync(this.lockPath, JSON.stringify(lockData, null, 2));
+        // Write via fd to avoid TOCTOU — no second path-based open
+        writeSync(this.lockFd, JSON.stringify(lockData, null, 2));
         this.lockHolder = holderId;
         
         return true;

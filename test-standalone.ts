@@ -117,10 +117,9 @@ class SharedBlackboard {
   }
 
   private initialize(): void {
-    if (!existsSync(this.path)) {
-      const initialContent = `# Swarm Blackboard\nLast Updated: ${new Date().toISOString()}\n\n## Active Tasks\n| TaskID | Agent | Status | Started | Description |\n|--------|-------|--------|---------|-------------|\n\n## Knowledge Cache\n\n## Coordination Signals\n\n## Execution History\n`;
-      writeFileSync(this.path, initialContent, 'utf-8');
-    }
+    const initialContent = `# Swarm Blackboard\nLast Updated: ${new Date().toISOString()}\n\n## Active Tasks\n| TaskID | Agent | Status | Started | Description |\n|--------|-------|--------|---------|-------------|\n\n## Knowledge Cache\n\n## Coordination Signals\n\n## Execution History\n`;
+    // 'wx' flag: exclusive create — atomic, no TOCTOU race condition
+    try { writeFileSync(this.path, initialContent, { flag: 'wx', encoding: 'utf-8' }); } catch { /* already exists */ }
     this.loadFromDisk();
   }
 
