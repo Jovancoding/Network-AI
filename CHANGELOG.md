@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.8] - 2026-02-19
+
+### Fixed
+- **TOCTOU race conditions** -- replaced `existsSync` + `writeFileSync` patterns with `appendFileSync`, `flag:'wx'`, and `writeSync via fd` in `security.ts`, `locked-blackboard.ts`, `swarm-utils.ts`, and `test-standalone.ts`; eliminates window between check and write
+- **Bad HTML filtering regexp** -- changed `.*?` to `[\s\S]*?` in script tag pattern in `security.ts`; `.` does not match newlines by default so multi-line `<script>` tags would bypass the sanitizer
+- **Missing regex anchor** -- added `\b` word boundary to `/example\.com/` pattern in `blackboard-validator.ts`; without it `notexample.com` would match
+- **Token-Permissions** -- added `permissions: contents: read` to `ci.yml`; workflows had implicit write access they do not need
+- Resolves all CodeQL HIGH severity alerts
+
 ## [3.2.7] - 2026-02-19
 
 ### Fixed
