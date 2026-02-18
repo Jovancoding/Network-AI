@@ -2,7 +2,7 @@
 
 **The plug-and-play AI agent orchestrator for TypeScript/Node.js -- connect 12 agent frameworks with zero glue code**
 
-[![Release](https://img.shields.io/badge/release-v3.2.2-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v3.2.3-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
@@ -15,12 +15,13 @@
 
 > **Legacy Users:** This skill works with **Clawdbot** and **Moltbot** (now OpenClaw). If you're searching for *Moltbot Security*, *Clawdbot Swarm*, or *Moltbot multi-agent* -- you're in the right place!
 
-Network-AI is a framework-agnostic multi-agent orchestrator that connects LLM agents across **12 frameworks** -- LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, and custom adapters. It provides shared blackboard coordination, built-in security (AES-256, HMAC tokens, rate limiting), content quality gates with hallucination detection, and agentic workflow patterns (parallel execution, voting, chaining). Zero dependencies per adapter -- bring your own framework SDK and start building multi-agent systems in minutes.
+Network-AI is a framework-agnostic multi-agent orchestrator and **behavioral control plane** that connects LLM agents across **12 frameworks** -- LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, and custom adapters. It provides shared blackboard coordination with atomic commits, built-in security (AES-256, HMAC tokens, rate limiting), content quality gates with hallucination detection, compliance enforcement, and agentic workflow patterns (parallel fan-out/fan-in, voting, chaining). Zero dependencies per adapter -- bring your own framework SDK and start building governed multi-agent systems in minutes.
 
 **Why Network-AI?**
 - **Framework-agnostic** -- Not locked to one LLM provider or agent SDK
-- **Production security** -- Encryption, audit trails, rate limiting built in
-- **Swarm intelligence** -- Parallel execution, voting, chain-of-agents patterns
+- **Governance layer** -- Permission gating, audit trails, budget ceilings, and compliance enforcement across all agents
+- **Shared state** -- Atomic blackboard with conflict resolution for safe parallel agent coordination (fan-out/fan-in)
+- **Production security** -- AES-256 encryption, HMAC audit logs, rate limiting, input sanitization
 - **Zero config** -- Works out of the box with `createSwarmOrchestrator()`
 
 ## Hello World -- Get Running in 60 Seconds
@@ -131,12 +132,15 @@ Network-AI wraps your agent swarm with **file-system mutexes**, **atomic commits
 - **Cryptographic Audit Logs** -- Tamper-evident signed audit trail with chain continuation
 - **Secure Gateway** -- Integrated security layer wrapping all operations
 
-### Operational Safety
+### Operational Safety & Governance
 - **Swarm Guard** -- Prevents "Handoff Tax" (wasted tokens) and detects silent agent failures
 - **Atomic Commits** -- File-system mutexes prevent split-brain in concurrent writes
 - **Priority-Based Preemption** -- Higher-priority agents preempt lower-priority writes on same-key conflicts (`priority-wins` strategy)
 - **Cost Awareness** -- Token budget tracking with automatic SafetyShutdown
 - **Budget-Aware Handoffs** -- `intercept-handoff` command wraps `sessions_send` with budget checks
+- **`--active-grants` Observability** -- Real-time view of which agents hold access to which APIs, with TTL countdown
+- **`--audit-summary` Observability** -- Per-agent and per-resource breakdown of permission requests, grants, and denials
+- **Justification Hardening** -- 16-pattern prompt-injection detector, keyword-stuffing defense, structural coherence scoring
 
 ## Project Structure
 
@@ -190,6 +194,7 @@ Network-AI/
 |-- test-standalone.ts        # Core orchestrator tests (79 tests)
 |-- test-security.ts          # Security module tests (33 tests)
 |-- test-adapters.ts          # Adapter system tests (139 tests)
+|-- test-priority.ts          # Priority & preemption tests (64 tests)
 |-- test-ai-quality.ts        # AI quality gate demo
 |-- test.ts                   # Full integration test suite
 ```
@@ -341,6 +346,65 @@ Expires: 2026-02-04T15:30:00Z
 Restrictions: read_only, max_records:100
 ```
 
+#### 3a. View Active Grants
+
+See which agents currently hold access to which APIs:
+
+```bash
+# Human-readable
+python scripts/check_permission.py --active-grants
+
+# Filter by agent
+python scripts/check_permission.py --active-grants --agent data_analyst
+
+# Machine-readable JSON
+python scripts/check_permission.py --active-grants --json
+```
+
+Output:
+```
+Active Grants:
+======================================================================
+  Agent:       data_analyst
+  Resource:    DATABASE
+  Scope:       read:orders
+  Token:       grant_c1ea828897...
+  Remaining:   4.4 min
+  Restrictions: read_only, max_records:100
+  ------------------------------------------------------------------
+
+Total: 1 active, 0 expired
+```
+
+#### 3b. Audit Summary
+
+Summarize permission activity across all agents:
+
+```bash
+# Human-readable
+python scripts/check_permission.py --audit-summary
+
+# Last 50 entries, JSON output
+python scripts/check_permission.py --audit-summary --last 50 --json
+```
+
+Output:
+```
+Audit Summary
+======================================================================
+  Requests:     12
+  Grants:        9
+  Denials:       3
+  Grant Rate:   75%
+
+  By Agent:
+  --------------------------------------------------
+  Agent                  Requests     Grants    Denials
+  data_analyst                  4          3          1
+  orchestrator                  5          4          1
+  strategy_advisor              3          2          1
+```
+
 #### 4. Use the Blackboard
 
 ```bash
@@ -359,7 +423,44 @@ python scripts/blackboard.py commit "chg_001"
 python scripts/blackboard.py list
 ```
 
-#### 5. Priority-Based Conflict Resolution (Phase 3)
+#### 5. Fan-Out / Fan-In with Shared Blackboard
+
+Coordinate multiple specialized agents working on independent subtasks, then merge results:
+
+```typescript
+import { LockedBlackboard } from 'network-ai';
+import { Logger } from 'network-ai';
+
+const logger = Logger.create('fan-out');
+const board = new LockedBlackboard('.', logger, { conflictResolution: 'first-commit-wins' });
+
+// Fan-out: each agent writes to its own section
+const agents = ['reliability', 'security', 'cost', 'operations', 'performance'];
+
+for (const pillar of agents) {
+  // Each agent evaluates independently, writes to its own key
+  const id = board.propose(`eval:${pillar}`, { score: Math.random(), findings: [] }, pillar);
+  board.validate(id, 'orchestrator');
+  board.commit(id);
+}
+
+// Fan-in: orchestrator reads all results and merges
+const results = agents.map(pillar => ({
+  pillar,
+  ...board.read(`eval:${pillar}`)
+}));
+
+const summary = board.propose('eval:summary', {
+  overall: results.reduce((sum, r) => sum + r.score, 0) / results.length,
+  pillars: results
+}, 'orchestrator');
+board.validate(summary, 'orchestrator');
+board.commit(summary);
+```
+
+This pattern works with any framework adapter -- LangChain agents, AutoGen agents, CrewAI crews, or any mix. The blackboard ensures no agent overwrites another's results.
+
+#### 6. Priority-Based Conflict Resolution (Phase 3)
 
 ```typescript
 import { LockedBlackboard } from 'network-ai';
@@ -384,7 +485,7 @@ board.commit(highId);                   // success
 board.read('shared:config'); // { mode: 'final' } -- supervisor wins
 ```
 
-#### 6. Check Budget Status
+#### 7. Check Budget Status
 
 ```bash
 python scripts/swarm_guard.py budget-check --task-id "task_001"
@@ -628,18 +729,43 @@ If you find Network-AI useful, **give it a star** -- it helps others discover th
 
 **Compatible with 12 agent frameworks: OpenClaw, LangChain, AutoGen, CrewAI, MCP, LlamaIndex, Semantic Kernel, OpenAI Assistants, Haystack, DSPy, Agno, and any custom adapter**
 
+## Competitive Comparison
+
+How Network-AI compares to other multi-agent frameworks:
+
+| Capability | Network-AI | LangChain/LangGraph | AutoGen/AG2 | CrewAI | Claude SDK |
+|---|---|---|---|---|---|
+| **Multi-framework support** | 12 adapters | LangChain only | AutoGen only | CrewAI only | Claude only |
+| **Shared state (blackboard)** | Atomic commits, TTL, priority | LangGraph state | Shared context | Shared memory | Project memory |
+| **Conflict resolution** | Priority preemption, last-write-wins | None | None | None | None |
+| **Fan-out / fan-in** | Native (parallel + merge) | LangGraph branches | Group chat | Parallel tasks | Subagents |
+| **Permission gating** | AuthGuardian (weighted scoring) | None | None | None | None |
+| **Budget tracking** | Token ceiling + per-task budgets | Callbacks only | None | None | None |
+| **Audit trail** | HMAC-signed, tamper-evident | None | None | None | None |
+| **Encryption at rest** | AES-256-GCM | None | None | None | None |
+| **Observability** | `--active-grants`, `--audit-summary` | LangSmith (SaaS) | None | None | None |
+| **Rate limiting** | Per-agent with lockout | None | None | None | None |
+| **Justification hardening** | 16-pattern injection defense | None | None | None | None |
+| **Language** | TypeScript/Node.js | Python | Python | Python | Python |
+| **Dependencies** | Zero (per adapter) | Heavy | Heavy | Heavy | Moderate |
+| **License** | MIT | MIT | CC-BY-4.0 | MIT | MIT |
+
+**Key differentiator:** Network-AI is the only framework that combines multi-framework orchestration with a governance layer (permissions, audit, encryption, budget enforcement). Other frameworks focus on one LLM provider; Network-AI wraps all of them.
+
 ## Related Concepts
 
 Network-AI fits into the broader AI agent ecosystem:
 
 - **Multi-Agent Systems** -- Coordinate multiple AI agents working together on complex tasks
 - **Agentic AI** -- Build autonomous agents that reason, plan, and execute using LLMs
-- **Swarm Intelligence** -- Parallel execution patterns with voting, merging, and chain strategies
+- **Behavioral Control Plane** -- Govern agent behavior with permission gating, compliance enforcement, and audit trails
+- **Swarm Intelligence** -- Parallel fan-out/fan-in patterns with voting, merging, and chain strategies
 - **Model Context Protocol (MCP)** -- Standard protocol support for LLM tool integration
 - **Agent-to-Agent (A2A)** -- Inter-agent communication via shared blackboard and handoff protocol
 - **Context Engineering** -- Manage and share context across agent boundaries
 - **Agentic Workflows** -- Task decomposition, parallel processing, and synthesis pipelines
 - **LLM Orchestration** -- Route tasks to the right agent framework automatically
+- **Agent Governance** -- Permission gating, budget enforcement, audit logging, and compliance monitoring
 
 If you're using LangGraph, Dify, Flowise, PraisonAI, AutoGen/AG2, CrewAI, or any other agent framework, Network-AI can integrate with it through the adapter system.
 
@@ -648,6 +774,6 @@ If you're using LangGraph, Dify, Flowise, PraisonAI, AutoGen/AG2, CrewAI, or any
 <details>
 <summary>Keywords (for search)</summary>
 
-ai-agents, agentic-ai, multi-agent, multi-agent-systems, multi-agent-system, agent-framework, ai-agent-framework, agentic-framework, agentic-workflow, llm, llm-agents, llm-agent, large-language-models, generative-ai, genai, orchestration, ai-orchestration, swarm, swarm-intelligence, autonomous-agents, agents, ai, typescript, nodejs, mcp, model-context-protocol, a2a, agent-to-agent, function-calling, tool-integration, context-engineering, rag, ai-safety, multi-agents-collaboration, multi-agents, aiagents, aiagentframework, plug-and-play, adapter-registry, blackboard-pattern, agent-coordination, agent-handoffs, token-permissions, budget-tracking, cost-awareness, atomic-commits, hallucination-detection, content-quality-gate, OpenClaw, Clawdbot, Moltbot, Clawdbot Swarm, Moltbot Security, Moltbot multi-agent, OpenClaw skills, AgentSkills, LangChain adapter, LangGraph, AutoGen adapter, AG2, CrewAI adapter, MCP adapter, LlamaIndex adapter, Semantic Kernel adapter, OpenAI Assistants adapter, Haystack adapter, DSPy adapter, Agno adapter, Phidata adapter, Dify, Flowise, PraisonAI, custom-adapter, AES-256 encryption, HMAC tokens, rate limiting, input sanitization, privilege escalation prevention, ClawHub, clawhub, agentic-rag, deep-research, workflow-orchestration, ai-assistant, ai-tools, developer-tools, open-source
+ai-agents, agentic-ai, multi-agent, multi-agent-systems, multi-agent-system, agent-framework, ai-agent-framework, agentic-framework, agentic-workflow, llm, llm-agents, llm-agent, large-language-models, generative-ai, genai, orchestration, ai-orchestration, swarm, swarm-intelligence, autonomous-agents, agents, ai, typescript, nodejs, mcp, model-context-protocol, a2a, agent-to-agent, function-calling, tool-integration, context-engineering, rag, ai-safety, multi-agents-collaboration, multi-agents, aiagents, aiagentframework, plug-and-play, adapter-registry, blackboard-pattern, agent-coordination, agent-handoffs, token-permissions, budget-tracking, cost-awareness, atomic-commits, hallucination-detection, content-quality-gate, behavioral-control-plane, governance-layer, compliance-enforcement, fan-out-fan-in, agent-observability, permission-gating, audit-trail, OpenClaw, Clawdbot, Moltbot, Clawdbot Swarm, Moltbot Security, Moltbot multi-agent, OpenClaw skills, AgentSkills, LangChain adapter, LangGraph, AutoGen adapter, AG2, CrewAI adapter, MCP adapter, LlamaIndex adapter, Semantic Kernel adapter, OpenAI Assistants adapter, Haystack adapter, DSPy adapter, Agno adapter, Phidata adapter, Dify, Flowise, PraisonAI, custom-adapter, AES-256 encryption, HMAC tokens, rate limiting, input sanitization, privilege escalation prevention, ClawHub, clawhub, agentic-rag, deep-research, workflow-orchestration, ai-assistant, ai-tools, developer-tools, open-source
 
 </details>

@@ -8,11 +8,17 @@ Evaluates permission requests for accessing sensitive resources
 Usage:
     python check_permission.py --agent AGENT_ID --resource RESOURCE_TYPE \
         --justification "REASON" [--scope SCOPE]
+    python check_permission.py --active-grants [--agent AGENT_ID] [--json]
+    python check_permission.py --audit-summary [--last N] [--json]
 
-Example:
+Examples:
     python check_permission.py --agent data_analyst --resource DATABASE \
         --justification "Need customer order history for sales report" \
         --scope "read:orders"
+
+    python check_permission.py --active-grants
+    python check_permission.py --active-grants --agent data_analyst --json
+    python check_permission.py --audit-summary --last 20 --json
 """
 
 import argparse
@@ -355,35 +361,277 @@ def evaluate_permission(agent_id: str, resource_type: str,
     }
 
 
+def list_active_grants(agent_filter: Optional[str] = None, as_json: bool = False) -> int:
+    """
+    Show which agents currently hold access to which APIs with expiry times.
+
+    Reads data/active_grants.json, filters out expired grants,
+    and displays remaining grants with TTL.
+    """
+    if not GRANTS_FILE.exists():
+        if as_json:
+            print(json.dumps({"grants": [], "total": 0, "expired_cleaned": 0}))
+        else:
+            print("No active grants. (No grants file found.)")
+        return 0
+
+    try:
+        grants = json.loads(GRANTS_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        if as_json:
+            print(json.dumps({"error": "Could not read grants file"}))
+        else:
+            print("Error: Could not read grants file.")
+        return 1
+
+    now = datetime.now(timezone.utc)
+    active: list[dict[str, Any]] = []
+    expired_count = 0
+
+    for token, grant in grants.items():
+        try:
+            expires_at = datetime.fromisoformat(grant["expires_at"])
+        except (KeyError, ValueError):
+            expired_count += 1
+            continue
+
+        if expires_at <= now:
+            expired_count += 1
+            continue
+
+        if agent_filter and grant.get("agent_id") != agent_filter:
+            continue
+
+        remaining = expires_at - now
+        minutes_left = remaining.total_seconds() / 60
+
+        active.append({
+            "token": token[:16] + "..." if len(token) > 16 else token,
+            "token_full": token,
+            "agent_id": grant.get("agent_id", "unknown"),
+            "resource_type": grant.get("resource_type", "unknown"),
+            "scope": grant.get("scope"),
+            "granted_at": grant.get("granted_at", "unknown"),
+            "expires_at": grant["expires_at"],
+            "minutes_remaining": round(minutes_left, 1),
+            "restrictions": grant.get("restrictions", []),
+        })
+
+    # Sort by expiry (soonest first)
+    active.sort(key=lambda g: g["expires_at"])
+
+    if as_json:
+        # In JSON mode, include full tokens
+        output: dict[str, Any] = {
+            "grants": active,
+            "total": len(active),
+            "expired_cleaned": expired_count,
+        }
+        print(json.dumps(output, indent=2))
+    else:
+        if not active:
+            filter_msg = f" for agent '{agent_filter}'" if agent_filter else ""
+            print(f"No active grants{filter_msg}. ({expired_count} expired.)")
+        else:
+            filter_msg = f" (agent: {agent_filter})" if agent_filter else ""
+            print(f"Active Grants{filter_msg}:")
+            print(f"{'='*70}")
+            for g in active:
+                print(f"  Agent:       {g['agent_id']}")
+                print(f"  Resource:    {g['resource_type']}")
+                if g["scope"]:
+                    print(f"  Scope:       {g['scope']}")
+                print(f"  Token:       {g['token']}")
+                print(f"  Granted:     {g['granted_at']}")
+                print(f"  Expires:     {g['expires_at']}")
+                print(f"  Remaining:   {g['minutes_remaining']} min")
+                if g["restrictions"]:
+                    print(f"  Restrictions: {', '.join(g['restrictions'])}")
+                print(f"  {'-'*66}")
+            print(f"\nTotal: {len(active)} active, {expired_count} expired")
+
+    return 0
+
+
+def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
+    """
+    Summarize recent permission requests, grants, and denials.
+
+    Parses data/audit_log.jsonl and produces per-agent and per-resource
+    breakdowns plus recent activity.
+    """
+    if not AUDIT_LOG.exists():
+        if as_json:
+            print(json.dumps({"entries": 0, "summary": {}, "recent": []}))
+        else:
+            print("No audit log found. (No permission requests recorded yet.)")
+        return 0
+
+    entries: list[dict[str, Any]] = []
+    try:
+        with open(AUDIT_LOG, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    except OSError:
+        if as_json:
+            print(json.dumps({"error": "Could not read audit log"}))
+        else:
+            print("Error: Could not read audit log.")
+        return 1
+
+    if not entries:
+        if as_json:
+            print(json.dumps({"entries": 0, "summary": {}, "recent": []}))
+        else:
+            print("Audit log is empty.")
+        return 0
+
+    # Aggregate stats
+    total_requests = 0
+    total_grants = 0
+    by_agent: dict[str, dict[str, int]] = {}
+    by_resource: dict[str, dict[str, int]] = {}
+
+    for entry in entries:
+        action = entry.get("action", "")
+        details = entry.get("details", {})
+        agent_id = details.get("agent_id", "unknown")
+        resource_type = details.get("resource_type", "unknown")
+
+        if action == "permission_request":
+            total_requests += 1
+            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0})
+            by_agent[agent_id]["requests"] += 1
+            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0})
+            by_resource[resource_type]["requests"] += 1
+        elif action == "permission_granted":
+            total_grants += 1
+            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0})
+            by_agent[agent_id]["grants"] += 1
+            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0})
+            by_resource[resource_type]["grants"] += 1
+
+    total_denials = total_requests - total_grants
+
+    # Recent entries (last N)
+    recent = entries[-last_n:]
+
+    # Time range
+    first_ts = entries[0].get("timestamp", "unknown")
+    last_ts = entries[-1].get("timestamp", "unknown")
+
+    if as_json:
+        output: dict[str, Any] = {
+            "total_entries": len(entries),
+            "total_requests": total_requests,
+            "total_grants": total_grants,
+            "total_denials": total_denials,
+            "time_range": {"first": first_ts, "last": last_ts},
+            "by_agent": by_agent,
+            "by_resource": by_resource,
+            "recent": recent[-last_n:],
+        }
+        print(json.dumps(output, indent=2))
+    else:
+        print("Audit Summary")
+        print(f"{'='*70}")
+        print(f"  Log entries:  {len(entries)}")
+        print(f"  Time range:   {first_ts}")
+        print(f"                {last_ts}")
+        print(f"")
+        print(f"  Requests:     {total_requests}")
+        print(f"  Grants:       {total_grants}")
+        print(f"  Denials:      {total_denials}")
+        grant_rate = (total_grants / total_requests * 100) if total_requests > 0 else 0
+        print(f"  Grant Rate:   {grant_rate:.0f}%")
+
+        if by_agent:
+            print(f"\n  By Agent:")
+            print(f"  {'-'*50}")
+            print(f"  {'Agent':<20} {'Requests':>10} {'Grants':>10} {'Denials':>10}")
+            print(f"  {'-'*50}")
+            for agent_id, stats in sorted(by_agent.items()):
+                denials = stats["requests"] - stats["grants"]
+                print(f"  {agent_id:<20} {stats['requests']:>10} {stats['grants']:>10} {denials:>10}")
+
+        if by_resource:
+            print(f"\n  By Resource:")
+            print(f"  {'-'*50}")
+            print(f"  {'Resource':<20} {'Requests':>10} {'Grants':>10} {'Denials':>10}")
+            print(f"  {'-'*50}")
+            for resource_type, stats in sorted(by_resource.items()):
+                denials = stats["requests"] - stats["grants"]
+                print(f"  {resource_type:<20} {stats['requests']:>10} {stats['grants']:>10} {denials:>10}")
+
+        print(f"\n  Recent Activity (last {min(last_n, len(recent))}):")
+        print(f"  {'-'*66}")
+        for entry in recent:
+            ts = entry.get("timestamp", "?")[:19]
+            action = entry.get("action", "?")
+            details = entry.get("details", {})
+            agent_id = details.get("agent_id", "?")
+            resource_type = details.get("resource_type", "?")
+            symbol = "GRANT" if action == "permission_granted" else "REQ" if action == "permission_request" else action.upper()
+            print(f"  {ts}  [{symbol:>5}]  {agent_id} -> {resource_type}")
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="AuthGuardian Permission Checker",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --agent data_analyst --resource SAP_API \\
-      --justification "Need Q4 invoice data for quarterly report"
-  
-  %(prog)s --agent orchestrator --resource FINANCIAL_API \\
-      --justification "Generating board presentation financials" \\
-      --scope "read:revenue,read:expenses"
+  Check permission:
+    %(prog)s --agent data_analyst --resource DATABASE \\
+        --justification "Need Q4 invoice data for quarterly report"
+
+  List active grants:
+    %(prog)s --active-grants
+    %(prog)s --active-grants --agent data_analyst --json
+
+  View audit summary:
+    %(prog)s --audit-summary
+    %(prog)s --audit-summary --last 50 --json
 """
     )
-    
+
+    # Action flags
+    parser.add_argument(
+        "--active-grants",
+        action="store_true",
+        help="List all active (non-expired) permission grants"
+    )
+    parser.add_argument(
+        "--audit-summary",
+        action="store_true",
+        help="Show audit log summary with per-agent and per-resource breakdowns"
+    )
+    parser.add_argument(
+        "--last",
+        type=int,
+        default=20,
+        help="Number of recent audit entries to show (default: 20)"
+    )
+
+    # Permission check args (required only for check mode)
     parser.add_argument(
         "--agent", "-a",
-        required=True,
-        help="Agent ID requesting permission"
+        help="Agent ID requesting permission (required for check; optional filter for --active-grants)"
     )
     parser.add_argument(
         "--resource", "-r",
-        required=True,
         choices=["DATABASE", "PAYMENTS", "EMAIL", "FILE_EXPORT"],
         help="Resource type to access"
     )
     parser.add_argument(
         "--justification", "-j",
-        required=True,
         help="Business justification for the request"
     )
     parser.add_argument(
@@ -395,29 +643,45 @@ Examples:
         action="store_true",
         help="Output result as JSON"
     )
-    
+
     args = parser.parse_args()
-    
+
+    # --- Action: --active-grants ---
+    if args.active_grants:
+        sys.exit(list_active_grants(agent_filter=args.agent, as_json=args.json))
+
+    # --- Action: --audit-summary ---
+    if args.audit_summary:
+        sys.exit(audit_summary(last_n=args.last, as_json=args.json))
+
+    # --- Default action: permission check ---
+    if not args.agent:
+        parser.error("--agent is required for permission checks")
+    if not args.resource:
+        parser.error("--resource is required for permission checks")
+    if not args.justification:
+        parser.error("--justification is required for permission checks")
+
     result = evaluate_permission(
         agent_id=args.agent,
         resource_type=args.resource,
         justification=args.justification,
         scope=args.scope
     )
-    
+
     if args.json:
         print(json.dumps(result, indent=2))
     else:
         if result["granted"]:
-            print("✅ GRANTED")
+            print("GRANTED")
             print(f"Token: {result['token']}")
             print(f"Expires: {result['expires_at']}")
             print(f"Restrictions: {', '.join(result['restrictions'])}")
         else:
-            print("❌ DENIED")
+            print("DENIED")
             print(f"Reason: {result['reason']}")
-        
-        print("\n📊 Evaluation Scores:")
+
+        print("\nEvaluation Scores:")
         scores = result["scores"]
         if scores.get("justification") is not None:
             print(f"  Justification: {scores['justification']:.2f}")
@@ -427,7 +691,7 @@ Examples:
             print(f"  Risk Score:    {scores['risk']:.2f}")
         if scores.get("weighted") is not None:
             print(f"  Weighted:      {scores['weighted']:.2f}")
-    
+
     sys.exit(0 if result["granted"] else 1)
 
 

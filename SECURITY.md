@@ -37,7 +37,7 @@ Network-AI includes built-in security features:
 
 - **VirusTotal**: Benign (0/64 engines)
 - **OpenClaw Scanner**: Benign, HIGH CONFIDENCE
-- **ClawHub Scanner**: v3.2.1 -- justification bypass vulnerability resolved
+- **ClawHub Scanner**: v3.2.3 -- justification bypass vulnerability resolved
 - **Snyk**: All High/Medium findings resolved in v3.0.3
 
 ## Disclosure Policy

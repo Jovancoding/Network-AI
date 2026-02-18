@@ -5,6 +5,28 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.3] - 2026-02-18
+
+### Added -- Phase 4 (Partial): Observability & Governance Vocabulary
+- **`--active-grants` command** -- `check_permission.py --active-grants` shows which agents currently hold access to which APIs, with TTL countdown, scope, restrictions; supports `--agent` filter and `--json` output
+- **`--audit-summary` command** -- `check_permission.py --audit-summary` summarizes permission activity: per-agent and per-resource breakdowns of requests/grants/denials, grant rate, recent activity log; supports `--last N` and `--json`
+- **Competitive comparison table** -- README now includes side-by-side feature comparison (Network-AI vs LangChain vs AutoGen vs CrewAI vs Claude SDK) across 14 capabilities
+- **Fan-out/fan-in example** -- README documents the parallel evaluation pattern using LockedBlackboard for coordinating independent agent subtasks
+- **Governance vocabulary** -- README reframed around "behavioral control plane," "compliance enforcement," "governance layer," "fan-out/fan-in orchestration"
+- **Observability section in Features** -- `--active-grants`, `--audit-summary`, and justification hardening listed under Operational Safety & Governance
+- **MCP Blackboard Tool Bindings** -- Added to Phase 4 roadmap (expose blackboard as MCP tool definitions)
+- **SEO keywords** -- Added behavioral-control-plane, governance-layer, compliance-enforcement, fan-out-fan-in, agent-observability, permission-gating, audit-trail
+
+### Changed
+- **`check_permission.py` restructured** -- `--agent`, `--resource`, `--justification` now optional at argparse level; validated manually only for permission check mode; action flags `--active-grants` and `--audit-summary` bypass check requirements
+- **README "Why Network-AI?" section** -- Updated to lead with governance, shared state, and security (previously led with swarm intelligence)
+- **Related Concepts section** -- Added Behavioral Control Plane and Agent Governance entries
+
+### Stats
+- 315 tests passing (79 + 33 + 139 + 64)
+- 0 compile errors
+- `check_permission.py`: 596 lines (was 436)
+
 ## [3.2.2] - 2026-02-17
 
 ### Changed
@@ -56,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`--active-grants` Command** -- Show which agents currently hold access to which APIs with expiry times
 - **`--audit-summary` Command** -- Summarize recent requests, grants, and denials by agent
 - **Behavioral Vocabulary in README** -- Reframe marketing around "behavioral control plane," "compliance enforcement," "governance layer"
+- **MCP Blackboard Tool Bindings** -- Expose `blackboard_read`, `blackboard_write`, `blackboard_list`, `blackboard_delete` as MCP-compatible tool definitions so any LLM agent can interact with shared state via tool calls
 
 ## [Future] -- Phase 5: Distributed Blackboard
 
