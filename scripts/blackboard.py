@@ -315,7 +315,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         Only allows alphanumeric characters, hyphens, underscores, and dots.
         Rejects any path separators or parent directory references.
         """
-        if not change_id or not isinstance(change_id, str):
+        if not change_id:
             raise ValueError("change_id must be a non-empty string")
         # Strip whitespace
         sanitized = change_id.strip()
