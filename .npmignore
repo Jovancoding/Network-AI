@@ -27,8 +27,11 @@ skill.json
 setup.ts
 
 # Python cache
+**/__pycache__/
 __pycache__/
+scripts/__pycache__/
 *.pyc
+**/*.pyc
 *.pyo
 .env
 .venv/
