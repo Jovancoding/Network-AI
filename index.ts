@@ -11,12 +11,12 @@
 
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'fs';
 import { join } from 'path';
-import { randomUUID, createHmac } from 'crypto';
+import { randomUUID } from 'crypto';
 import { AdapterRegistry } from './adapters/adapter-registry';
-import { InputSanitizer, SecureSwarmGateway, RateLimiter, SecureAuditLogger, DataEncryptor, SecurityError } from './security';
+import { InputSanitizer, SecureSwarmGateway } from './security';
 import { LockedBlackboard } from './lib/locked-blackboard';
 import type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions } from './lib/locked-blackboard';
-import { BlackboardValidator, QualityGateAgent } from './lib/blackboard-validator';
+import { QualityGateAgent } from './lib/blackboard-validator';
 import { Logger } from './lib/logger';
 import {
   IdentityVerificationError,
@@ -1796,7 +1796,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
   private async querySwarmState(params: Record<string, unknown>, context: SkillContext): Promise<SkillResult> {
     const scope = (params.scope as string) ?? 'all';
     const agentFilter = params.agentFilter as string[] | undefined;
-    const includeHistory = (params.includeHistory as boolean) ?? false;
+    const _includeHistory = (params.includeHistory as boolean) ?? false;
 
     const state: Partial<SwarmState> = {
       timestamp: new Date().toISOString(),

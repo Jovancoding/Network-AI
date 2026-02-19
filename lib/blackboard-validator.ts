@@ -311,7 +311,7 @@ export class BlackboardValidator {
         /lorem ipsum/i,
         /foo\s*bar\s*baz/i,
         /\bexample\.com\b/i,
-        /TODO|FIXME|HACK|XXX/,
+        /\b(?:TODO|FIXME|HACK|XXX)\b/,
         /placeholder/i,
         /dummy[_\s]?data/i,
         /sample[_\s]?data/i,

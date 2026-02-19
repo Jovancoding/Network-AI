@@ -35,7 +35,6 @@ const originalCallSkill = async (skillName: string, params: Record<string, unkno
 // ============================================================================
 
 import { 
-  SwarmOrchestrator, 
   SharedBlackboard, 
   AuthGuardian,
   createSwarmOrchestrator 

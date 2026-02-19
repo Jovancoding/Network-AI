@@ -8,7 +8,7 @@
  * Run with: npx ts-node test-ai-quality.ts
  */
 
-import { BlackboardValidator, QualityGateAgent, AIReviewCallback } from './lib/blackboard-validator';
+import { QualityGateAgent, AIReviewCallback } from './lib/blackboard-validator';
 
 // --- Simulated AI reviewer (replace with real LLM call) -------------------
 const mockAIReviewer: AIReviewCallback = async (key, value, entryType, context) => {

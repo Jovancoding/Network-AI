@@ -463,8 +463,8 @@ function testMultiplePreemptions(): void {
 
   // ALL four agents propose before any commits (creates true conflict)
   const idL1 = board.propose('hot:key', 'low1', 'agent-low-1', undefined, 0);
-  const idL2 = board.propose('hot:key', 'low2', 'agent-low-2', undefined, 1);
-  const idL3 = board.propose('hot:key', 'low3', 'agent-low-3', undefined, 1);
+  const _idL2 = board.propose('hot:key', 'low2', 'agent-low-2', undefined, 1);
+  const _idL3 = board.propose('hot:key', 'low3', 'agent-low-3', undefined, 1);
   const idHigh = board.propose('hot:key', 'critical-update', 'agent-critical', undefined, 3);
 
   // Low-1 commits first

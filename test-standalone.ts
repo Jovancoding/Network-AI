@@ -9,9 +9,9 @@
  * Run with: npx ts-node test-standalone.ts
  */
 
-import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { randomUUID, createHmac } from 'crypto';
+import { randomUUID } from 'crypto';
 import { BlackboardValidator, QualityGateAgent } from './lib/blackboard-validator';
 
 // ============================================================================
@@ -629,7 +629,7 @@ async function testBlackboard() {
   }
 
   // Test key sanitization (markdown injection prevention)
-  const injectedEntry = blackboard.write('task:normal', { safe: true }, 'orchestrator', undefined, 'orch-token-001');
+  const _injectedEntry = blackboard.write('task:normal', { safe: true }, 'orchestrator', undefined, 'orch-token-001');
   // Keys with | # [ ] ` should be sanitized
   const injectionKey = 'task:#inject|test`bad[key]';
   const sanitized = blackboard.write(injectionKey, { x: 1 }, 'orchestrator', undefined, 'orch-token-001');
@@ -1462,7 +1462,7 @@ async function testQualityGate() {
     },
   });
 
-  const aiResult = await gateWithAI.gate('result:ai-review', goodResult, 'agent-x');
+  const _aiResult = await gateWithAI.gate('result:ai-review', goodResult, 'agent-x');
   if (aiReviewCalled) {
     pass('AI review callback invoked for borderline entries');
   } else {

@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.10] - 2026-02-19
+
+### Fixed
+- **js/unused-local-variable** -- removed unused imports (`createHmac`, `DataEncryptor`, `RateLimiter`, `SecureAuditLogger`, `SecurityError`, `BlackboardValidator`, `appendFileSync`, `SwarmOrchestrator`) from `index.ts`, `test-standalone.ts`, `test.ts`, `test-ai-quality.ts`; prefixed intentionally unused destructured variables with `_` in `test-priority.ts`, `test-standalone.ts`, `setup.ts`, and `index.ts`
+- **js/regex/missing-regexp-anchor** -- added `\b` word boundaries to `/TODO|FIXME|HACK|XXX/` placeholder detection pattern in `blackboard-validator.ts`
+- **js/bad-tag-filter + js/regex/missing-regexp-anchor** -- dismissed as false positives via GitHub Code Scanning API; both are detection patterns operating within serialized content, not full-string validators
+- **Token-Permissions** -- strengthened `ci.yml` to `permissions: contents: read; actions: read`
+
 ## [3.2.9] - 2026-02-19
 
 ### Fixed
