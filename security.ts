@@ -16,7 +16,7 @@
  */
 
 import { createHmac, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
-import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
+import { readFileSync, appendFileSync } from 'fs';
 import { join, normalize, isAbsolute } from 'path';
 
 // ============================================================================

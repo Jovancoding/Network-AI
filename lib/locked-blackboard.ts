@@ -25,7 +25,6 @@ import {
   openSync,
   closeSync,
   writeSync,
-  statSync,
   readdirSync
 } from 'fs';
 import { join, dirname } from 'path';
@@ -128,9 +127,8 @@ export class FileLock {
 
   private ensureDir(): void {
     const dir = dirname(this.lockPath);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
+    // recursive: true is idempotent — no existsSync check needed
+    mkdirSync(dir, { recursive: true });
   }
 
   /**
@@ -143,25 +141,26 @@ export class FileLock {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeoutMs) {
-      // Check for stale lock
-      if (existsSync(this.lockPath)) {
-        try {
-          const lockData = JSON.parse(readFileSync(this.lockPath, 'utf-8'));
-          const lockAge = Date.now() - new Date(lockData.acquired_at).getTime();
-          
-          // If lock is stale, force release it
-          if (lockAge > CONFIG.staleLockThresholdMs) {
-            log.warn('Stale lock detected, force releasing', { lockAgeMs: lockAge });
-            this.forceRelease();
-          } else {
-            // Lock is held by someone else, wait and retry
-            this.sleep(CONFIG.lockRetryIntervalMs);
-            continue;
-          }
-        } catch {
+      // Check for stale lock — read directly to avoid existsSync+readFileSync TOCTOU
+      try {
+        const lockData = JSON.parse(readFileSync(this.lockPath, 'utf-8'));
+        const lockAge = Date.now() - new Date(lockData.acquired_at).getTime();
+        
+        // If lock is stale, force release it
+        if (lockAge > CONFIG.staleLockThresholdMs) {
+          log.warn('Stale lock detected, force releasing', { lockAgeMs: lockAge });
+          this.forceRelease();
+        } else {
+          // Lock is held by someone else, wait and retry
+          this.sleep(CONFIG.lockRetryIntervalMs);
+          continue;
+        }
+      } catch (e: any) {
+        if (e.code !== 'ENOENT') {
           // Corrupted lock file, remove it
           this.forceRelease();
         }
+        // ENOENT: no lock file yet, fall through to create
       }
 
       // Try to create lock file atomically

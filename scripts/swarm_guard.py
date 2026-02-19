@@ -122,19 +122,15 @@ class SwarmGuard:
             try:
                 self.task_tracking = json.loads(self.task_log_path.read_text())
             except json.JSONDecodeError:
-                pass
-        
-        if self.health_log_path.exists():
+                pass  # corrupt file — keep default empty dict
             try:
                 self.agent_health = json.loads(self.health_log_path.read_text())
             except json.JSONDecodeError:
-                pass
-        
-        if self.budget_log_path.exists():
+                pass  # corrupt file — keep default empty dict
             try:
                 self.budget_tracking = json.loads(self.budget_log_path.read_text())
             except json.JSONDecodeError:
-                pass
+                pass  # corrupt file — keep default empty dict
     
     def _save_state(self) -> None:
         """Persist tracking state to disk."""

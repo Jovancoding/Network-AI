@@ -5,6 +5,16 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.9] - 2026-02-19
+
+### Fixed
+- **Pinned-Dependencies** -- all GitHub Actions in `ci.yml`, `codeql.yml`, and `dependabot-auto-merge.yml` pinned to full commit SHA (Scorecard supply-chain requirement)
+- **Token-Permissions** -- added `permissions: read-all` at workflow level in `codeql.yml`
+- **Remaining TOCTOU** -- removed final `existsSync` + `readFileSync` race in `locked-blackboard.ts`; now reads directly and handles `ENOENT`
+- **Unused imports** -- removed `existsSync`/`writeFileSync` from `security.ts` and `statSync` from `locked-blackboard.ts`
+- **py/redundant-comparison** -- removed always-true `word_count > 0` ternary in `check_permission.py` (guaranteed `>= 3` by earlier guard)
+- **py/empty-except** -- added explanatory comments to all bare `pass` except blocks in `blackboard.py`, `swarm_guard.py`, and `validate_token.py`
+
 ## [3.2.8] - 2026-02-19
 
 ### Fixed

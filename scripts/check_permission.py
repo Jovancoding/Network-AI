@@ -139,7 +139,7 @@ def score_justification(justification: str) -> float:
 
     # ----- Repetition / padding detection -----
     unique_words = set(w.lower() for w in words)
-    unique_ratio = len(unique_words) / word_count if word_count > 0 else 0
+    unique_ratio = len(unique_words) / word_count  # word_count >= 3 guaranteed above
     if unique_ratio < 0.4:
         return 0.1  # More than 60% repeated words — likely padding
 
@@ -153,7 +153,7 @@ def score_justification(justification: str) -> float:
         stripped, re.IGNORECASE,
     )
     total_matched = len(task_keywords) + len(specificity_keywords)
-    keyword_density = total_matched / word_count if word_count > 0 else 0
+    keyword_density = total_matched / word_count  # word_count >= 3 guaranteed above
     if keyword_density > 0.5:
         return 0.1  # More than half the words are scoring keywords — stuffing
 

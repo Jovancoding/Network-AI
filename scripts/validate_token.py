@@ -59,7 +59,7 @@ def validate_token(token: str) -> dict[str, Any]:
                     "expired_at": expires_at
                 }
         except Exception:
-            pass
+            pass  # unparseable expiry field — treat token as non-expired
     
     return {
         "valid": True,

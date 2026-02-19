@@ -54,7 +54,7 @@ try:
     import fcntl as _fcntl_import
     _fcntl = _fcntl_import
 except ImportError:
-    pass
+    pass  # fcntl unavailable on Windows; file-based lock fallback is used instead
 
 # Default blackboard location
 BLACKBOARD_PATH = Path(__file__).parent.parent / "swarm-blackboard.md"
@@ -130,7 +130,7 @@ class FileLock:
                 
                 self.lock_file.close()
             except Exception:
-                pass
+                pass  # best-effort unlock; fd and marker cleaned up in finally
             finally:
                 self.lock_file = None
                 self.lock_marker = None
