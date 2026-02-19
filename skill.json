@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "3.2.10",
+  "version": "3.2.11",
   "description": "Multi-agent orchestrator and behavioral control plane for TypeScript/Node.js. Connects 12 AI frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw) with shared blackboard coordination, permission gating, audit trails, AES-256 encryption, and token budget enforcement.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",

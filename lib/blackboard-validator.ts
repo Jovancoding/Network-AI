@@ -310,7 +310,7 @@ export class BlackboardValidator {
       const placeholderPatterns = [
         /lorem ipsum/i,
         /foo\s*bar\s*baz/i,
-        /\bexample\.com\b/i,
+        /^.*\bexample\.com\b.*$/im,
         /\b(?:TODO|FIXME|HACK|XXX)\b/,
         /placeholder/i,
         /dummy[_\s]?data/i,

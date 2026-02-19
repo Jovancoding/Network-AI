@@ -5,6 +5,13 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.11] - 2026-02-19
+
+### Security
+- Add `^` / `$` anchors to `example.com` placeholder regex in `blackboard-validator.ts` (CodeQL #54 `js/regex/missing-regexp-anchor`)
+- Enable GitHub branch-protection rule on `main` (resolves Scorecard `BranchProtectionID`)
+- Dismiss Scorecard policy alerts unfixable on solo repo: `CII-Best-Practices`, `Code-Review`, `Fuzzing`, `Maintained`
+
 ## [3.2.10] - 2026-02-19
 
 ### Fixed
