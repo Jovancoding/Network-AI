@@ -2176,6 +2176,50 @@ export {
   TimeoutError,
 } from './lib/errors';
 
+// ============================================================================
+// Phase 4: Behavioral Control Plane
+// ============================================================================
+
+// FSM Journey Layer
+export {
+  JourneyFSM,
+  ToolAuthorizationMatrix,
+  ComplianceMiddleware,
+  ComplianceViolationError,
+  createDeliveryPipelineFSM,
+  WORKFLOW_STATES,
+} from './lib/fsm-journey';
+export type {
+  WorkflowStateDefinition,
+  StateTransition,
+  TransitionResult,
+  ComplianceCheckResult,
+  JourneyFSMOptions,
+} from './lib/fsm-journey';
+
+// Real-Time Compliance Monitor
+export { ComplianceMonitor } from './lib/compliance-monitor';
+export type {
+  ComplianceViolation,
+  ViolationType,
+  AgentAction,
+  AgentMonitorConfig,
+  ComplianceMonitorOptions,
+} from './lib/compliance-monitor';
+
+// MCP Blackboard Tool Bindings
+export {
+  BlackboardMCPTools,
+  registerBlackboardTools,
+  BLACKBOARD_TOOL_DEFINITIONS,
+} from './lib/mcp-blackboard-tools';
+export type {
+  MCPToolDefinition,
+  MCPJsonSchema,
+  BlackboardToolResult,
+  IBlackboard,
+} from './lib/mcp-blackboard-tools';
+
 /**
  * Factory function for creating a configured SwarmOrchestrator instance.
  * 

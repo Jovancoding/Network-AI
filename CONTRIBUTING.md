@@ -16,7 +16,7 @@ Unsolicited PRs without a linked, approved issue will be closed.
 
 ### Code Quality
 
-- All 251+ existing tests must pass (`npm test`)
+- All 462+ existing tests must pass (`npm run test:all`)
 - Zero TypeScript compile errors (`npx tsc --noEmit`)
 - New features must include tests with >90% branch coverage
 - Follow existing code style and patterns
@@ -41,7 +41,7 @@ Unsolicited PRs without a linked, approved issue will be closed.
 2. Implement your change with tests
 3. Run the full test suite:
    ```bash
-   npm test
+   npm run test:all
    npx tsc --noEmit
    ```
 4. Open a PR referencing the approved issue
@@ -78,7 +78,8 @@ Unsolicited PRs without a linked, approved issue will be closed.
 git clone https://github.com/jovanSAPFIONEER/Network-AI.git
 cd Network-AI
 npm install
-npm test          # Run all 251 tests
+npm run test:all  # Run all 462 tests (5 suites)
+npm run test:phase4  # Phase 4 behavioral control plane tests only
 npx tsc --noEmit  # Type-check
 ```
 
