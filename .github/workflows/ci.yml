@@ -102,6 +102,12 @@ jobs:
         run: npm run build
 
       - name: Publish to npm (with provenance)
-        run: npm publish --provenance --access public
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view network-ai@$PKG_VERSION version 2>/dev/null; then
+            echo "network-ai@$PKG_VERSION already published — skipping."
+          else
+            npm publish --provenance --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
