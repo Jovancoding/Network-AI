@@ -138,7 +138,7 @@ async function main() {
 
   // ─── STEP 1: Delegate to Researcher ────────────────────────────────────────
   banner('Step 1 - Researcher');
-  const r1 = await orchestrator.execute('delegate_task', {
+  await orchestrator.execute('delegate_task', {
     targetAgent : 'custom:researcher',
     taskPayload : {
       instruction   : 'multi-agent coordination patterns',
@@ -146,13 +146,9 @@ async function main() {
     },
   }, ctx);
 
-  if (!r1.success) {
-    console.error(`${c.bold}${c.yellow}[WARN]${c.reset} Researcher failed:`, r1.error?.message);
-  }
-
   // ─── STEP 2: Delegate to Analyst ───────────────────────────────────────────
   banner('Step 2 - Analyst');
-  const r2 = await orchestrator.execute('delegate_task', {
+  await orchestrator.execute('delegate_task', {
     targetAgent : 'custom:analyst',
     taskPayload : {
       instruction   : 'analyze researcher findings',
@@ -160,23 +156,15 @@ async function main() {
     },
   }, ctx);
 
-  if (!r2.success) {
-    console.error(`${c.bold}${c.yellow}[WARN]${c.reset} Analyst failed:`, r2.error?.message);
-  }
-
   // ─── STEP 3: Delegate to Reporter ──────────────────────────────────────────
   banner('Step 3 - Reporter');
-  const r3 = await orchestrator.execute('delegate_task', {
+  await orchestrator.execute('delegate_task', {
     targetAgent : 'custom:reporter',
     taskPayload : {
       instruction   : 'produce final report from analysis',
       expectedOutput: 'formatted report object',
     },
   }, ctx);
-
-  if (!r3.success) {
-    console.error(`${c.bold}${c.yellow}[WARN]${c.reset} Reporter failed:`, r3.error?.message);
-  }
 
   // ─── FINAL REPORT ──────────────────────────────────────────────────────────
   banner('Final Report');
