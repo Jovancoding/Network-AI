@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "issues": {
+    "evalDynamicCodeExecution": [
+      {
+        "path": "dist/lib/blackboard-validator.js",
+        "reason": "False positive — this is a security detection pattern that scans for eval() usage in untrusted agent code. It is not dynamic code execution."
+      }
+    ]
+  }
+}

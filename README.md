@@ -19,12 +19,14 @@
 
 > **Legacy Users:** This skill works with **Clawdbot** and **Moltbot** (now OpenClaw). If you're searching for *Moltbot Security*, *Clawdbot Swarm*, or *Moltbot multi-agent* -- you're in the right place!
 
-Network-AI is a framework-agnostic multi-agent orchestrator and **behavioral control plane** that connects LLM agents across **12 frameworks** -- LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, and custom adapters. It provides shared blackboard coordination with atomic commits, built-in security (AES-256, HMAC tokens, rate limiting), content quality gates with hallucination detection, compliance enforcement, and agentic workflow patterns (parallel fan-out/fan-in, voting, chaining). Zero dependencies per adapter -- bring your own framework SDK and start building governed multi-agent systems in minutes.
+If network-ai saves you time, a ⭐ on GitHub helps others find it.
+
+Connect agents across **12 frameworks** through a shared blackboard with built-in security, compliance enforcement, and behavioral governance -- in a single `npm install`. No glue code, no lock-in.
 
 **Why Network-AI?**
-- **Framework-agnostic** -- Not locked to one LLM provider or agent SDK
-- **Governance layer** -- Permission gating, audit trails, budget ceilings, and compliance enforcement across all agents
-- **Shared state** -- Atomic blackboard with conflict resolution for safe parallel agent coordination (fan-out/fan-in)
+- **Framework-agnostic** -- LangChain, AutoGen, CrewAI, MCP, OpenAI Assistants, and 7 more in one orchestrator
+- **Governed coordination** -- FSM-controlled agent turns, permission gating, audit trails, budget ceilings
+- **Shared state** -- Atomic blackboard with conflict resolution for safe parallel agent coordination
 - **Production security** -- AES-256 encryption, HMAC audit logs, rate limiting, input sanitization
 - **Zero config** -- Works out of the box with `createSwarmOrchestrator()`
 
