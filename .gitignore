@@ -19,8 +19,9 @@ Thumbs.db
 __pycache__/
 *.pyc
 
-# Live demo (contains API key - never commit)
+# Live demos (use real API keys - never commit)
 examples/04-live-swarm.ts
+examples/05-code-review-swarm.ts
 *.pyo
 .env
 .venv/
