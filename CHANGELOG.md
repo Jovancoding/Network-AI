@@ -5,6 +5,11 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.7] - 2026-02-21
+
+### Changed
+- **Re-publish to unblock ClawHub security scan** — v3.3.6 scan stalled; fresh publish triggers new scan pipeline
+
 ## [3.3.6] - 2026-02-21
 
 ### Fixed
