@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.6] - 2026-02-21
+
+### Fixed
+- **All 4 demo modes now produce output after merger** — modes 2 and 4 were silently stopping after the merger step
+- **Orchestrator task-cache collision** — repeated runs with the same mode shared a cache key (same instruction string = same first-50-chars of serialized payload); handler was bypassed and `mergerResult` stayed null; fixed by adding `_rid: totalStart` to every `taskPayload`
+- **Merger/coordinator executed directly via adapter** — bypasses orchestrator sanitization and cache entirely for the final merge step, guaranteeing the handler always fires
+- **Budget-aware patch truncation** — replaces hard 600-char/5-patch cap with a dynamic per-patch limit (`max(400, floor(40k_budget / total_patch_count))`); all patches retained regardless of count
+- **Defensive merger input normalization** — malformed fixer outputs (missing/non-string fields) are sanitized before merger prep so they can no longer crash the merge stage
+- **try-catch on merger and coordinator API calls** — errors are now captured into `mergerResult`/`coordinatorResult` with an error message instead of leaving the variable null
+- **Fixer `max_completion_tokens` raised to 16 000** — prevents fixer output truncation on larger code files
+- **`.env` auto-loader** — inline IIFE reads `.env` at startup, strips surrounding quotes from values; no `dotenv` dependency required
+
 ## [3.3.5] - 2026-02-21
 
 ### Added
