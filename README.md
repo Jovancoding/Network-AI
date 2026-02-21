@@ -60,6 +60,14 @@ console.log(result.data); // "Hello, World! Your task: welcome"
 
 That's it. No config files, no setup wizards. Add more agents, swap frameworks, layer on security -- all optional.
 
+## Demo
+
+[![Code Review Swarm Demo](https://img.youtube.com/vi/UyMsNhaw9lU/0.jpg)](https://youtu.be/UyMsNhaw9lU)
+
+*5-agent code review swarm — parallel specialist agents coordinated through a shared blackboard*
+
+> **Note:** The live demo files (`04-live-swarm.ts`, `05-code-review-swarm.ts`) are not included in the repository because they require a personal API key to run. Shipping them without one would produce silent failures for most users, and including a key, even as an example, is a security risk. The three bundled examples (`01`–`03`) cover all core framework features and run without any external dependencies.
+
 ## Why This Exists -- The Multi-Agent Race Condition Problem
 
 Most agent frameworks let you run multiple AI agents in parallel. None of them protect you when those agents write to the same resource at the same time.
