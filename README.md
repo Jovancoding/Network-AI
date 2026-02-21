@@ -66,7 +66,7 @@ That's it. No config files, no setup wizards. Add more agents, swap frameworks, 
 
 *5-agent code review swarm — parallel specialist agents coordinated through a shared blackboard*
 
-> **Note:** The live demo files (`04-live-swarm.ts`, `05-code-review-swarm.ts`) are not included in the repository because they require a personal API key to run. Shipping them without one would produce silent failures for most users, and including a key, even as an example, is a security risk. The three bundled examples (`01`–`03`) cover all core framework features and run without any external dependencies.
+> **Note:** The live demo files (`04-live-swarm.ts`, `05-code-review-swarm.ts`) are not included in the repository. They call live LLM APIs and need real keys, model names, and provider choices wired in — details that differ for every setup. Shipping a half-configured file would break silently for most people. The three bundled examples (`01`–`03`) cover all core framework features and run without any external dependencies.
 
 ## Why This Exists -- The Multi-Agent Race Condition Problem
 
