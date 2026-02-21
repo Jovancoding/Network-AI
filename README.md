@@ -66,6 +66,8 @@ That's it. No config files, no setup wizards. Add more agents, swap frameworks, 
 
 *5-agent code review swarm — parallel specialist agents coordinated through a shared blackboard*
 
+> The demo shows a code review swarm, but Network-AI is not a code review tool. The same orchestration pattern works for research pipelines, data processing, content moderation, customer support routing, document analysis, financial workflows — any task where multiple agents need to coordinate without stepping on each other.
+
 > **Note:** The live demo files (`04-live-swarm.ts`, `05-code-review-swarm.ts`) are not included in the repository. They call live LLM APIs and need real keys, model names, and provider choices wired in — details that differ for every setup. Shipping a half-configured file would break silently for most people. The three bundled examples (`01`–`03`) cover all core framework features and run without any external dependencies.
 
 ## Why This Exists -- The Multi-Agent Race Condition Problem
