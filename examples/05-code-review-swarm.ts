@@ -166,6 +166,24 @@ async function warnIfMismatch(mode: InputMode, content: string, colors: Record<s
   });
 }
 
+// ─── Load .env file if present (no dotenv dependency) ────────────────────────
+;(function loadDotEnv() {
+  const fs   = require('fs')   as typeof import('fs');
+  const path = require('path') as typeof import('path');
+  const envPath = path.resolve(__dirname, '..', '.env');
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 1) continue;
+    const key = line.slice(0, eq).trim();
+    const val = line.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+    if (key && val && !process.env[key]) process.env[key] = val;
+  }
+})();
+
 // ─── Guard: require API key upfront ──────────────────────────────────────────
 const API_KEY = process.env.OPENAI_API_KEY ?? '';
 if (!API_KEY) {
@@ -479,6 +497,9 @@ async function main() {
     activeReviewers.map(r => [r.id, { status: 'waiting', findings: '', ms: 0 }])
   );
 
+  // Direct findings store — bypasses blackboard sanitization which strips security-relevant content
+  const reviewFindings = new Map<string, { label: string; angle: string; findings: string; ms: number }>();
+
   function countFindings(raw: string) {
     return raw.split('\n').filter(l => /^\[?(CRITICAL|HIGH|MEDIUM|LOW)/i.test(l.trim())).length;
   }
@@ -606,7 +627,10 @@ async function main() {
         }
 
         agentState.set(id, { status: 'done', findings, ms });
-        blackboard.write(`review:${id}`, { label, angle, findings, ms }, id, 3600, `tok-${id}`);
+        reviewFindings.set(id, { label, angle, findings, ms });
+        try {
+          blackboard.write(`review:${id}`, { label, angle, findings, ms }, id, 3600, `tok-${id}`);
+        } catch { /* sanitizer may strip security content — reviewFindings is the source of truth */ }
         return { label, findings, ms };
       } catch (err: any) {
         const ms = Date.now() - t0;
@@ -623,12 +647,14 @@ async function main() {
   const fixedHeader    = isDesign ? '=== REVISED DESIGN ==='      : '=== FIXED CODE ===';
 
   // ─── Design mode: single coordinator call ────────────────────────────────
+  let coordinatorResult: { verdict: string; fixed: string; finishReason: string; reviewCount: number; ms: number } | null = null;
   if (isDesign) {
     adapter.registerHandler('coordinator', async (payload) => {
       agent('coordinator', 'Synthesizing risks + rewriting design...');
       const allReviews = (payload.handoff?.context as any)?.reviews as Array<{ label: string; findings: string }> ?? [];
       const combined   = allReviews.map(r => '=== ' + r.label + ' Review ===\n' + r.findings).join('\n\n');
       const t0 = Date.now();
+      try {
       const resp = await openai.chat.completions.create({
         model                : 'gpt-5.2',
         messages             : [
@@ -663,20 +689,34 @@ async function main() {
         verdict = decodeHtml(String(parsed.blockers ?? '').trim());
         fixed   = decodeHtml(String(parsed.fixed   ?? '').trim());
       } catch { /* keep empty */ }
-      blackboard.write('verdict:final', { verdict, fixed, finishReason, reviewCount: allReviews.length, ms, generatedAt: new Date().toISOString() }, 'coordinator', 3600, 'tok-coord');
+      coordinatorResult = { verdict, fixed, finishReason, reviewCount: allReviews.length, ms };
+      try {
+        blackboard.write('verdict:final', { verdict, fixed, finishReason, reviewCount: allReviews.length, ms, generatedAt: new Date().toISOString() }, 'coordinator', 3600, 'tok-coord');
+      } catch { /* blackboard sanitization may strip content — coordinatorResult is the source of truth */ }
       return { verdict, fixed, finishReason, ms };
+      } catch (coordErr: any) {
+        const ms = Date.now() - t0;
+        const errMsg = String(coordErr?.message ?? coordErr).slice(0, 200);
+        process.stderr.write('\n[coordinator] API error: ' + errMsg + '\n');
+        coordinatorResult = { verdict: '#1  [CRITICAL]  Coordinator API call failed: ' + errMsg, fixed: '', finishReason: 'error', reviewCount: allReviews.length, ms };
+        return { verdict: coordinatorResult.verdict, fixed: '', finishReason: 'error', ms };
+      }
     });
   }
 
   // ─── Code / custom mode: Wave 2 fixers + Wave 3 merger ───────────────────
+  // Direct result store — bypasses blackboard sanitization for large/code-heavy outputs
+  let mergerResult: { verdict: string; fixed: string; finishReason: string; reviewCount: number; ms: number } | null = null;
+  const fixerPatches = new Map<string, { domain: string; changes: Array<{ fn: string; issue: string; fixed: string }>; ms: number }>();
+
   if (!isDesign) {
     // 5 specialist fixers — each reads its reviewer's findings and applies targeted patches
     for (const { id, label, angle } of activeReviewers) {
       const fixId = id.replace('_review', '_fixer');
       adapter.registerHandler(fixId, async (_payload) => {
         fixerState.set(fixId, { status: 'running', nChanges: 0, ms: 0 });
-        const reviewEntry = blackboard.read('review:' + id);
-        const findings    = (reviewEntry?.value as any)?.findings ?? '';
+        const reviewEntry = reviewFindings.get(id);
+        const findings    = reviewEntry?.findings ?? '';
         const t0 = Date.now();
         try {
           const resp = await openai.chat.completions.create({
@@ -709,7 +749,7 @@ async function main() {
                     label + ' issues to fix:\n' + (findings || 'No issues — return { "changes": [] }'),
               },
             ],
-            max_completion_tokens: 3000,
+            max_completion_tokens: 16000,
             temperature          : 0.1,
             response_format      : { type: 'json_object' },
           });
@@ -720,12 +760,14 @@ async function main() {
             changes = Array.isArray(parsed.changes) ? parsed.changes : [];
           } catch { /* keep empty */ }
           fixerState.set(fixId, { status: 'done', nChanges: changes.length, ms });
-          blackboard.write('fix:' + id, { domain: label, changes, ms }, fixId, 3600, 'tok-' + fixId);
+          fixerPatches.set(id, { domain: label, changes, ms });
+          try { blackboard.write('fix:' + id, { domain: label, changes, ms }, fixId, 3600, 'tok-' + fixId); } catch { /* sanitizer may strip code content */ }
           return { domain: label, changes, ms };
         } catch (err: any) {
           const ms = Date.now() - t0;
           fixerState.set(fixId, { status: 'done', nChanges: 0, ms });
-          blackboard.write('fix:' + id, { domain: label, changes: [], ms }, fixId, 3600, 'tok-' + fixId);
+          fixerPatches.set(id, { domain: label, changes: [], ms });
+          try { blackboard.write('fix:' + id, { domain: label, changes: [], ms }, fixId, 3600, 'tok-' + fixId); } catch { /* sanitizer may strip code content */ }
           return { domain: label, changes: [], ms };
         }
       });
@@ -735,10 +777,42 @@ async function main() {
     adapter.registerHandler('merger', async (_payload) => {
       agent('merger', 'Merging all targeted patches into final unified output...');
       const allFixes = activeReviewers.map(r => {
-        const entry = blackboard.read('fix:' + r.id);
-        return (entry?.value as any) ?? { domain: r.label, changes: [] };
+        return fixerPatches.get(r.id) ?? { domain: r.label, changes: [] };
       });
       const t0 = Date.now();
+      // Budget-aware payload truncation: keep ALL patches but cap "fixed" body size
+      // dynamically so total patch chars stay under ~40 000 (safe for 32k-token merger).
+      // Mode 4 can produce 10+ patches/domain (37 total); mode 2 produces 2–6 per domain.
+      // Normalize shape defensively so malformed fixer payloads never crash merger prep.
+      const normalizedFixes = allFixes.map((f: any) => ({
+        domain : String(f?.domain ?? ''),
+        changes: Array.isArray(f?.changes)
+          ? f.changes.map((c: any) => ({
+              fn   : String(c?.fn ?? ''),
+              issue: String(c?.issue ?? ''),
+              fixed: String(c?.fixed ?? ''),
+            }))
+          : [],
+      }));
+      const totalPatchCount = normalizedFixes.reduce((s, f) => s + f.changes.length, 0);
+      const PAYLOAD_BUDGET  = 40000;                               // chars
+      const originLen       = content.length;
+      const patchBudget     = Math.max(PAYLOAD_BUDGET - originLen, 8000);
+      // min 400 chars per patch so instructions remain meaningful
+      const maxPerPatch     = totalPatchCount > 0
+        ? Math.max(400, Math.floor(patchBudget / totalPatchCount))
+        : 2000;
+      const truncatedFixes = normalizedFixes.map(f => ({
+        domain : f.domain,
+        changes: f.changes.map((c: { fn: string; issue: string; fixed: string }) => ({
+          fn   : c.fn,
+          issue: c.issue,
+          fixed: c.fixed.length > maxPerPatch
+            ? c.fixed.slice(0, maxPerPatch) + '\n// ... (continue applying the fix intent described above)'
+            : c.fixed,
+        })),
+      }));
+      try {
       const resp = await openai.chat.completions.create({
         model                : 'gpt-5.2',
         messages             : [
@@ -768,8 +842,8 @@ async function main() {
           {
             role   : 'user',
             content: mode === 'custom'
-              ? 'Original content:\n' + content + '\n\nImprovement sets to merge:\n' + JSON.stringify(allFixes, null, 2)
-              : 'Original code:\n' + content + '\n\nPatch sets to merge:\n' + JSON.stringify(allFixes, null, 2),
+              ? 'Original content:\n' + content + '\n\nImprovement sets to merge:\n' + JSON.stringify(truncatedFixes, null, 2)
+              : 'Original code:\n' + content + '\n\nPatch sets to merge:\n' + JSON.stringify(truncatedFixes, null, 2),
           },
         ],
         max_completion_tokens: 32000,
@@ -784,8 +858,18 @@ async function main() {
         verdict = decodeHtml(String(parsed.blockers ?? '').trim());
         fixed   = decodeHtml(String(parsed.fixed   ?? '').trim());
       } catch { /* keep empty */ }
-      blackboard.write('verdict:final', { verdict, fixed, finishReason, reviewCount: activeReviewers.length, ms, generatedAt: new Date().toISOString() }, 'merger', 3600, 'tok-merger');
+      mergerResult = { verdict, fixed, finishReason, reviewCount: activeReviewers.length, ms };
+      try {
+        blackboard.write('verdict:final', { verdict, fixed, finishReason, reviewCount: activeReviewers.length, ms, generatedAt: new Date().toISOString() }, 'merger', 3600, 'tok-merger');
+      } catch { /* blackboard sanitization may strip code content — mergerResult is the source of truth */ }
       return { verdict, fixed, finishReason, ms };
+      } catch (mergerErr: any) {
+        const ms = Date.now() - t0;
+        const errMsg = String(mergerErr?.message ?? mergerErr).slice(0, 200);
+        process.stderr.write('\n[merger] API error: ' + errMsg + '\n');
+        mergerResult = { verdict: '#1  [CRITICAL]  Merger API call failed: ' + errMsg, fixed: '', finishReason: 'error', reviewCount: activeReviewers.length, ms };
+        return { verdict: mergerResult.verdict, fixed: '', finishReason: 'error', ms };
+      }
     });
   }
 
@@ -842,14 +926,14 @@ async function main() {
     await orchestrator.execute('delegate_task', {
       targetAgent: `custom:${r.id}`,
       taskPayload: {
+        _rid          : totalStart,
         instruction   : r.angle,
         context       : { content },
         expectedOutput: '[SEVERITY] Issue  |  Fix: remedy',
       },
     }, ctx);
-    const entry = blackboard.read(`review:${r.id}`);
-    const val = entry?.value as { label: string; findings: string } | undefined;
-    if (val?.findings) collectedReviews.push({ label: val.label, findings: val.findings, color: r.color });
+    const rf = reviewFindings.get(r.id);
+    if (rf?.findings) collectedReviews.push({ label: rf.label, findings: rf.findings, color: r.color });
   }
 
   // Silent retry for any blank agents (rate-limit hit on first call)
@@ -860,18 +944,18 @@ async function main() {
       await orchestrator.execute('delegate_task', {
         targetAgent: `custom:${r.id}`,
         taskPayload: {
+          _rid          : totalStart,
           instruction   : r.angle,
           context       : { content },
           expectedOutput: '[SEVERITY] Issue  |  Fix: remedy',
         },
       }, ctx);
-      const entry = blackboard.read(`review:${r.id}`);
-      const val = entry?.value as { label: string; findings: string } | undefined;
-      if (val?.findings) collectedReviews.push({ label: val.label, findings: val.findings, color: r.color });
+      const rf2 = reviewFindings.get(r.id);
+      if (rf2?.findings) collectedReviews.push({ label: rf2.label, findings: rf2.findings, color: r.color });
       // Update agentState for board if retry succeeded
       const st = agentState.get(r.id)!;
-      if (!st.findings && val?.findings) {
-        agentState.set(r.id, { ...st, findings: val.findings });
+      if (!st.findings && rf2?.findings) {
+        agentState.set(r.id, { ...st, findings: rf2.findings });
       }
       await sleep(3000);
     }
@@ -912,7 +996,7 @@ async function main() {
       const fid = r.id.replace('_review', '_fixer');
       await orchestrator.execute('delegate_task', {
         targetAgent: 'custom:' + fid,
-        taskPayload: { instruction: r.angle, context: { content }, expectedOutput: '{ "changes": [] }' },
+        taskPayload: { _rid: totalStart, instruction: r.angle, context: { content }, expectedOutput: '{ "changes": [] }' },
       }, ctx);
     }
     clearInterval(fixerSpinInterval);
@@ -931,21 +1015,63 @@ async function main() {
     coordFrame++;
   }, 120);
 
-  await orchestrator.execute('delegate_task', {
-    targetAgent: mergeTarget,
-    taskPayload: {
-      instruction   : mergeLabel,
-      context       : { reviews: collectedReviews },
-      expectedOutput: '{ "blockers": "...", "fixed": "..." }',
+  // Execute merger/coordinator directly through the adapter.
+  // This avoids orchestrator task-cache collisions and sanitizer interference
+  // on large final outputs.
+  const mergeAgentId = isDesign ? 'coordinator' : 'merger';
+  const mergeExec = await adapter.executeAgent(
+    mergeAgentId,
+    {
+      action: 'execute',
+      params: {},
+      handoff: {
+        handoffId      : 'merge-direct-' + totalStart,
+        sourceAgent    : 'orchestrator',
+        targetAgent    : 'custom:' + mergeAgentId,
+        taskType       : 'delegate',
+        instruction    : mergeLabel,
+        context        : { reviews: collectedReviews },
+        expectedOutput : '{ "blockers": "...", "fixed": "..." }',
+      },
+      blackboardSnapshot: {},
     },
-  }, ctx);
+    {
+      agentId  : 'orchestrator',
+      taskId   : 'merge-direct-' + totalStart,
+      sessionId: 'demo-' + totalStart,
+    }
+  );
+
+  if (!mergeExec.success) {
+    const errMsg = String(mergeExec.error?.message ?? 'unknown merge execution error');
+    process.stderr.write('\n[' + mergeAgentId + '] adapter execution error: ' + errMsg + '\n');
+  } else {
+    const data = mergeExec.data as any;
+    if (!isDesign && !mergerResult && data && typeof data === 'object') {
+      mergerResult = {
+        verdict    : String(data.verdict ?? ''),
+        fixed      : String(data.fixed ?? ''),
+        finishReason: String(data.finishReason ?? 'unknown'),
+        reviewCount: activeReviewers.length,
+        ms         : Number(data.ms ?? 0),
+      };
+    }
+    if (isDesign && !coordinatorResult && data && typeof data === 'object') {
+      coordinatorResult = {
+        verdict    : String(data.verdict ?? ''),
+        fixed      : String(data.fixed ?? ''),
+        finishReason: String(data.finishReason ?? 'unknown'),
+        reviewCount: activeReviewers.length,
+        ms         : Number(data.ms ?? 0),
+      };
+    }
+  }
 
   clearInterval(coordSpin);
   process.stdout.write('\r\x1b[2K');
 
-  const verdictEntry = blackboard.read('verdict:final');
-  if (verdictEntry) {
-    const val        = verdictEntry.value as { verdict: string; fixed: string; finishReason?: string; reviewCount: number; ms: number };
+  const val = (mergerResult ?? coordinatorResult) as { verdict: string; fixed: string; finishReason: string; reviewCount: number; ms: number } | null;
+  if (val) {
     const reviewType = isDesign ? 'architecture reviews' : 'specialist reviews';
 
     // ── Blockers
@@ -1054,7 +1180,7 @@ async function main() {
       }
 
       const fixedLines = currentCode.split('\n');
-      const fixCount   = fixedLines.filter(l => l.includes('// FIX:') || l.includes('## Changes Made')).length;
+      const fixCount   = fixedLines.filter((l: string) => l.includes('// FIX:') || l.includes('## Changes Made')).length;
       const truncated  = val.finishReason === 'length';
 
       if (syntaxErrors.length === 0) {
