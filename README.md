@@ -68,7 +68,7 @@ That's it. No config files, no setup wizards. Add more agents, swap frameworks, 
 
 > The demo shows a code review swarm, but Network-AI is not a code review tool. The same orchestration pattern works for research pipelines, data processing, content moderation, customer support routing, document analysis, financial workflows — any task where multiple agents need to coordinate without stepping on each other.
 
-> **Live demo source coming soon:** The full source for `04-live-swarm.ts` and `05-code-review-swarm.ts` will be added to the repo with a `.env.example` so you can run them against your own API keys. In the meantime, examples `01`–`03` cover all core framework features — atomic blackboard, FSM governance, parallel dispatch — with no API key or external dependency required.
+> **Run the demo yourself:** `05-code-review-swarm.ts` is in the repo. Copy `.env.example` to `.env`, add your `OPENAI_API_KEY`, then run `npx ts-node examples/05-code-review-swarm.ts`. Supports 4 modes: built-in code review, paste your own code, system design document, or custom role for any content type (proposals, policies, job descriptions, emails). Examples `01`–`03` cover all core framework features with no API key required. `04-live-swarm.ts` (live AI research swarm) is coming soon.
 
 ## Why This Exists -- The Multi-Agent Race Condition Problem
 

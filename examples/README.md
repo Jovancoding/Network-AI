@@ -1,14 +1,16 @@
 # network-ai · Examples
 
-Runnable demos that show the core features in under five minutes.  
-All three examples work without an API key.
+Runnable demos that show the core features in under five minutes.
 
 ```
 examples/
-  01-hello-swarm.ts      ← three agents passing work through a blackboard
-  02-fsm-pipeline.ts     ← FSM governance (state-based access control)
-  03-parallel-agents.ts  ← parallel agents + four synthesis strategies
+  01-hello-swarm.ts        ← three agents passing work through a blackboard  (no API key)
+  02-fsm-pipeline.ts       ← FSM governance (state-based access control)     (no API key)
+  03-parallel-agents.ts    ← parallel agents + four synthesis strategies      (no API key)
+  05-code-review-swarm.ts  ← 5-agent AI code review swarm, 4 modes            (OPENAI_API_KEY required)
 ```
+
+Examples `01`–`03` run without any API key. `05` calls the OpenAI API — copy `.env.example` to `.env` and add your key before running it.
 
 ## Prerequisites
 
@@ -79,7 +81,35 @@ npx ts-node examples/03-parallel-agents.ts
 npx ts-node examples/01-hello-swarm.ts
 npx ts-node examples/02-fsm-pipeline.ts
 npx ts-node examples/03-parallel-agents.ts
+
+# 05 requires OPENAI_API_KEY in .env
+npx ts-node examples/05-code-review-swarm.ts
 ```
+
+---
+
+## 05 · Code Review Swarm
+
+A 5-agent swarm (Security, Performance, Reliability, Testing, Architecture) reviews code or documents in parallel, then a coordinator synthesizes the findings and a fixer agent applies them. Requires `OPENAI_API_KEY`.
+
+```bash
+# Setup (one time)
+cp .env.example .env        # then add your key inside .env
+
+# Run
+npx ts-node examples/05-code-review-swarm.ts
+```
+
+**4 modes at launch:**
+
+| Mode | Prompt | Output |
+|------|--------|--------|
+| `[1]` Built-in | Reviews the bundled `auth-service.ts` | Fixed `.ts` file |
+| `[2]` Paste code | Paste your own source (ends with `end`) | Fixed `.ts` file |
+| `[3]` System design | Paste a design/architecture doc | Revised `.md` file |
+| `[4]` Custom role | Define your own reviewers for any content | Revised `.md` file |
+
+Output files are saved to `examples/output/`. See the [YouTube demo](https://youtu.be/UyMsNhaw9lU) for a walkthrough.
 
 ---
 
