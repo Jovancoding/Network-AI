@@ -407,15 +407,8 @@ class SharedBlackboard {
    * Prevents DoS via oversized writes and circular data.
    */
   private validateValue(value: unknown): { valid: boolean; reason?: string } {
-    if (value === undefined) {
-      return { valid: false, reason: 'Value is undefined and cannot be stored' };
-    }
     try {
       const serialized = JSON.stringify(value);
-      if (serialized === undefined) {
-        // JSON.stringify returns undefined for unsupported root types (functions, symbols, etc.)
-        return { valid: false, reason: 'Value cannot be serialized (unsupported type)' };
-      }
       if (serialized.length > CONFIG.maxBlackboardValueSize) {
         return { valid: false, reason: `Value exceeds max size (${serialized.length} > ${CONFIG.maxBlackboardValueSize} bytes)` };
       }
@@ -1208,14 +1201,10 @@ class TaskDecomposer {
 
         individualResults.push(result);
 
-        // Cache successful results (non-fatal if caching fails)
-        if (result.success && result.result !== undefined) {
-          try {
-            const cacheKey = `task:${task.agentType}:${this.hashPayload(task.taskPayload)}`;
-            this.blackboard.write(cacheKey, result.result, context.agentId, 3600, 'system-orchestrator-token'); // 1 hour TTL
-          } catch {
-            // Caching failure should not abort the entire wave
-          }
+        // Cache successful results
+        if (result.success) {
+          const cacheKey = `task:${task.agentType}:${this.hashPayload(task.taskPayload)}`;
+          this.blackboard.write(cacheKey, result.result, context.agentId, 3600, 'system-orchestrator-token'); // 1 hour TTL
         }
       }
     }
@@ -1292,19 +1281,6 @@ class TaskDecomposer {
       };
 
       const result = await this.adapterRegistry.executeAgent(task.agentType, agentPayload, agentContext);
-
-      // If the adapter returned a failure, propagate it
-      if (!result.success) {
-        return {
-          agentType: task.agentType,
-          success: false,
-          result: {
-            error: result.error?.message ?? 'Agent execution failed',
-            recoverable: result.error?.recoverable ?? true,
-          },
-          executionTime: Date.now() - taskStart,
-        };
-      }
 
       // Sanitize adapter output before returning/caching
       let sanitizedData = result.data;

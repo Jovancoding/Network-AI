@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.4] - 2026-02-21
+
+### Added
+- **API Architecture & Performance** section in README -- explains single-key rate limits, multi-key parallelism, local GPU setup, cloud provider comparison table, and `max_completion_tokens` guidance
+- **`run.ts` demo launcher** -- interactive menu to run any of the 5 examples via `npx ts-node run.ts`
+
+### Changed
+- `tsconfig.json` -- exclude `examples/output/` and `**/fixed-*.ts` from compilation
+
+### Fixed
+- `SharedBlackboard.validateValue` -- removed redundant `undefined` pre-check; `JSON.stringify` try/catch handles all unsupported types correctly
+- `TaskDecomposer` -- simplified task result caching; removed duplicate failure propagation block that shadowed adapter error handling
+
 ## [3.2.11] - 2026-02-19
 
 ### Security

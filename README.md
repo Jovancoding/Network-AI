@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v3.3.2-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v3.3.4-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -541,6 +541,190 @@ class MyAdapter extends BaseAdapter {
 ```
 
 See [references/adapter-system.md](references/adapter-system.md) for the full adapter architecture guide.
+
+## API Architecture & Performance
+
+**Your swarm is only as fast as the backend it calls into.**
+
+Network-AI is backend-agnostic — every agent in a swarm can call a cloud API, a different cloud API, or a local GPU model. That choice has a direct and significant impact on speed, parallelism, and reliability.
+
+### Why It Matters
+
+When you run a 5-agent swarm, Network-AI can dispatch all 5 calls simultaneously. Whether those calls actually execute in parallel depends entirely on what's behind each agent:
+
+| Backend | Parallelism | Typical 5-agent swarm | Notes |
+|---|---|---|---|
+| **Single cloud API key** (OpenAI, Anthropic, etc.) | Rate-limited | 40–70s sequential | RPM limits force sequential dispatch + retry waits |
+| **Multiple API keys / providers** | True parallel | 8–15s | Each agent hits a different key or provider |
+| **Local GPU** (Ollama, llama.cpp, vLLM) | True parallel | 5–20s depending on hardware | No RPM limit — all 5 agents fire simultaneously |
+| **Mixed** (some cloud, some local) | Partial | Varies | Local agents never block; cloud agents rate-paced |
+
+### The Single-Key Rate Limit Problem
+
+Cloud APIs enforce **Requests Per Minute (RPM)** limits per API key. When you run 5 agents sharing one key and hit the ceiling, the API silently returns empty responses — not a 429 error, just blank content. Network-AI's swarm demos handle this automatically with **sequential dispatch** (one agent at a time) and **adaptive header-based pacing** that reads the `x-ratelimit-reset-requests` header to wait exactly as long as needed before the next call.
+
+```
+Single key (gpt-5.2, 6 RPM limit):
+  Agent 1 ──call──▶ response (7s)
+                                wait 1s
+  Agent 2 ──call──▶ response (7s)
+                                wait 1s
+  ... (sequential)
+  Total: ~60s for 5 agents + coordinator
+```
+
+### Multiple Keys or Providers = True Parallel
+
+Register each reviewer agent against a different API key or provider and dispatch fires all 5 simultaneously:
+
+```typescript
+import { CustomAdapter, AdapterRegistry } from 'network-ai';
+
+// Each agent points to a different OpenAI key
+const registry = new AdapterRegistry();
+
+for (const reviewer of REVIEWERS) {
+  const adapter = new CustomAdapter();
+  const client  = new OpenAI({ apiKey: process.env[`OPENAI_KEY_${reviewer.id.toUpperCase()}`] });
+
+  adapter.registerHandler(reviewer.id, async (payload) => {
+    const resp = await client.chat.completions.create({ ... });
+    return { findings: extractContent(resp) };
+  });
+
+  registry.register(reviewer.id, adapter);
+}
+
+// Now all 5 dispatch in parallel via Promise.all
+// Total: ~8-12s instead of ~60s
+```
+
+### Local GPU = Zero Rate Limits
+
+Run Ollama or any OpenAI-compatible local server and drop it in as a backend. No RPM ceiling means every agent fires the moment the previous one starts — true parallel for free:
+
+```typescript
+// Point any agent at a local Ollama or vLLM server
+const localClient = new OpenAI({
+  apiKey    : 'not-needed',
+  baseURL   : 'http://localhost:11434/v1',
+});
+
+adapter.registerHandler('sec_review', async (payload) => {
+  const resp = await localClient.chat.completions.create({
+    model   : 'llama3.2',     // or mistral, deepseek-r1, codellama, etc.
+    messages: [...],
+  });
+  return { findings: extractContent(resp) };
+});
+```
+
+### Mixing Cloud and Local
+
+The adapter system makes it trivial to give some agents a cloud backend and others a local one:
+
+```typescript
+// Fast local model for lightweight reviewers
+registry.register('test_review',  localAdapter);
+registry.register('arch_review',  localAdapter);
+
+// Cloud model for high-stakes reviewers
+registry.register('sec_review',   cloudAdapter);  // GPT-4o / Claude
+```
+
+Network-AI's orchestrator, blackboard, and trust model stay identical regardless of what's behind each adapter. The only thing that changes is speed.
+
+### Summary
+
+| You have | What to expect |
+|---|---|
+| One cloud API key | Sequential dispatch, 40–70s per 5-agent swarm — fully handled automatically |
+| Multiple cloud keys | Near-parallel, 10–15s — use one key per adapter instance |
+| Local GPU (Ollama, vLLM) | True parallel, 5–20s depending on hardware |
+| Home GPU + cloud mix | Local agents never block — cloud agents rate-paced independently |
+
+The framework doesn't get in the way of any of these setups. Connect whatever backend you have and the orchestration layer handles the rest.
+
+### Cloud Provider Performance
+
+Not all cloud APIs perform the same. Model size, inference infrastructure, and tier all affect how fast each agent gets a response — and that directly multiplies across every agent in your swarm.
+
+| Provider / Model | Avg response (5-agent swarm) | RPM limit (free/tier-1) | Notes |
+|---|---|---|---|
+| **OpenAI gpt-5.2** | 6–10s per call | 3–6 RPM | Flagship model, high latency, strict RPM |
+| **OpenAI gpt-4o-mini** | 2–4s per call | 500 RPM | Fast, cheap, good for reviewer agents |
+| **OpenAI gpt-4o** | 4–7s per call | 60–500 RPM | Balanced quality/speed |
+| **Anthropic Claude 3.5 Haiku** | 2–3s per call | 50 RPM | Fastest Claude, great for parallel agents |
+| **Anthropic Claude 3.7 Sonnet** | 4–8s per call | 50 RPM | Stronger reasoning, higher latency |
+| **Google Gemini 2.0 Flash** | 1–3s per call | 15 RPM (free) | Very fast inference, low RPM on free tier |
+| **Groq (Llama 3.3 70B)** | 0.5–2s per call | 30 RPM | Fastest cloud inference available |
+| **Together AI / Fireworks** | 1–3s per call | Varies by plan | Good for parallel workloads, competitive RPM |
+
+**Key insight:** A 5-agent swarm using `gpt-4o-mini` at 500 RPM can fire all 5 agents truly in parallel and finish in ~4s total. The same swarm on `gpt-5.2` at 6 RPM must go sequential and takes 60s. **The model tier matters more than the orchestration framework.**
+
+#### Choosing a Model for Swarm Agents
+
+- **Speed over depth** (many agents, real-time feedback) → `gpt-4o-mini`, `gpt-5-mini`, `claude-3.5-haiku`, `gemini-2.0-flash`, `groq/llama-3.3-70b`
+- **Depth over speed** (fewer agents, high-stakes output) → `gpt-4o`, `claude-3.7-sonnet`, `gpt-5.2`
+- **Free / no-cost testing** → Groq free tier, Gemini free tier, or Ollama locally
+- **Production swarms with budget** → Multiple keys across providers, route different agents to different models
+
+All of these plug into Network-AI through the `CustomAdapter` by swapping the client's `baseURL` and `model` string — no other code changes needed.
+
+### `max_completion_tokens` — The Silent Truncation Trap
+
+One of the most common failure modes in agentic output tasks is **silent truncation**. When a model hits the `max_completion_tokens` ceiling it stops mid-output and returns whatever it has — no error, no warning. The API call succeeds with a 200 and `finish_reason: "length"` instead of `"stop"`.
+
+**This is especially dangerous for code-rewrite agents** where the output is a full file. A fixed `max_completion_tokens: 3000` cap will silently drop everything after line ~150 of a 200-line fix.
+
+```
+# What you set vs what you need
+
+max_completion_tokens: 3000  →  enough for a short blog post
+                             →  NOT enough for a 200-line code rewrite
+
+# Real numbers (gpt-5-mini, order-service.ts rewrite):
+  Blockers section:  ~120 tokens
+  Fixed code:        ~2,800 tokens  (213 lines with // FIX: comments)
+  Total needed:      ~3,000 tokens  ← hits the cap exactly, empty output
+  Fix: set to 16,000 → full rewrite delivered in one shot
+```
+
+**Lessons learned from building the code-review swarm:**
+
+| Issue | Root cause | Fix |
+|---|---|---|  
+| Fixed code output was empty | `max_completion_tokens: 3000` too low for a full rewrite | Raise to `16000`+ for any code-output agent |
+| `finish_reason: "length"` silently discards output | Model hits cap, returns partial response with no error | Always check `choices[0].finish_reason` and alert on `"length"` |
+| `gpt-5.2` slow + expensive for reviewer agents | Flagship model = high latency + $14/1M output tokens | Use `gpt-5-mini` ($2/1M, 128k output, same RPM) for reviewer/fixer agents |
+| Coordinator + fixer as two separate calls | Second call hits rate limit window, adds 60s wait | Merge into one combined call with a structured two-section response format |
+
+**Rule of thumb for `max_completion_tokens` by task:**
+
+| Task | Recommended cap |
+|---|---|
+| Short classification / sentiment | 200–500 |
+| Code review findings (one reviewer) | 400–800 |
+| Blocker summary (coordinator) | 500–1,000 |
+| Full file rewrite (≤300 lines) | 12,000–16,000 |
+| Full file rewrite (≤1,000 lines) | 32,000–64,000 |
+| Document / design revision | 16,000–32,000 |
+
+All GPT-5 variants (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5.2`) support **128,000 max output tokens** — the ceiling is never the model, it's always the cap you set.
+
+#### Cloud GPU Instances (Self-Hosted on AWS / GCP / Azure)
+
+Running your own model on a cloud GPU VM (e.g. AWS `p3.2xlarge` / A100, GCP `a2-highgpu`, Azure `NC` series) sits between managed APIs and local hardware:
+
+| Setup | Parallelism | Speed vs managed API | RPM limit |
+|---|---|---|---|
+| A100 (80GB) + vLLM, Llama 3.3 70B | True parallel | **Faster** — 0.5–2s per call | None |
+| H100 + vLLM, Mixtral 8x7B | True parallel | **Faster** — 0.3–1s per call | None |
+| T4 / V100 + Ollama, Llama 3.2 8B | True parallel | Comparable | None |
+
+Since you own the endpoint, there are no rate limits — all 5 agents fire at the same moment. At inference speeds on an A100, a 5-agent swarm can complete in **3–8 seconds** for a 70B model, comparable to Groq and faster than any managed flagship model.
+
+The tradeoff is cost (GPU VMs are $1–$5/hr) and setup (vLLM install, model download). For high-volume production swarms or teams that want no external API dependency, it's the fastest architecture available. The connection is identical to local Ollama — just point `baseURL` at your VM's IP.
 
 ## Permission System
 

@@ -33,3 +33,8 @@ dist/
 # Test artifacts
 test-*.log
 security-audit.log
+
+# Runtime state (auto-generated, changes every run)
+swarm-blackboard.md
+err.txt
+examples/output/
