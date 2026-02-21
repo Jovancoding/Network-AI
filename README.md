@@ -246,6 +246,55 @@ npm run setup -- --list        # List all 12 available adapters
 npm run setup:example          # Generate a starter example.ts
 ```
 
+### Running in PowerShell (Windows)
+
+All commands work in PowerShell. The only difference from bash is how you set environment variables.
+
+**Set your API key for the current session:**
+
+```powershell
+$env:OPENAI_API_KEY = "sk-..."
+```
+
+**Or load it from `.env` automatically** — copy the template first:
+
+```powershell
+Copy-Item .env.example .env   # then open .env and fill in your key
+```
+
+**Run the examples (no API key needed):**
+
+```powershell
+npx ts-node examples/01-hello-swarm.ts
+npx ts-node examples/02-fsm-pipeline.ts
+npx ts-node examples/03-parallel-agents.ts
+```
+
+**Run the interactive launcher** (picks which example to run):
+
+```powershell
+npx ts-node run.ts
+```
+
+**Run the AI code review swarm demo** (requires `OPENAI_API_KEY`):
+
+```powershell
+$env:OPENAI_API_KEY = "sk-..."
+npx ts-node examples/05-code-review-swarm.ts
+```
+
+**Run the tests:**
+
+```powershell
+npm test                      # Core orchestrator (79 tests)
+npm run test:security         # Security module (33 tests)
+npm run test:adapters         # Adapter system (139 tests)
+npm run test:priority         # Priority & preemption (64 tests)
+npm run test:all              # All suites in sequence
+```
+
+> **Tip:** To persist `OPENAI_API_KEY` across sessions, add it to your PowerShell profile or set it as a user environment variable via *System Properties → Environment Variables*.
+
 ### For OpenClaw Users
 
 Copy this skill into your OpenClaw workspace:
