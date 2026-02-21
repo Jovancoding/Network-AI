@@ -5,6 +5,28 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.5] - 2026-02-21
+
+### Added
+- **`examples/05-code-review-swarm.ts`** published to repo — hardcoded API key removed, now requires `OPENAI_API_KEY` env var
+- **`.env.example`** template added for local setup
+- **Content / mode mismatch guard** — `warnIfMismatch()` detects wrong content type per mode (code in design doc slot, prose in code slot, etc.) and prompts `y/N` before continuing
+- **`CUSTOM_REVIEWERS`** array for mode 4 — 5 generic angles (Clarity, Completeness, Accuracy, Risk, Improvement) applicable to any content type, not just code
+- **DEMO disclaimer banner** shown at startup with LLM output disclaimer and source link
+- **`end` instruction box** shown in all three paste prompts with ASCII box diagram
+- **Mode-aware fixer and merger prompts** — mode 4 produces plain Markdown output, not TypeScript; file saved as `.md`
+- **Mode-aware coordinator prompt** — mode 3 now explicitly forbids inventing a new document; enforces rewriting the exact submitted document
+
+### Changed
+- Mode 3 and mode 4 output saved as `.md` (not `.ts`); TypeScript syntax checker skipped for non-code output
+- `fixedBanner` label is `REVISED CONTENT` for mode 4, `REVISED DESIGN` for mode 3, `FIXED CODE` for modes 1/2
+- Menu descriptions updated with content-type hints for all four modes
+
+### Security
+- Removed hardcoded `OPENAI_API_KEY` fallback from `05-code-review-swarm.ts`
+- `examples/05-code-review-swarm.ts` removed from `.gitignore` (now safe to publish)
+- `examples/04-live-swarm.ts` remains gitignored (requires live key at runtime)
+
 ## [3.3.4] - 2026-02-21
 
 ### Added
@@ -156,6 +178,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Future] -- Phase 5: Distributed Blackboard
 
 ### Planned
+- **Named Multi-Blackboard API** -- `orchestrator.getBlackboard(name)` returns isolated `SharedBlackboard` instances managed by the orchestrator; each board gets its own directory, agent registration, token management, and FSM governance. Replaces the current pattern of manually constructing separate `SharedBlackboard` instances outside the orchestrator. Recommended approach by user tier: individuals use key namespacing on one board; small business use multiple named boards per project/domain; medium business add namespace restrictions within each board; enterprise add distributed backend (Redis/CRDT) per board.
 - **CRDT-Based Synchronization** -- Conflict-free replicated data types with vector clocks for eventual consistency across machines
 - **Redis Blackboard Backend** -- Optional Redis pub/sub + distributed locks for multi-process / multi-machine agent coordination (peer dependency, not bundled -- zero-dep default unchanged)
 - **Configurable Consistency Levels** -- `eventual` (async replication), `session` (read-your-writes), `strong` (synchronous quorum)
