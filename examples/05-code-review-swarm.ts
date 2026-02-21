@@ -1071,7 +1071,8 @@ async function main() {
       }
 
       console.log();
-      fs.writeFileSync(outFile, currentCode, 'utf8');
+      const outputContent = ext === 'ts' ? `// @ts-nocheck\n${currentCode}` : currentCode;
+      fs.writeFileSync(outFile, outputContent, 'utf8');
       console.log(`  ${c.green}✓  Saved → ${outFile}${c.reset}  ${c.dim}(open to see the full file)${c.reset}`);
     } else {
       console.log(`  ${c.yellow}⚠  Fixed output empty (token limit hit) — increase max_completion_tokens or use a model with higher context${c.reset}`);
