@@ -175,17 +175,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 315 tests passing (79 + 33 + 139 + 64)
 - 0 compile errors
 
-## [Future] -- Phase 4: Behavioral Control Plane (Enterprise Governance)
+## [3.3.0] - 2026-02-19
 
-### Planned
-- **FSM Journey Layer** -- Define state machines (e.g. INTAKE -> VALIDATE -> RESEARCH -> DELIVER) with per-state agent authorization; agents can only act in their designated states
-- **Inline Compliance Blocking** -- Middleware that blocks agent actions *before* execution if not authorized in current workflow state (vs. post-hoc audit)
-- **Tool Authorization Matrix** -- Configurable matrix defining which agent can call which tool in which state
-- **Real-Time Compliance Monitor** -- Async loop checking turn-taking violations, response timeouts, journey adherence, tool usage anomalies
-- **`--active-grants` Command** -- Show which agents currently hold access to which APIs with expiry times
-- **`--audit-summary` Command** -- Summarize recent requests, grants, and denials by agent
-- **Behavioral Vocabulary in README** -- Reframe marketing around "behavioral control plane," "compliance enforcement," "governance layer"
-- **MCP Blackboard Tool Bindings** -- Expose `blackboard_read`, `blackboard_write`, `blackboard_list`, `blackboard_delete` as MCP-compatible tool definitions so any LLM agent can interact with shared state via tool calls
+### Added -- Phase 4: Behavioral Control Plane (Enterprise Governance)
+- **FSM Journey Layer** -- `lib/fsm-journey.ts`; state machines (e.g. INTAKE -> VALIDATE -> RESEARCH -> DELIVER) with per-state agent authorization; agents can only act in their designated states
+- **Inline Compliance Blocking** -- `ComplianceMiddleware` blocks agent actions *before* execution if not authorized in current workflow state (vs. post-hoc audit)
+- **Tool Authorization Matrix** -- `ToolAuthorizationMatrix`; configurable matrix defining which agent can call which tool in which state
+- **Real-Time Compliance Monitor** -- `lib/compliance-monitor.ts`; async loop checking turn-taking violations, response timeouts, journey adherence, tool usage anomalies
+- **`--active-grants` Command** -- `check_permission.py --active-grants` shows which agents currently hold access to which APIs with TTL countdown
+- **`--audit-summary` Command** -- `check_permission.py --audit-summary` summarizes requests, grants, and denials by agent
+- **Behavioral Vocabulary in README** -- Reframed around "behavioral control plane," "compliance enforcement," "governance layer"
+- **MCP Blackboard Tool Bindings** -- `lib/mcp-blackboard-tools.ts`; exposes `blackboard_read`, `blackboard_write`, `blackboard_list`, `blackboard_delete` as MCP-compatible tool definitions
+- **Phase 4 test suite** -- `test-phase4.ts`; 777-line suite covering all FSM, compliance, and MCP tool binding scenarios
 
 ## [Future] -- Phase 5: Distributed Blackboard
 
