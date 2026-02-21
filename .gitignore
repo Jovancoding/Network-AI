@@ -36,4 +36,5 @@ security-audit.log
 # Runtime state (auto-generated, changes every run)
 swarm-blackboard.md
 err.txt
-examples/output/
+examples/output/*.ts
+examples/output/*.md
