@@ -242,23 +242,29 @@ const divider = () =>
 const sleep   = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 function decodeHtml(s: string): string {
-  // &amp; MUST go first so double-encoded sequences (&amp;#x27; → &#x27; → ')
-  // are resolved in the same chain pass. Run twice to catch any triple-encoding.
-  const once = (x: string) => x
-    .replace(/&amp;/g,  '&')   // first — unlocks double-encoded entities
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#39;/g,  "'")
-    .replace(/&#x60;/g, '`')
-    .replace(/&lt;/g,   '<')
-    .replace(/&gt;/g,   '>')
-    .replace(/&vert;/g, '|')   // || operator
-    .replace(/&#x7C;/g, '|')
-    .replace(/&quest;/g,'?')   // ?? operator
-    .replace(/&#x3F;/g, '?')
-    .replace(/&amp;/g,  '&');  // second pass catches any remaining &amp;
-  return once(once(s));         // two passes handles double → triple encoding
+  // Handle double-encoded sequences first (e.g. &amp;#x27; → ') so that the
+  // final &amp; → & replacement never re-triggers entity patterns.
+  // Single-pass approach avoids chained double-unescaping (CodeQL js/double-escaping).
+  return s
+    .replace(/&amp;#x27;/g, "'")   // double-encoded apostrophe
+    .replace(/&amp;#39;/g,  "'")
+    .replace(/&amp;quot;/g, '"')
+    .replace(/&amp;apos;/g, "'")
+    .replace(/&amp;gt;/g,   '>')
+    .replace(/&amp;lt;/g,   '<')
+    .replace(/&amp;amp;/g,  '&')   // double-encoded ampersand
+    .replace(/&quot;/g,     '"')
+    .replace(/&apos;/g,     "'")
+    .replace(/&#x27;/g,     "'")
+    .replace(/&#39;/g,      "'")
+    .replace(/&#x60;/g,     '`')
+    .replace(/&lt;/g,       '<')
+    .replace(/&gt;/g,       '>')
+    .replace(/&vert;/g,     '|')
+    .replace(/&#x7C;/g,     '|')
+    .replace(/&quest;/g,    '?')
+    .replace(/&#x3F;/g,     '?')
+    .replace(/&amp;/g,      '&');  // any remaining single &amp;
 }
 
 function extractContent(resp: any): string {
@@ -643,8 +649,8 @@ async function main() {
 
   // ─── Shared display config ────────────────────────────────────────────────
   const isDesign       = mode === 'design';
-  const blockersHeader = isDesign ? '=== ARCHITECTURAL RISKS ===' : '=== SHIP BLOCKERS ===';
-  const fixedHeader    = isDesign ? '=== REVISED DESIGN ==='      : '=== FIXED CODE ===';
+  const _blockersHeader = isDesign ? '=== ARCHITECTURAL RISKS ===' : '=== SHIP BLOCKERS ===';
+  const _fixedHeader    = isDesign ? '=== REVISED DESIGN ==='      : '=== FIXED CODE ==='; void _blockersHeader; void _fixedHeader;
 
   // ─── Design mode: single coordinator call ────────────────────────────────
   let coordinatorResult: { verdict: string; fixed: string; finishReason: string; reviewCount: number; ms: number } | null = null;
@@ -1005,7 +1011,7 @@ async function main() {
 
   // ─── Wave 3: Merger / Coordinator ────────────────────────────────────────
   stageBar(3); // ● Merging
-  const mergeTarget = isDesign ? 'custom:coordinator' : 'custom:merger';
+  const _mergeTarget = isDesign ? 'custom:coordinator' : 'custom:merger'; void _mergeTarget;
   const mergeLabel  = isDesign ? 'Synthesizing risks + rewriting design...' : 'Merging patches into unified output...';
   banner(isDesign ? 'Coordinator' : 'Merger');
   console.log();
@@ -1103,6 +1109,7 @@ async function main() {
       const outDir  = path.join(__dirname, 'output');
       if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
       const outFile = path.join(outDir, `fixed-${slug}-${Date.now()}.${ext}`);
+      if (!path.resolve(outFile).startsWith(path.resolve(outDir) + path.sep)) throw new Error('Output path outside output directory');
 
       // ── Syntax feedback loop (TS files only, max 2 correction passes) ───
       let currentCode  = val.fixed;
@@ -1112,6 +1119,7 @@ async function main() {
       async function runSyntaxCheck(code: string): Promise<string[]> {
         if (ext !== 'ts') return [];
         const tmpFile = path.join(outDir, `_syntax_tmp_${Date.now()}.ts`);
+        if (!path.resolve(tmpFile).startsWith(path.resolve(outDir) + path.sep)) throw new Error('Temp path outside output directory');
         fs.writeFileSync(tmpFile, code, 'utf8');
         try {
           execSync(

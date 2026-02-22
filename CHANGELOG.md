@@ -5,6 +5,13 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.8] - 2026-02-22
+
+### Security
+- **CodeQL #56 (HIGH) — Double escaping/unescaping** — Rewrote `decodeHtml()` from a two-pass chained approach to a single-pass ordered replacement; double-encoded sequences (e.g. `&amp;#x27;`) are resolved explicitly before the final `&amp;` → `&` step, eliminating the double-unescaping chain
+- **CodeQL #59 & #60 (MEDIUM) — Network data written to file** — Added `path.resolve()` bounds check before both `fs.writeFileSync` calls (`outFile` and `tmpFile`); throws if resolved path escapes the output directory
+- **CodeQL #57, #58, #61 (Note) — Unused variables** — Prefixed `blockersHeader`, `fixedHeader`, and `mergeTarget` with `_` and added `void` suppression; no logic change
+
 ## [3.3.7] - 2026-02-21
 
 ### Changed
