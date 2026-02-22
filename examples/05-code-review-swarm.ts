@@ -1116,7 +1116,7 @@ async function main() {
         if (ext !== 'ts') return [];
         const tmpFile = path.join(outDir, `_syntax_tmp_${Date.now()}.ts`);
         if (!path.resolve(tmpFile).startsWith(path.resolve(outDir) + path.sep)) throw new Error('Temp path outside output directory');
-        fs.writeFileSync(tmpFile, code, 'utf8'); // codeql[js/http-to-file-access] -- Intentional: demo writes LLM-generated code to a bounded local temp file for tsc syntax checking only
+        fs.writeFileSync(tmpFile, code, 'utf8');
         try {
           execSync(
             'npx tsc --noEmit --skipLibCheck --noResolve --allowSyntheticDefaultImports ' +
@@ -1202,7 +1202,7 @@ async function main() {
 
       console.log();
       const outputContent = ext === 'ts' ? `// @ts-nocheck\n${currentCode}` : currentCode;
-      fs.writeFileSync(outFile, outputContent, 'utf8'); // codeql[js/http-to-file-access] -- Intentional: demo saves LLM-generated output to a path-bounded local output directory
+      fs.writeFileSync(outFile, outputContent, 'utf8');
       console.log(`  ${c.green}✓  Saved → ${outFile}${c.reset}  ${c.dim}(open to see the full file)${c.reset}`);
     } else {
       console.log(`  ${c.yellow}⚠  Fixed output empty (token limit hit) — increase max_completion_tokens or use a model with higher context${c.reset}`);

@@ -1,0 +1,6 @@
+name: "Network-AI CodeQL Config"
+
+# Example files are intentionally demonstrating LLM output written to disk.
+# Excluding them avoids false-positive js/http-to-file-access alerts on demo code.
+paths-ignore:
+  - examples/**

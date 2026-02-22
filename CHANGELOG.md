@@ -5,6 +5,11 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.11] - 2026-02-22
+
+### Security
+- **CodeQL #63 & #64 (MEDIUM) — Network data written to file** — GitHub CodeQL does not support inline suppression comments for JavaScript/TypeScript; added `.github/codeql/codeql-config.yml` with `paths-ignore: examples/**` to exclude demo/example files from analysis; removed non-functional `// codeql[...]` comments from demo file
+
 ## [3.3.10] - 2026-02-22
 
 ### Security
