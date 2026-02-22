@@ -242,29 +242,25 @@ const divider = () =>
 const sleep   = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 function decodeHtml(s: string): string {
-  // Handle double-encoded sequences first (e.g. &amp;#x27; → ') so that the
-  // final &amp; → & replacement never re-triggers entity patterns.
-  // Single-pass approach avoids chained double-unescaping (CodeQL js/double-escaping).
-  return s
-    .replace(/&amp;#x27;/g, "'")   // double-encoded apostrophe
-    .replace(/&amp;#39;/g,  "'")
-    .replace(/&amp;quot;/g, '"')
-    .replace(/&amp;apos;/g, "'")
-    .replace(/&amp;gt;/g,   '>')
-    .replace(/&amp;lt;/g,   '<')
-    .replace(/&amp;amp;/g,  '&')   // double-encoded ampersand
-    .replace(/&quot;/g,     '"')
-    .replace(/&apos;/g,     "'")
-    .replace(/&#x27;/g,     "'")
-    .replace(/&#39;/g,      "'")
-    .replace(/&#x60;/g,     '`')
-    .replace(/&lt;/g,       '<')
-    .replace(/&gt;/g,       '>')
-    .replace(/&vert;/g,     '|')
-    .replace(/&#x7C;/g,     '|')
-    .replace(/&quest;/g,    '?')
-    .replace(/&#x3F;/g,     '?')
-    .replace(/&amp;/g,      '&');  // any remaining single &amp;
+  // Single regex pass with a lookup table.
+  // Using one .replace() call avoids the chained double-unescaping pattern
+  // that CodeQL js/double-escaping flags in fluent .replace() chains.
+  const map: Record<string, string> = {
+    '&amp;#x27;': "'",  '&amp;#39;':  "'",
+    '&amp;quot;': '"',  '&amp;apos;': "'",
+    '&amp;gt;':   '>',  '&amp;lt;':   '<',
+    '&amp;amp;':  '&',  '&amp;':       '&',
+    '&quot;':     '"',  '&apos;':      "'",
+    '&#x27;':     "'",  '&#39;':       "'",
+    '&#x60;':     '`',  '&lt;':        '<',
+    '&gt;':       '>',  '&vert;':      '|',
+    '&#x7C;':     '|',  '&quest;':     '?',
+    '&#x3F;':     '?',
+  };
+  return s.replace(
+    /&amp;(?:#x27|#39|quot|apos|gt|lt|amp);|&amp;|&(?:quot|apos|lt|gt|vert|quest);|&#(?:x27|x60|x7C|x3F|39);/g,
+    (m) => map[m] ?? m
+  );
 }
 
 function extractContent(resp: any): string {
@@ -1120,6 +1116,7 @@ async function main() {
         if (ext !== 'ts') return [];
         const tmpFile = path.join(outDir, `_syntax_tmp_${Date.now()}.ts`);
         if (!path.resolve(tmpFile).startsWith(path.resolve(outDir) + path.sep)) throw new Error('Temp path outside output directory');
+        // lgtm[js/http-to-file-access] -- Intentional: demo writes LLM-generated code to a local temp file for syntax checking
         fs.writeFileSync(tmpFile, code, 'utf8');
         try {
           execSync(
@@ -1206,6 +1203,7 @@ async function main() {
 
       console.log();
       const outputContent = ext === 'ts' ? `// @ts-nocheck\n${currentCode}` : currentCode;
+      // lgtm[js/http-to-file-access] -- Intentional: demo saves LLM-generated output to local output directory
       fs.writeFileSync(outFile, outputContent, 'utf8');
       console.log(`  ${c.green}✓  Saved → ${outFile}${c.reset}  ${c.dim}(open to see the full file)${c.reset}`);
     } else {

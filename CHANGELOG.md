@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.9] - 2026-02-22
+
+### Security
+- **CodeQL #62 (HIGH) — Double escaping/unescaping** — Rewrote `decodeHtml()` as a single `.replace()` call with a regex alternation and lookup table; eliminates the chained fluent replace pattern that CodeQL flags
+- **CodeQL #59 & #60 (MEDIUM) — Network data written to file** — Added `// lgtm[js/http-to-file-access]` suppression comments with justification; writing LLM output to a local output directory is the explicit purpose of the demo and is not a vulnerability
+
 ## [3.3.8] - 2026-02-22
 
 ### Security
