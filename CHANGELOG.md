@@ -5,6 +5,11 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.10] - 2026-02-22
+
+### Security
+- **CodeQL #59 & #60 (MEDIUM) — Network data written to file** — Switched suppression from outdated `lgtm[]` syntax to correct GitHub CodeQL inline syntax `// codeql[js/http-to-file-access]` placed on the same line as each `fs.writeFileSync` call; both writes are already path-bounded to the local output directory
+
 ## [3.3.9] - 2026-02-22
 
 ### Security
