@@ -365,7 +365,7 @@ Content Hash: ${this.computeHash('')}
 ## Execution History
 <!-- Chronological log of completed tasks -->
 `;
-    writeFileSync(this.blackboardPath, content, 'utf-8');
+    writeFileSync(this.blackboardPath, content, { encoding: 'utf-8', mode: 0o600 });
   }
 
   private computeHash(content: string): string {
@@ -466,7 +466,7 @@ ${cacheContent}
 ## Execution History
 <!-- Chronological log of completed tasks -->
 `;
-      writeFileSync(this.blackboardPath, content, 'utf-8');
+      writeFileSync(this.blackboardPath, content, { encoding: 'utf-8', mode: 0o600 });
     } finally {
       this.lock.release();
     }
@@ -480,7 +480,7 @@ ${cacheContent}
 
   private savePendingChange(change: PendingChange): void {
     const filePath = join(this.pendingDir, `${change.change_id}.json`);
-    writeFileSync(filePath, JSON.stringify(change, null, 2));
+    writeFileSync(filePath, JSON.stringify(change, null, 2), { encoding: 'utf-8', mode: 0o600 });
   }
 
   private archivePendingChange(change: PendingChange): void {
@@ -494,7 +494,7 @@ ${cacheContent}
 
     try {
       if (existsSync(sourcePath)) {
-        writeFileSync(archivePath, JSON.stringify(change, null, 2));
+        writeFileSync(archivePath, JSON.stringify(change, null, 2), { encoding: 'utf-8', mode: 0o600 });
         unlinkSync(sourcePath);
       }
     } catch (error) {
@@ -897,7 +897,7 @@ ${cacheContent}
 ## Execution History
 <!-- Chronological log of completed tasks -->
 `;
-    writeFileSync(this.blackboardPath, content, 'utf-8');
+    writeFileSync(this.blackboardPath, content, { encoding: 'utf-8', mode: 0o600 });
   }
 
   // ==========================================================================
