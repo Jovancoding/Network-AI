@@ -5,6 +5,21 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-02-23
+
+### Added — Phase 5 Part 2: Pluggable Backend API
+- **`BlackboardBackend` interface** — storage abstraction for `SharedBlackboard`; implement it to plug in Redis, CRDT, cloud KV, or any custom store
+- **`MemoryBackend`** — pure in-memory backend; zero disk I/O, deterministic TTL, version tracking; ideal for unit tests and short-lived ephemeral boards; exposes `clear()` and `size()` helpers
+- **`FileBackend`** — thin wrapper around `LockedBlackboard`; the default when no `backend` option is supplied (100% backward compatible)
+- **`NamedBlackboardOptions.backend?`** — pass any `BlackboardBackend` to `getBlackboard(name, { backend })` to control per-board storage; omitting it continues to use `FileBackend`
+- **`SharedBlackboard` constructor overload** — now accepts `string | BlackboardBackend`; string path creates a `FileBackend` automatically; all existing call sites unchanged
+- **55 new tests** in `test-phase5b.ts` covering standalone backends, TTL, custom backends (duck typing), mixed-backend isolation, idempotency, `destroyBlackboard` + re-attach, and export verification
+
+### Notes
+- 100% backward compatible — no existing APIs changed
+- `FileBackend`, `MemoryBackend`, and `BlackboardBackend` are all exported from the package root
+- Total test count: **552 passing**
+
 ## [3.4.1] - 2026-02-23
 
 ### Security

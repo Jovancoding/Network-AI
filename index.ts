@@ -16,6 +16,8 @@ import { AdapterRegistry } from './adapters/adapter-registry';
 import { InputSanitizer, SecureSwarmGateway } from './security';
 import { LockedBlackboard } from './lib/locked-blackboard';
 import type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions } from './lib/locked-blackboard';
+import { FileBackend, MemoryBackend } from './lib/blackboard-backend';
+import type { BlackboardBackend } from './lib/blackboard-backend';
 import { QualityGateAgent } from './lib/blackboard-validator';
 import { Logger } from './lib/logger';
 import {
@@ -254,6 +256,23 @@ export interface NamedBlackboardOptions {
    * Falls back to the orchestrator's global config when omitted.
    */
   validationConfig?: Partial<ValidationConfig>;
+  /**
+   * Pluggable storage backend for this board.
+   *
+   * - Omit (default): `FileBackend` — persisted to disk at `<workspacePath>/boards/<name>/`
+   * - `new MemoryBackend()`: pure in-memory, no disk writes
+   * - Custom class implementing `BlackboardBackend`: Redis, CRDT, cloud KV, etc.
+   *
+   * @example
+   * ```typescript
+   * // Ephemeral board (testing / short-lived tasks)
+   * const board = orchestrator.getBlackboard('tmp', { backend: new MemoryBackend() });
+   *
+   * // Custom Redis backend
+   * const board = orchestrator.getBlackboard('prod', { backend: new RedisBackend(client) });
+   * ```
+   */
+  backend?: BlackboardBackend;
 }
 
 /** A single task within a parallel execution batch. */
@@ -370,15 +389,22 @@ const DEFAULT_AGENT_TRUST: AgentTrustConfig[] = [
  * ```
  */
 class SharedBlackboard {
-  private backend: LockedBlackboard;
+  private backend: BlackboardBackend;
   private agentTokens: Map<string, string> = new Map(); // agentId -> verified token
   private agentNamespaces: Map<string, string[]> = new Map(); // agentId -> allowed prefixes
 
-  constructor(basePath: string) {
-    if (!basePath || typeof basePath !== 'string' || basePath.trim() === '') {
-      throw new ValidationError('basePath must be a non-empty string');
+  constructor(backendOrPath: string | BlackboardBackend) {
+    if (typeof backendOrPath === 'string') {
+      if (!backendOrPath || backendOrPath.trim() === '') {
+        throw new ValidationError('basePath must be a non-empty string');
+      }
+      this.backend = new FileBackend(backendOrPath);
+    } else {
+      if (!backendOrPath || typeof backendOrPath !== 'object') {
+        throw new ValidationError('backend must be a BlackboardBackend instance');
+      }
+      this.backend = backendOrPath;
     }
-    this.backend = new LockedBlackboard(basePath);
   }
 
   /**
@@ -506,7 +532,7 @@ class SharedBlackboard {
       sanitizedValue = value; // Fall back to raw if sanitization can't handle it
     }
 
-    // 6. Write through LockedBlackboard (atomic, file-locked)
+    // 6. Write through backend (atomic when using FileBackend; in-memory for MemoryBackend)
     const entry = this.backend.write(safeKey, sanitizedValue, sourceAgent, ttl);
 
     // Normalize for backward compat
@@ -2108,11 +2134,18 @@ export class SwarmOrchestrator implements OpenClawSkill {
       return this.namedBlackboards.get(name)!;
     }
 
-    // Create subdirectory: <workspacePath>/boards/<name>/
-    const boardPath = join(this._workspacePath, 'boards', name);
-    mkdirSync(boardPath, { recursive: true });
-
-    const board = new SharedBlackboard(boardPath);
+    let board: SharedBlackboard;
+    if (options?.backend) {
+      // Custom backend — no disk directory needed
+      board = new SharedBlackboard(options.backend);
+      log.info('Named blackboard created (custom backend)', { name });
+    } else {
+      // Default: file backend persisted to <workspacePath>/boards/<name>/
+      const boardPath = join(this._workspacePath, 'boards', name);
+      mkdirSync(boardPath, { recursive: true });
+      board = new SharedBlackboard(boardPath);
+      log.info('Named blackboard created', { name, boardPath });
+    }
 
     // Register the orchestrator agent on this board
     board.registerAgent(
@@ -2122,7 +2155,6 @@ export class SwarmOrchestrator implements OpenClawSkill {
     );
 
     this.namedBlackboards.set(name, board);
-    log.info('Named blackboard created', { name, boardPath });
     return board;
   }
 
@@ -2289,6 +2321,10 @@ export type { OpenClawSkill, SkillContext, SkillResult };
 
 // Phase 3: Priority & Preemption types
 export type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions };
+
+// Phase 5 Part 2: Pluggable Backend API
+export { FileBackend, MemoryBackend } from './lib/blackboard-backend';
+export type { BlackboardBackend } from './lib/blackboard-backend';
 
 // Logger
 export { Logger, LogLevel } from './lib/logger';
