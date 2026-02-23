@@ -166,7 +166,7 @@ export class FileLock {
       // Try to create lock file atomically
       try {
         // Use exclusive flag to prevent race conditions
-        this.lockFd = openSync(this.lockPath, 'wx');
+        this.lockFd = openSync(this.lockPath, 'wx', 0o600);
         
         const lockData = {
           holder: holderId,

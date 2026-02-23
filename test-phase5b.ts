@@ -16,7 +16,6 @@ import {
   SwarmOrchestrator,
   MemoryBackend,
   FileBackend,
-  ValidationError,
 } from './index';
 import type { BlackboardBackend } from './index';
 
@@ -30,32 +29,19 @@ const errors: string[] = [];
 
 function pass(label: string): void {
   passed++;
-  process.stdout.write(`  ✓ ${label}\n`);
+  process.stdout.write(`  [PASS] ${label}\n`);
 }
 
 function fail(label: string, reason: string): void {
   failed++;
-  errors.push(`  ✗ ${label}: ${reason}`);
-  process.stdout.write(`  ✗ ${label}: ${reason}\n`);
+  errors.push(`  [FAIL] ${label}: ${reason}`);
+  process.stdout.write(`  [FAIL] ${label}: ${reason}\n`);
 }
 
 function assert(condition: boolean, label: string, reason = 'assertion failed'): void {
   condition ? pass(label) : fail(label, reason);
 }
 
-function assertThrows(fn: () => unknown, label: string, msgFragment?: string): void {
-  try {
-    fn();
-    fail(label, 'expected an error to be thrown');
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msgFragment && !msg.toLowerCase().includes(msgFragment.toLowerCase())) {
-      fail(label, `expected message to contain "${msgFragment}", got: "${msg}"`);
-    } else {
-      pass(label);
-    }
-  }
-}
 
 function section(title: string): void {
   process.stdout.write(`\n--- ${title} ---\n`);
@@ -128,7 +114,6 @@ section('2. MemoryBackend TTL expiry');
   const b = new MemoryBackend();
 
   // Write with 0s TTL (already expired)
-  const past = new Date(Date.now() - 5000).toISOString();
   // Manually inject an expired entry to test without needing to wait
   // We'll use write with a 1s TTL and simulate by checking the logic
   b.write('expire-me', 'val', 'agent', 1);
