@@ -4,8 +4,9 @@
 
 | Version | Supported |
 |---------|-----------|
-| 3.3.x   | Yes (latest) |
-| 3.2.x   | Security fixes only |
+| 3.4.x   | Yes (latest) |
+| 3.3.x   | Security fixes only |
+| 3.2.x   | No |
 | 3.1.x   | No |
 | 3.0.x   | No |
 | < 3.0   | No |
@@ -33,12 +34,13 @@ Network-AI includes built-in security features:
 - **Justification hardening** (v3.2.1) -- prompt-injection detection (16 patterns), keyword-stuffing defense, repetition/padding detection, structural coherence validation
 - **FSM Behavioral Control Plane** (v3.3.0) -- state-scoped agent and tool authorization via `JourneyFSM` and `ToolAuthorizationMatrix`; unauthorized actions blocked with `ComplianceViolationError`
 - **ComplianceMonitor** (v3.3.0) -- real-time agent behavior surveillance with configurable violation policies, severity classification, and async audit loop
+- **Named Multi-Blackboard API** (v3.4.0) -- isolated `SharedBlackboard` instances per name with independent namespaces, validation configs, and agent scoping; prevents cross-task data leakage
 
 ## Security Scan Results
 
 - **VirusTotal**: Benign (0/64 engines)
 - **OpenClaw Scanner**: Benign, HIGH CONFIDENCE
-- **CodeQL**: v3.3.0 -- all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed
+- **CodeQL**: v3.3.0 -- all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed; v3.4.0 clean
 - **Snyk**: All High/Medium findings resolved in v3.0.3
 
 ## Disclosure Policy

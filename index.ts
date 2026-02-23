@@ -9,7 +9,7 @@
  * @license MIT
  */
 
-import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { AdapterRegistry } from './adapters/adapter-registry';
@@ -236,6 +236,24 @@ interface AgentTrustConfig {
   allowedNamespaces?: string[];
   /** Resource types this agent can request */
   allowedResources?: string[];
+}
+
+/**
+ * Options for creating a named blackboard via `orchestrator.getBlackboard(name)`.
+ * All fields are optional -- sensible defaults are applied automatically.
+ */
+export interface NamedBlackboardOptions {
+  /**
+   * Namespace prefixes the orchestrator agent is allowed to use on this board.
+   * Defaults to `['*']` (full access). Pass e.g. `['analysis:', 'result:']` to
+   * restrict the board to specific key prefixes.
+   */
+  allowedNamespaces?: string[];
+  /**
+   * Custom validation config applied to writes on this board.
+   * Falls back to the orchestrator's global config when omitted.
+   */
+  validationConfig?: Partial<ValidationConfig>;
 }
 
 /** A single task within a parallel execution batch. */
@@ -1424,6 +1442,11 @@ export class SwarmOrchestrator implements OpenClawSkill {
   private gateway: SecureSwarmGateway;
   private qualityGate: QualityGateAgent;
 
+  /** Named isolated blackboards, keyed by board name */
+  private namedBlackboards: Map<string, SharedBlackboard> = new Map();
+  /** Root workspace path -- used as the parent for named board subdirectories */
+  private _workspacePath: string;
+
   /** The adapter registry -- routes requests to the right agent framework */
   public readonly adapters: AdapterRegistry;
 
@@ -1444,6 +1467,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
     if (workspacePath !== undefined && workspacePath.trim() === '') {
       throw new ValidationError('workspacePath must not be empty');
     }
+    this._workspacePath = workspacePath;
     this.blackboard = new SharedBlackboard(workspacePath);
     this.authGuardian = new AuthGuardian({
       trustLevels: options?.trustLevels,
@@ -2038,6 +2062,115 @@ export class SwarmOrchestrator implements OpenClawSkill {
   /** Expose the quality gate for external configuration */
   public getQualityGate(): QualityGateAgent {
     return this.qualityGate;
+  }
+
+  // -------------------------------------------------------------------------
+  // NAMED MULTI-BLACKBOARD API (Phase 5)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Get or create a named, isolated blackboard managed by this orchestrator.
+   *
+   * Each named board is stored in its own subdirectory:
+   *   `<workspacePath>/boards/<name>/`
+   *
+   * Calling `getBlackboard(name)` a second time returns the same instance --
+   * no duplicate boards are created.
+   *
+   * All existing APIs (`orchestrator.blackboard`, adapters, AuthGuardian, etc.)
+   * are completely unaffected. This is a purely additive method.
+   *
+   * @example
+   * ```typescript
+   * const board = orchestrator.getBlackboard('project-alpha');
+   * board.registerAgent('analyst', 'tok-1', ['analysis:']);
+   * board.write('analysis:result', { score: 0.9 }, 'analyst', 3600, 'tok-1');
+   * const entry = board.read('analysis:result');
+   * ```
+   *
+   * @param name    - Board name: alphanumeric, hyphens and underscores only
+   * @param options - Optional creation options (ignored on subsequent calls)
+   * @returns The isolated `SharedBlackboard` instance for this name
+   * @throws {@link ValidationError} if `name` is empty or contains invalid characters
+   */
+  public getBlackboard(name: string, options?: NamedBlackboardOptions): SharedBlackboard {
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      throw new ValidationError('name must be a non-empty string');
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+      throw new ValidationError(
+        'name must contain only alphanumeric characters, hyphens, or underscores'
+      );
+    }
+
+    // Return existing board (idempotent)
+    if (this.namedBlackboards.has(name)) {
+      return this.namedBlackboards.get(name)!;
+    }
+
+    // Create subdirectory: <workspacePath>/boards/<name>/
+    const boardPath = join(this._workspacePath, 'boards', name);
+    mkdirSync(boardPath, { recursive: true });
+
+    const board = new SharedBlackboard(boardPath);
+
+    // Register the orchestrator agent on this board
+    board.registerAgent(
+      'orchestrator',
+      'system-orchestrator-token',
+      options?.allowedNamespaces ?? ['*'],
+    );
+
+    this.namedBlackboards.set(name, board);
+    log.info('Named blackboard created', { name, boardPath });
+    return board;
+  }
+
+  /**
+   * Returns the names of all currently active named blackboards.
+   *
+   * @example
+   * ```typescript
+   * orchestrator.getBlackboard('alpha');
+   * orchestrator.getBlackboard('beta');
+   * orchestrator.listBlackboards(); // ['alpha', 'beta']
+   * ```
+   */
+  public listBlackboards(): string[] {
+    return Array.from(this.namedBlackboards.keys());
+  }
+
+  /**
+   * Returns `true` if a named blackboard with the given name is currently active.
+   *
+   * @param name - The board name to check
+   */
+  public hasBlackboard(name: string): boolean {
+    if (!name || typeof name !== 'string') return false;
+    return this.namedBlackboards.has(name);
+  }
+
+  /**
+   * Removes a named blackboard from the in-memory registry.
+   *
+   * **On-disk data is NOT deleted** -- call `getBlackboard(name)` again to
+   * re-attach to the same persistent board at a later point.
+   *
+   * @param name - The board name to remove
+   * @returns `true` if the board existed and was removed, `false` otherwise
+   *
+   * @example
+   * ```typescript
+   * orchestrator.destroyBlackboard('project-alpha'); // true
+   * orchestrator.hasBlackboard('project-alpha');     // false
+   * ```
+   */
+  public destroyBlackboard(name: string): boolean {
+    if (!name || typeof name !== 'string') return false;
+    const existed = this.namedBlackboards.has(name);
+    this.namedBlackboards.delete(name);
+    if (existed) log.info('Named blackboard removed from registry', { name });
+    return existed;
   }
 
   // -------------------------------------------------------------------------

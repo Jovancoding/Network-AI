@@ -5,6 +5,21 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-02-23
+
+### Added — Phase 5 (Part 1): Named Multi-Blackboard API
+- **`orchestrator.getBlackboard(name)`** — returns an isolated `SharedBlackboard` instance managed by the orchestrator; each named board gets its own subdirectory (`<workspacePath>/boards/<name>/`), independent agent registration, token management, and namespace access control. Idempotent — calling with the same name returns the same instance
+- **`orchestrator.listBlackboards()`** — returns the names of all currently active named boards
+- **`orchestrator.hasBlackboard(name)`** — returns `true` if a named board is currently active
+- **`orchestrator.destroyBlackboard(name)`** — removes a board from the in-memory registry without deleting on-disk data; re-attaching with `getBlackboard(name)` restores access to persisted state
+- **`NamedBlackboardOptions`** — exported interface for board creation options (`allowedNamespaces`, `validationConfig`)
+- **35 new tests** in `test-phase5.ts` covering all methods, board isolation, input validation, and default blackboard non-interference
+
+### Notes
+- 100% backward compatible — all existing APIs unchanged; this is purely additive
+- On-disk layout: `<workspacePath>/boards/<name>/` (auto-created on first access)
+- Recommended usage by tier: individuals → key namespacing on one board; small business → multiple named boards per project/domain; enterprise → add Redis/CRDT backend per board (Phase 5 Part 2)
+
 ## [3.3.11] - 2026-02-22
 
 ### Security
