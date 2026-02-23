@@ -27,7 +27,7 @@ import {
   writeSync,
   readdirSync
 } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { randomUUID, createHash } from 'crypto';
 import { Logger } from './logger';
 import { LockAcquisitionError } from './errors';
@@ -128,7 +128,7 @@ export class FileLock {
   private ensureDir(): void {
     const dir = dirname(this.lockPath);
     // recursive: true is idempotent — no existsSync check needed
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 
   /**
@@ -307,10 +307,12 @@ export class LockedBlackboard {
   private conflictResolution: ConflictResolutionStrategy;
 
   constructor(basePath: string = '.', auditLoggerOrOptions?: SecureAuditLogger | LockedBlackboardOptions, options?: LockedBlackboardOptions) {
-    this.basePath = basePath;
-    this.blackboardPath = join(basePath, 'swarm-blackboard.md');
-    this.lockPath = join(basePath, 'data', '.blackboard.lock');
-    this.pendingDir = join(basePath, 'data', 'pending_changes');
+    // Resolve to an absolute path to prevent insecure relative/temp-dir path propagation
+    const resolvedBase = resolve(basePath);
+    this.basePath = resolvedBase;
+    this.blackboardPath = join(resolvedBase, 'swarm-blackboard.md');
+    this.lockPath = join(resolvedBase, 'data', '.blackboard.lock');
+    this.pendingDir = join(resolvedBase, 'data', 'pending_changes');
     this.lock = new FileLock(this.lockPath);
 
     // Support both signatures:
@@ -329,10 +331,10 @@ export class LockedBlackboard {
   private initialize(): void {
     // Ensure directories exist
     if (!existsSync(dirname(this.blackboardPath))) {
-      mkdirSync(dirname(this.blackboardPath), { recursive: true });
+      mkdirSync(dirname(this.blackboardPath), { recursive: true, mode: 0o700 });
     }
     if (!existsSync(this.pendingDir)) {
-      mkdirSync(this.pendingDir, { recursive: true });
+      mkdirSync(this.pendingDir, { recursive: true, mode: 0o700 });
     }
 
     // Initialize blackboard file if needed
@@ -484,7 +486,7 @@ ${cacheContent}
   private archivePendingChange(change: PendingChange): void {
     const archiveDir = join(this.pendingDir, 'archive');
     if (!existsSync(archiveDir)) {
-      mkdirSync(archiveDir, { recursive: true });
+      mkdirSync(archiveDir, { recursive: true, mode: 0o700 });
     }
 
     const sourcePath = join(this.pendingDir, `${change.change_id}.json`);
