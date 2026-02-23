@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.1] - 2026-02-23
+
+### Fixed
+- **CodeQL #69** (High) — `openSync` on lock file now passes `mode: 0o600` to prevent insecure creation in world-readable directories (CWE-377, CWE-378)
+- **CodeQL #70** — removed unused `LockedBlackboard` value import from `index.ts` (superseded by `FileBackend` in v3.5.0)
+- **CodeQL #71** — removed unused `MemoryBackend` value import from `index.ts` (re-exported directly from source)
+- **CodeQL #72** — removed unused `ValidationError` import from `test-phase5b.ts`
+- **CodeQL #73** — removed unused `assertThrows` function from `test-phase5b.ts`
+- **CodeQL #74** — removed unused `past` variable from `test-phase5b.ts`
+- Fixed Windows console encoding: replaced Unicode `✓`/`✗` symbols in `test-phase5b.ts` output with ASCII `[PASS]`/`[FAIL]` to match all other test files
+
 ## [3.5.0] - 2026-02-23
 
 ### Added — Phase 5 Part 2: Pluggable Backend API
