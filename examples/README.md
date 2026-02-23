@@ -7,10 +7,11 @@ examples/
   01-hello-swarm.ts        ← three agents passing work through a blackboard  (no API key)
   02-fsm-pipeline.ts       ← FSM governance (state-based access control)     (no API key)
   03-parallel-agents.ts    ← parallel agents + four synthesis strategies      (no API key)
+  04-live-swarm.ts         ← 10-agent live AI research swarm (3 parallel waves + synthesizer)  (OPENAI_API_KEY required)
   05-code-review-swarm.ts  ← 5-agent AI code review swarm, 4 modes            (OPENAI_API_KEY required)
 ```
 
-Examples `01`–`03` run without any API key. `05` calls the OpenAI API — copy `.env.example` to `.env` and add your key before running it.
+Examples `01`–`03` run without any API key. `04` and `05` call the OpenAI API — copy `.env.example` to `.env` and add your key before running them.
 
 ## Prerequisites
 
