@@ -5,6 +5,11 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.1] - 2026-02-23
+
+### Security
+- **CodeQL #65–#68 (HIGH) — Insecure temporary file** — `LockedBlackboard` constructor now calls `path.resolve(basePath)` to normalize all derived paths (breaks CodeQL taint chain from `os.tmpdir()`); all `mkdirSync` calls updated to `mode: 0o700` so directories are owner-only (addresses CWE-377, CWE-378); no API or behavior change, 64/64 priority tests passing
+
 ## [3.4.0] - 2026-02-23
 
 ### Added — Phase 5 (Part 1): Named Multi-Blackboard API

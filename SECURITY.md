@@ -40,7 +40,7 @@ Network-AI includes built-in security features:
 
 - **VirusTotal**: Benign (0/64 engines)
 - **OpenClaw Scanner**: Benign, HIGH CONFIDENCE
-- **CodeQL**: v3.3.0 -- all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed; v3.4.0 clean
+- **CodeQL**: v3.3.0 -- all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed; v3.4.0 clean; v3.4.1 -- #65–#68 HIGH (insecure temporary file) resolved via `path.resolve()` sanitization and `mode: 0o700` directory permissions
 - **Snyk**: All High/Medium findings resolved in v3.0.3
 
 ## Disclosure Policy
