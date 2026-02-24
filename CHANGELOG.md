@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.2] - 2026-02-24
+
+### Fixed
+- **CodeQL #75** — replaced `_typed !== undefined` with `!!_typed` in `test-phase5c.ts`; variable typed as `BlackboardBackend` (object) can never be `undefined`, making the original comparison trivially true (CWE-570, CWE-571)
+- **Socket.dev supply chain** — added `networkAccess` suppression to `socket.json` for `CustomAdapter`'s intentional `fetch()` call to user-supplied URLs
+
 ## [3.6.0] - 2026-02-24
 
 ### Added — Phase 5 Part 3: Redis Blackboard Backend
