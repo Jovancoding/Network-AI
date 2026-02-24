@@ -72,7 +72,7 @@
     "python": ">=3.9"
   },
   "devDependencies": {
-    "@types/node": "^25.2.3",
+    "@types/node": "^25.3.0",
     "openai": "^6.23.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
