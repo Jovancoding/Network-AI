@@ -5,6 +5,24 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-02-24
+
+### Added — Phase 5 Part 3: Redis Blackboard Backend
+- **`RedisBackend`** — Redis-backed `BlackboardBackend` for multi-process/multi-machine agent coordination; write-through local cache for sync interface compatibility; user-supplied Redis client (ioredis, node-redis, or any compatible client) — zero new production dependencies
+- **`hydrate()`** — async method to load existing Redis keys into local cache on startup; call once before agents start reading to catch state written by other processes
+- **`flush()`** — async method to write all local cache entries to Redis in a single pipeline; useful for durability before graceful shutdown
+- **`clearCache()`** — resets local cache without deleting Redis keys
+- **`isReady`** getter — `true` after `hydrate()` completes
+- **`cacheSize`** getter — number of entries in local cache
+- **`keyPrefix` option** — namespace multiple boards on shared Redis instance (default: `'network-ai:bb:'`)
+- **`RedisClient` / `RedisPipeline` / `RedisBackendOptions`** interfaces — exported for typing custom clients
+- **73 new tests** in `test-phase5c.ts` — mock Redis client (in-process, no server needed), covering all methods, TTL, write-through, hydrate, flush, round-trip, prefix isolation, and export verification
+
+### Notes
+- No breaking changes — all existing backends unchanged
+- `RedisBackend` exported from package root
+- Total test count: **625 passing**
+
 ## [3.5.1] - 2026-02-23
 
 ### Fixed
@@ -267,7 +285,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - **Named Multi-Blackboard API** -- `orchestrator.getBlackboard(name)` returns isolated `SharedBlackboard` instances managed by the orchestrator; each board gets its own directory, agent registration, token management, and FSM governance. Replaces the current pattern of manually constructing separate `SharedBlackboard` instances outside the orchestrator. Recommended approach by user tier: individuals use key namespacing on one board; small business use multiple named boards per project/domain; medium business add namespace restrictions within each board; enterprise add distributed backend (Redis/CRDT) per board.
 - **CRDT-Based Synchronization** -- Conflict-free replicated data types with vector clocks for eventual consistency across machines
-- **Redis Blackboard Backend** -- Optional Redis pub/sub + distributed locks for multi-process / multi-machine agent coordination (peer dependency, not bundled -- zero-dep default unchanged)
+- **Redis Blackboard Backend** -- ✅ Released in v3.6.0
 - **Configurable Consistency Levels** -- `eventual` (async replication), `session` (read-your-writes), `strong` (synchronous quorum)
 - **Federated Budget Tracking** -- Token spending tracked across distributed agent swarms
 - **MCP Networking** -- Cross-machine agent communication (see [references/mcp-roadmap.md](references/mcp-roadmap.md))

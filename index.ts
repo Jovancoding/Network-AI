@@ -2325,6 +2325,10 @@ export type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions
 export { FileBackend, MemoryBackend } from './lib/blackboard-backend';
 export type { BlackboardBackend } from './lib/blackboard-backend';
 
+// Phase 5 Part 3: Redis Backend
+export { RedisBackend } from './lib/blackboard-backend-redis';
+export type { RedisClient, RedisPipeline, RedisBackendOptions } from './lib/blackboard-backend-redis';
+
 // Logger
 export { Logger, LogLevel } from './lib/logger';
 export type { LogEntry, LogTransport, LoggerConfig } from './lib/logger';

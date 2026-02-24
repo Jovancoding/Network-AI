@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 3.5.x   | Yes (latest) |
+| 3.6.x   | Yes (latest) |
+| 3.5.x   | Security fixes only |
 | 3.4.x   | Security fixes only |
 | 3.3.x   | No |
 | 3.2.x   | No |
