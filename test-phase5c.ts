@@ -141,7 +141,7 @@ section('1. Construction and interface compliance');
 
   // Satisfies BlackboardBackend interface (compile-time check via assignment)
   const _typed: BlackboardBackend = backend;
-  assert(_typed !== undefined, 'satisfies BlackboardBackend interface');
+  assert(!!_typed, 'satisfies BlackboardBackend interface');
 
   assert(backend.isReady === false, 'isReady is false before hydrate()');
   assert(backend.cacheSize === 0, 'cacheSize starts at 0');
