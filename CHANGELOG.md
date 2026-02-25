@@ -5,6 +5,29 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-02-25
+
+### Added -- Phase 5 Part 6: Federated Budget Tracking
+- **`FederatedBudget`** -- token-budget tracker shared across distributed agent swarms; enforces a global ceiling with optional per-agent sub-ceiling
+- **`spend(agentId, tokens)`** -- atomic spend attempt; returns `{ allowed, remaining, deniedReason? }` without mutating state on denial
+- **`remaining()`** -- tokens left in the global pool
+- **`getTotalSpent()`** -- cumulative tokens spent by all agents
+- **`getAgentSpent(agentId)`** -- cumulative tokens spent by a specific agent (returns `0` for unseen agents)
+- **`getSpendLog()`** -- per-agent totals as a plain `Record<string, number>` snapshot
+- **`getTransactionLog()`** -- ordered list of every approved `spend()` call with `agentId`, `tokens`, and ISO `timestamp`
+- **`reset()`** -- clears all spend counters and the transaction log; preserves current ceiling
+- **`setCeiling(n)`** -- dynamically adjust the global ceiling at runtime
+- **`getCeiling()` / `getPerAgentCeiling()`** -- introspect current limits
+- **Blackboard persistence** -- optional `blackboard` backend; JSON snapshot written under `budgetKey` after every mutation for automatic cross-node sync via `CrdtBackend` or `RedisBackend`
+- **`loadFromBlackboard()`** -- restore in-memory state from a previously saved snapshot; enables node restart recovery
+- **`SpendResult`** / **`SpendLogEntry`** types exported from package root
+- **127 new tests** in `test-phase5f.ts`
+
+### Notes
+- No breaking changes
+- `FederatedBudget`, `FederatedBudgetOptions`, `SpendResult`, `SpendLogEntry` exported from package root
+- Total test count: **974 passing**
+
 ## [3.7.1] - 2026-02-25
 
 ### Added — Phase 5 Part 5: Configurable Consistency Levels
@@ -338,7 +361,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CRDT-Based Synchronization** -- ✅ Released in v3.7.0
 - **Redis Blackboard Backend** -- ✅ Released in v3.6.0
 - **Configurable Consistency Levels** -- ✅ Released in v3.7.1
-- **Federated Budget Tracking** -- Token spending tracked across distributed agent swarms
+- **Federated Budget Tracking** -- ✅ Released in v3.8.0
 - **MCP Networking** -- Cross-machine agent communication (see [references/mcp-roadmap.md](references/mcp-roadmap.md))
 
 ## [3.1.0] - 2026-02-16

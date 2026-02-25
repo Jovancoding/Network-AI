@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v3.7.1-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v3.8.0-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-compatible-orange.svg)](https://agentskills.io)
-[![Tests](https://img.shields.io/badge/tests-847%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-974%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-12%20supported-blueviolet.svg)](#adapter-system)
 [![RSS Feed](https://img.shields.io/badge/RSS-releases-orange?logo=rss)](https://github.com/jovanSAPFIONEER/Network-AI/releases.atom)
 

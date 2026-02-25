@@ -2369,6 +2369,10 @@ export { tickClock, mergeClock, happensBefore, isConcurrent, compareClock, merge
 export { ConsistentBackend, isFlushable } from './lib/consistency';
 export type { ConsistencyLevel, FlushableBackend } from './lib/consistency';
 
+// Phase 5 Part 6: Federated Budget Tracking
+export { FederatedBudget } from './lib/federated-budget';
+export type { FederatedBudgetOptions, SpendResult, SpendLogEntry } from './lib/federated-budget';
+
 // Logger
 export { Logger, LogLevel } from './lib/logger';
 export type { LogEntry, LogTransport, LoggerConfig } from './lib/logger';
