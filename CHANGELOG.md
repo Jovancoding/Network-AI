@@ -5,6 +5,31 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-02-25
+
+### Added — Phase 5 Part 4: CRDT-Based Synchronization
+- **`CrdtBackend`** — CRDT-based `BlackboardBackend` for distributed multi-node agent coordination; vector-clock-tagged writes converge deterministically across nodes without a central coordinator
+- **`VectorClock`** type — `Record<string, number>` mapping nodeId to logical counter
+- **`CrdtEntry`** interface — extends `BlackboardEntry` with `vectorClock`, `nodeId`, and `deleted` (tombstone) fields
+- **`tickClock(clock, nodeId)`** — increment a node's counter; returns new clock, no mutation
+- **`mergeClock(a, b)`** — component-wise max of two clocks; returns new clock, no mutation
+- **`happensBefore(a, b)`** — returns `true` if clock `a` causally preceded `b`
+- **`isConcurrent(a, b)`** — returns `true` if neither clock happened-before the other
+- **`compareClock(a, b)`** — returns `-1 | 0 | 1` for causal ordering
+- **`mergeEntry(a, b)`** — conflict-free merge for two `CrdtEntry` values: causal order → timestamp → lexicographic nodeId tiebreak
+- **`CrdtBackend.merge(entries)`** — apply incoming `CrdtEntry` array from another node; clock advances to component-wise max
+- **`CrdtBackend.sync(other)`** — bidirectional merge with another `CrdtBackend` node; both converge after one call
+- **`CrdtBackend.getVectorClock()`** — returns a copy of the node's current clock
+- **`CrdtBackend.getCrdtEntry(key)`** — raw entry including tombstones, for sync/inspection
+- **`CrdtBackend.getCrdtSnapshot()`** — full raw store including tombstones, for sync payloads
+- **Tombstone deletes** — `delete()` records `deleted: true` so deletions propagate via `merge()` / `sync()`
+- **117 new tests** in `test-phase5d.ts` — vector clock primitives, causal/concurrent merge, three-node convergence, tombstone propagation, TTL, commutativity, idempotency, export verification
+
+### Notes
+- No breaking changes — all existing backends unchanged
+- `CrdtBackend`, `VectorClock`, `CrdtEntry`, and all clock functions exported from package root
+- Total test count: **742 passing**
+
 ## [3.6.2] - 2026-02-24
 
 ### Fixed
@@ -290,7 +315,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - **Named Multi-Blackboard API** -- `orchestrator.getBlackboard(name)` returns isolated `SharedBlackboard` instances managed by the orchestrator; each board gets its own directory, agent registration, token management, and FSM governance. Replaces the current pattern of manually constructing separate `SharedBlackboard` instances outside the orchestrator. Recommended approach by user tier: individuals use key namespacing on one board; small business use multiple named boards per project/domain; medium business add namespace restrictions within each board; enterprise add distributed backend (Redis/CRDT) per board.
-- **CRDT-Based Synchronization** -- Conflict-free replicated data types with vector clocks for eventual consistency across machines
+- **CRDT-Based Synchronization** -- ✅ Released in v3.7.0
 - **Redis Blackboard Backend** -- ✅ Released in v3.6.0
 - **Configurable Consistency Levels** -- `eventual` (async replication), `session` (read-your-writes), `strong` (synchronous quorum)
 - **Federated Budget Tracking** -- Token spending tracked across distributed agent swarms

@@ -2329,6 +2329,11 @@ export type { BlackboardBackend } from './lib/blackboard-backend';
 export { RedisBackend } from './lib/blackboard-backend-redis';
 export type { RedisClient, RedisPipeline, RedisBackendOptions } from './lib/blackboard-backend-redis';
 
+// Phase 5 Part 4: CRDT Backend
+export { CrdtBackend } from './lib/blackboard-backend-crdt';
+export type { CrdtBackendOptions, VectorClock, CrdtEntry } from './lib/blackboard-backend-crdt';
+export { tickClock, mergeClock, happensBefore, isConcurrent, compareClock, mergeEntry } from './lib/crdt';
+
 // Logger
 export { Logger, LogLevel } from './lib/logger';
 export type { LogEntry, LogTransport, LoggerConfig } from './lib/logger';
