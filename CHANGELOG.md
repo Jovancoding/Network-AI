@@ -5,6 +5,26 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - 2026-02-25
+
+### Added -- Phase 5 Part 7: MCP Networking
+- **`McpBlackboardBridge`** -- wraps any `IBlackboard` (or `BlackboardMCPTools`) as a JSON-RPC 2.0 MCP endpoint; handles `tools/list` and `tools/call` RPC methods
+- **`handleRPC(request)`** -- dispatch a raw `McpJsonRpcRequest` and receive a `McpJsonRpcResponse`; never rejects, errors are encoded in the response
+- **`listTools()`** / **`callTool(name, args)`** -- direct access bypassing JSON-RPC framing for same-process use
+- **`McpTransport` interface** -- swap transport implementations (in-process, SSE, WebSocket, stdio) without changing any client code
+- **`McpInProcessTransport`** -- zero-I/O transport; routes calls directly to a `McpBlackboardBridge` instance; ideal for testing and single-machine multi-board setups
+- **`McpBridgeClient`** -- high-level client: `listTools()`, `callTool(name, args)`, `sendRaw(method, params)`; auto-assigns request IDs; throws on JSON-RPC protocol errors, returns `ok:false` on tool-level errors
+- **`McpBridgeRouter`** -- manages multiple named bridges (one per blackboard); `register()`, `unregister()`, `has()`, `listBridges()`, `route()`, `getClient()` — routes MCP calls to the correct board by name
+- **Full JSON-RPC 2.0 compliance** -- standard error codes: `-32700` (ParseError), `-32600` (InvalidRequest), `-32601` (MethodNotFound), `-32602` (InvalidParams), `-32603` (InternalError)
+- **`McpCallToolResult`** -- follows MCP `CallToolResult` shape; `content[0].text` holds JSON-serialized `BlackboardToolResult`; `isError` flag enables error detection without parsing content
+- **Zero external dependencies** -- in-process transport works with no network stack; clear upgrade path to add SSE/WebSocket transports by implementing `McpTransport`
+- **121 new tests** in `test-phase5g.ts`
+
+### Notes
+- No breaking changes
+- `McpBlackboardBridge`, `McpBridgeClient`, `McpBridgeRouter`, `McpInProcessTransport`, and all MCP types exported from package root
+- Total test count: **1095 passing**
+
 ## [3.8.0] - 2026-02-25
 
 ### Added -- Phase 5 Part 6: Federated Budget Tracking
@@ -362,7 +382,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Redis Blackboard Backend** -- ✅ Released in v3.6.0
 - **Configurable Consistency Levels** -- ✅ Released in v3.7.1
 - **Federated Budget Tracking** -- ✅ Released in v3.8.0
-- **MCP Networking** -- Cross-machine agent communication (see [references/mcp-roadmap.md](references/mcp-roadmap.md))
+- **MCP Networking** -- ✅ Released in v3.9.0
 
 ## [3.1.0] - 2026-02-16
 

@@ -2373,6 +2373,24 @@ export type { ConsistencyLevel, FlushableBackend } from './lib/consistency';
 export { FederatedBudget } from './lib/federated-budget';
 export type { FederatedBudgetOptions, SpendResult, SpendLogEntry } from './lib/federated-budget';
 
+// Phase 5 Part 7: MCP Networking
+export {
+  McpBlackboardBridge,
+  McpBridgeClient,
+  McpBridgeRouter,
+  McpInProcessTransport,
+} from './lib/mcp-bridge';
+export type {
+  McpJsonRpcRequest,
+  McpJsonRpcResponse,
+  McpJsonRpcError,
+  McpListToolsResult,
+  McpCallToolResult,
+  McpContentBlock,
+  McpTransport,
+  McpBlackboardBridgeOptions,
+} from './lib/mcp-bridge';
+
 // Logger
 export { Logger, LogLevel } from './lib/logger';
 export type { LogEntry, LogTransport, LoggerConfig } from './lib/logger';

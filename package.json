@@ -1,6 +1,6 @@
 {
   "name": "network-ai",
-  "version": "3.8.0",
+  "version": "3.9.0",
   "description": "AI agent orchestration framework for TypeScript/Node.js - plug-and-play multi-agent coordination with 12 frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw). Built-in security, swarm intelligence, and agentic workflow patterns.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,6 +20,7 @@
     "test:phase5d": "npx ts-node test-phase5d.ts",
     "test:phase5e": "npx ts-node test-phase5e.ts",
     "test:phase5f": "npx ts-node test-phase5f.ts",
+    "test:phase5g": "npx ts-node test-phase5g.ts",
     "test:all": "npx ts-node run-tests.ts",
     "setup": "npx ts-node setup.ts",
     "setup:check": "npx ts-node setup.ts --check",

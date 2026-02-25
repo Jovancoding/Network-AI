@@ -21,6 +21,7 @@ const SUITES = [
   'test-phase5d.ts',
   'test-phase5e.ts',
   'test-phase5f.ts',
+  'test-phase5g.ts',
 ];
 
 const WIDTH = 60;
