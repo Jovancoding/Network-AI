@@ -19,7 +19,7 @@ import {
 } from './lib/consistency';
 
 import { MemoryBackend } from './lib/blackboard-backend';
-import type { BlackboardBackend, BlackboardEntry } from './lib/blackboard-backend';
+import type { BlackboardBackend } from './lib/blackboard-backend';
 
 // ============================================================================
 // TEST HARNESS
@@ -444,19 +444,8 @@ async function main(): Promise<void> {
   // ==========================================================================
   section('26. TTL expiry: eventual');
   {
-    const inner = new MemoryBackend();
-    const backend = new ConsistentBackend(inner, 'eventual');
-    // Write a back-dated entry directly to inner to simulate expiry
-    const expired: BlackboardEntry = {
-      key: 'exp', value: 'old', source_agent: 'ag',
-      timestamp: new Date(Date.now() - 5000).toISOString(),
-      ttl: 1, version: 1,
-    };
-    inner.write('exp', 'old', 'ag');
-    // Overwrite inner store entry with expired one via direct write
+    // MemoryBackend handles TTL natively — verify delegation works via ConsistentBackend
     const inner2 = new MemoryBackend();
-    // We can test with ConsistentBackend by reading before TTL in underlying MemoryBackend
-    // MemoryBackend handles TTL natively — just verify delegation works
     const b2 = new ConsistentBackend(inner2, 'eventual');
     b2.write('k', 'v', 'ag', 3600);
     assert(b2.read('k')?.value === 'v', 'eventual: unexpired entry readable');

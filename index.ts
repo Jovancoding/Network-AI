@@ -17,7 +17,7 @@ import { InputSanitizer, SecureSwarmGateway } from './security';
 import type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions } from './lib/locked-blackboard';
 import { FileBackend } from './lib/blackboard-backend';
 import type { BlackboardBackend } from './lib/blackboard-backend';
-import { ConsistentBackend, isFlushable } from './lib/consistency';
+import { ConsistentBackend } from './lib/consistency';
 import type { ConsistencyLevel, FlushableBackend } from './lib/consistency';
 import { QualityGateAgent } from './lib/blackboard-validator';
 import { Logger } from './lib/logger';
