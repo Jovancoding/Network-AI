@@ -17,6 +17,8 @@ import { InputSanitizer, SecureSwarmGateway } from './security';
 import type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions } from './lib/locked-blackboard';
 import { FileBackend } from './lib/blackboard-backend';
 import type { BlackboardBackend } from './lib/blackboard-backend';
+import { ConsistentBackend, isFlushable } from './lib/consistency';
+import type { ConsistencyLevel, FlushableBackend } from './lib/consistency';
 import { QualityGateAgent } from './lib/blackboard-validator';
 import { Logger } from './lib/logger';
 import {
@@ -272,6 +274,26 @@ export interface NamedBlackboardOptions {
    * ```
    */
   backend?: BlackboardBackend;
+  /**
+   * Consistency level applied to this board's backend.
+   *
+   * When provided, the backend is automatically wrapped in a `ConsistentBackend`
+   * with the specified level. Omitting this (or passing `'eventual'`) leaves the
+   * backend unwrapped for maximum performance.
+   *
+   * - `'eventual'` (default): no wrapping — highest throughput
+   * - `'session'`: read-your-writes guarantee via a local session cache
+   * - `'strong'`: use `board.writeAsync()` to await `backend.flush()` confirmation
+   *
+   * @example
+   * ```typescript
+   * const board = orchestrator.getBlackboard('live', {
+   *   backend: new RedisBackend(client),
+   *   consistency: 'strong',
+   * });
+   * ```
+   */
+  consistency?: ConsistencyLevel;
 }
 
 /** A single task within a parallel execution batch. */
@@ -2134,17 +2156,26 @@ export class SwarmOrchestrator implements OpenClawSkill {
     }
 
     let board: SharedBlackboard;
+    let selectedBackend: BlackboardBackend;
     if (options?.backend) {
       // Custom backend — no disk directory needed
-      board = new SharedBlackboard(options.backend);
+      selectedBackend = options.backend;
       log.info('Named blackboard created (custom backend)', { name });
     } else {
       // Default: file backend persisted to <workspacePath>/boards/<name>/
       const boardPath = join(this._workspacePath, 'boards', name);
       mkdirSync(boardPath, { recursive: true });
-      board = new SharedBlackboard(boardPath);
-      log.info('Named blackboard created', { name, boardPath });
+      selectedBackend = new FileBackend(boardPath);
+      log.info('Named blackboard created', { name, boardPath: join(this._workspacePath, 'boards', name) });
     }
+
+    // Auto-wrap with ConsistentBackend when a non-default consistency level is requested
+    if (options?.consistency && options.consistency !== 'eventual') {
+      selectedBackend = new ConsistentBackend(selectedBackend, options.consistency);
+      log.info('Named blackboard wrapped with ConsistentBackend', { name, consistency: options.consistency });
+    }
+
+    board = new SharedBlackboard(selectedBackend);
 
     // Register the orchestrator agent on this board
     board.registerAgent(
@@ -2333,6 +2364,10 @@ export type { RedisClient, RedisPipeline, RedisBackendOptions } from './lib/blac
 export { CrdtBackend } from './lib/blackboard-backend-crdt';
 export type { CrdtBackendOptions, VectorClock, CrdtEntry } from './lib/blackboard-backend-crdt';
 export { tickClock, mergeClock, happensBefore, isConcurrent, compareClock, mergeEntry } from './lib/crdt';
+
+// Phase 5 Part 5: Configurable Consistency Levels
+export { ConsistentBackend, isFlushable } from './lib/consistency';
+export type { ConsistencyLevel, FlushableBackend } from './lib/consistency';
 
 // Logger
 export { Logger, LogLevel } from './lib/logger';

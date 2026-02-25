@@ -5,6 +5,26 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.1] - 2026-02-25
+
+### Added — Phase 5 Part 5: Configurable Consistency Levels
+- **`ConsistentBackend`** — wraps any `BlackboardBackend` and enforces a `ConsistencyLevel`; drop-in with no changes to existing backends
+- **`eventual`** — reads/writes delegate directly to the underlying backend; no session overhead
+- **`session`** — read-your-writes guarantee; writes cached in a local session `Map` so the current process always sees its own latest writes; `clearSession()` flushes the cache
+- **`strong`** — synchronous durability; `writeAsync()` calls `flush()` on any `FlushableBackend` (e.g. `RedisBackend`) after each write, ensuring the write is durable before returning
+- **`FlushableBackend` interface** — opt-in interface for backends supporting explicit flush (`flush(): Promise<void>`) 
+- **`isFlushable(backend)`** — exported type guard; `true` if backend implements `FlushableBackend`
+- **`ConsistentBackend.writeAsync()`** — async write; triggers `flush()` in `strong` mode, no-op alias in `session`/`eventual`
+- **`ConsistentBackend.sessionSize`** — entries in session cache (always `0` for `eventual`/`strong`)
+- **`ConsistentBackend.clearSession()`** — clear session cache; safe no-op for `eventual`/`strong`
+- **`run-tests.ts`** — isolated test runner; spawns each suite as a separate child process with `--max-old-space-size=512` to prevent VS Code terminal memory exhaustion; detects both `[PASS]`/`[FAIL]` and `[v]`/`[x]` output formats; `test:all` now points here
+- **87 new tests** in `test-phase5e.ts`
+
+### Notes
+- No breaking changes
+- `ConsistentBackend` and `isFlushable` exported from package root
+- Total test count: **847 passing**
+
 ## [3.7.0] - 2026-02-25
 
 ### Added — Phase 5 Part 4: CRDT-Based Synchronization
@@ -317,7 +337,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Named Multi-Blackboard API** -- `orchestrator.getBlackboard(name)` returns isolated `SharedBlackboard` instances managed by the orchestrator; each board gets its own directory, agent registration, token management, and FSM governance. Replaces the current pattern of manually constructing separate `SharedBlackboard` instances outside the orchestrator. Recommended approach by user tier: individuals use key namespacing on one board; small business use multiple named boards per project/domain; medium business add namespace restrictions within each board; enterprise add distributed backend (Redis/CRDT) per board.
 - **CRDT-Based Synchronization** -- ✅ Released in v3.7.0
 - **Redis Blackboard Backend** -- ✅ Released in v3.6.0
-- **Configurable Consistency Levels** -- `eventual` (async replication), `session` (read-your-writes), `strong` (synchronous quorum)
+- **Configurable Consistency Levels** -- ✅ Released in v3.7.1
 - **Federated Budget Tracking** -- Token spending tracked across distributed agent swarms
 - **MCP Networking** -- Cross-machine agent communication (see [references/mcp-roadmap.md](references/mcp-roadmap.md))
 
