@@ -5,6 +5,28 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.5] - 2026-02-26
+
+### Added
+- **`07-full-showcase.ts`** — flagship multi-agent AI demo: 8-agent pipeline builds a Payment Processing Service end-to-end with FSM governance, `AuthGuardian` token gating, `FederatedBudget` per-agent ceilings, `QualityGateAgent` content safety, and a cryptographic audit trail; deterministic 10/10 scoring using 8 objective gates (no LLM score parsing); requires `OPENAI_API_KEY`
+- **`08-control-plane-stress-demo.ts`** — no-API-key control-plane stress demo: `LockedBlackboard` atomic commits, priority preemption (`priority-wins`), FSM timeout enforcement, and live `ComplianceMonitor` violations (TOOL_ABUSE, TURN_TAKING, RESPONSE_TIMEOUT, JOURNEY_TIMEOUT); completes in ~2 seconds
+- **`examples/demo-runner.ts`** — unified demo launcher: `npm run demo` with interactive menu or flags `--07`, `--08`, `--both`, `--silent-summary`
+- **`npm run demo` script** added to `package.json`
+- **Deterministic scoring** (`computeDeterministicScore()`) — 8-gate objective scorer replacing LLM-parsed scoring for reproducible results; `score = (gatesPassed / 8) × 10`
+- **`debugger_agent`** — two-pass post-fix hardening in Phase 4 of `07`; persists `debugger:lastPass` to blackboard; triggers pre-DELIVER NO-GO report if gates still failing
+- **`--silent-summary` mode** — suppresses full logs and prints regex-extracted highlights (score gates, violations, completion markers); designed for press-kit / slide output
+
+### Changed
+- `package.json` version: `4.0.4` → `4.0.5`
+- `skill.json` version: `4.0.4` → `4.0.5`
+- README release badge updated to `v4.0.5`
+- README Demo section expanded with `npm run demo` launcher and both new demos
+
+## [4.0.4] - 2026-02-26
+
+### Fixed
+- Version bump for npm re-publish (4.0.3 publish metadata sync)
+
 ## [4.0.3] - 2026-02-26
 
 ### Fixed

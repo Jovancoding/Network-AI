@@ -2,6 +2,21 @@
 
 Runnable demos that show the core features in under five minutes.
 
+Single entrypoint:
+
+```bash
+npm run demo
+```
+
+Optional flags:
+
+```bash
+npm run demo -- --07
+npm run demo -- --08
+npm run demo -- --both
+npm run demo -- --both --silent-summary
+```
+
 ```
 examples/
   01-hello-swarm.ts        ← three agents passing work through a blackboard  (no API key)
@@ -9,6 +24,9 @@ examples/
   03-parallel-agents.ts    ← parallel agents + four synthesis strategies      (no API key)
   04-live-swarm.ts         ← 10-agent live AI research swarm (3 parallel waves + synthesizer)  (OPENAI_API_KEY required)
   05-code-review-swarm.ts  ← 5-agent AI code review swarm, 4 modes            (OPENAI_API_KEY required)
+  06-ai-pipeline-demo.ts   ← 6-agent AI delivery pipeline                      (OPENAI_API_KEY required)
+  07-full-showcase.ts      ← full feature showcase (security + quality loops)  (OPENAI_API_KEY required)
+  08-control-plane-stress-demo.ts ← control-plane stress demo (locks/FSM/compliance) (no API key)
 ```
 
 Examples `01`–`03` run without any API key. `04` and `05` call the OpenAI API — copy `.env.example` to `.env` and add your key before running them.
@@ -82,6 +100,7 @@ npx ts-node examples/03-parallel-agents.ts
 npx ts-node examples/01-hello-swarm.ts
 npx ts-node examples/02-fsm-pipeline.ts
 npx ts-node examples/03-parallel-agents.ts
+npx ts-node examples/08-control-plane-stress-demo.ts
 
 # 05 requires OPENAI_API_KEY in .env
 npx ts-node examples/05-code-review-swarm.ts

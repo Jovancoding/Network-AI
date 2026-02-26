@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.0.3-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.0.5-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -60,7 +60,60 @@ console.log(result.data); // "Hello, World! Your task: welcome"
 
 That's it. No config files, no setup wizards. Add more agents, swap frameworks, layer on security -- all optional.
 
-## Demo
+## Demos
+
+### One command to run everything
+
+```bash
+npm run demo
+```
+
+Interactive menu or use flags directly:
+
+```bash
+npm run demo -- --07                    # Full AI showcase (OPENAI_API_KEY required)
+npm run demo -- --08                    # Control-plane stress demo (no API key)
+npm run demo -- --both                  # Both sequentially
+npm run demo -- --both --silent-summary # Both, highlights only
+```
+
+---
+
+### Demo 07 — Full AI Showcase *(requires `OPENAI_API_KEY`)*
+
+8-agent pipeline that builds a Payment Processing Service from scratch with full governance:
+
+- **FSM state machine** — each agent phase is gated by `JourneyFSM` state transitions
+- **AuthGuardian tokens** — scoped HMAC-signed tokens required at every gate
+- **FederatedBudget** — per-agent token ceilings, hard cut-off on overspend
+- **QualityGateAgent** — AI-assisted security scan + content safety on generated code
+- **Fixer + debugger agents** — two-pass automated remediation loop
+- **Deterministic 10/10 scoring** — 8 objective gates, no LLM score parsing
+- **Cryptographic audit trail** — every write signed to `data/audit_log.jsonl`
+
+```bash
+npm run demo -- --07
+```
+
+---
+
+### Demo 08 — Control-Plane Stress Demo *(no API key)*
+
+No LLM calls. Runs in ~2 seconds. Shows the synchronization and governance primitives under load:
+
+- **`LockedBlackboard`** — atomic `propose → validate → commit` workflow with file-system mutex
+- **Priority preemption** — high-priority (3) write overwrites low-priority (0) write on same key
+- **FSM timeout** — state times out after 700 ms, FSM hard-stops
+- **Live compliance violations** — TOOL_ABUSE (6 rapid writes), TURN_TAKING (5 consecutive actions), RESPONSE_TIMEOUT (1.2 s sleep), JOURNEY_TIMEOUT — all captured by `ComplianceMonitor`
+- **`FederatedBudget`** — per-agent ceilings tracked without any AI backend
+
+```bash
+npm run demo -- --08
+```
+
+---
+
+### Demo 05 — Code Review Swarm *(requires `OPENAI_API_KEY`)*
 
 [![Code Review Swarm Demo](https://img.youtube.com/vi/UyMsNhaw9lU/0.jpg)](https://youtu.be/UyMsNhaw9lU)
 
@@ -68,7 +121,12 @@ That's it. No config files, no setup wizards. Add more agents, swap frameworks, 
 
 > The demo shows a code review swarm, but Network-AI is not a code review tool. The same orchestration pattern works for research pipelines, data processing, content moderation, customer support routing, document analysis, financial workflows — any task where multiple agents need to coordinate without stepping on each other.
 
-> **Run the demo yourself:** `05-code-review-swarm.ts` is in the repo. Copy `.env.example` to `.env`, add your `OPENAI_API_KEY`, then run `npx ts-node examples/05-code-review-swarm.ts`. Supports 4 modes: built-in code review, paste your own code, system design document, or custom role for any content type (proposals, policies, job descriptions, emails). Examples `01`–`03` cover all core framework features with no API key required. `04-live-swarm.ts` runs a 10-agent live AI research swarm (3 parallel analyst waves + synthesizer) — also requires `OPENAI_API_KEY`.
+```bash
+npm run demo -- --07   # or run directly:
+npx ts-node examples/05-code-review-swarm.ts
+```
+
+Supports 4 modes: built-in code review, paste your own code, system design document, or custom role for any content type. Examples `01`–`03` run without any API key. `04-live-swarm.ts` runs a 10-agent live AI research swarm (3 parallel analyst waves + synthesizer).
 
 ## Why This Exists -- The Multi-Agent Race Condition Problem
 
