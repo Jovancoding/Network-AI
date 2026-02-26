@@ -342,7 +342,7 @@ type SynthesisStrategy = 'merge' | 'vote' | 'chain' | 'first-success';
 
 const CONFIG = {
   blackboardPath: './swarm-blackboard.md',
-  maxParallelAgents: 3,
+  maxParallelAgents: Infinity,
   defaultTimeout: 30000,
   enableTracing: true,
   grantTokenTTL: 300000, // 5 minutes in milliseconds
@@ -1223,10 +1223,7 @@ class TaskDecomposer {
     if (!context || typeof context !== 'object' || !context.agentId) {
       throw new ValidationError('context is required and must include agentId');
     }
-    // Enforce maximum parallel agent limit
-    if (tasks.length > CONFIG.maxParallelAgents) {
-      throw new ParallelLimitError(tasks.length, CONFIG.maxParallelAgents);
-    }
+    // No hard parallel limit — caller controls concurrency via task count
 
     const startTime = Date.now();
     const individualResults: ParallelExecutionResult['individualResults'] = [];
@@ -2525,3 +2522,52 @@ export function createSwarmOrchestrator(config?: Partial<typeof CONFIG> & {
   }
   return new SwarmOrchestrator();
 }
+
+// ============================================================================
+// Phase 6: Full AI Control — config accessors
+// ============================================================================
+
+/**
+ * Read the current value of a CONFIG key, or the entire CONFIG snapshot.
+ *
+ * @example
+ * ```typescript
+ * const cfg = getConfig(); // { maxParallelAgents: Infinity, ... }
+ * const timeout = getConfig('defaultTimeout'); // 30000
+ * ```
+ */
+export function getConfig(): Readonly<typeof CONFIG>;
+export function getConfig(key: string): unknown;
+export function getConfig(key?: string): unknown {
+  if (key !== undefined) return (CONFIG as Record<string, unknown>)[key];
+  return { ...CONFIG };
+}
+
+/**
+ * Update a CONFIG key at runtime.  Changes take effect immediately for all
+ * subsequent orchestrator operations.
+ *
+ * @example
+ * ```typescript
+ * setConfig('maxParallelAgents', 10);
+ * setConfig('enableTracing', false);
+ * ```
+ */
+export function setConfig(key: string, value: unknown): void {
+  (CONFIG as Record<string, unknown>)[key] = value;
+}
+
+// Phase 6: SSE transport + extended/control tools
+export {
+  McpSseServer,
+  McpSseTransport,
+  McpCombinedBridge,
+  McpBlackboardBridgeAdapter,
+} from './lib/mcp-transport-sse';
+export type { McpToolProvider, McpSseServerOptions } from './lib/mcp-transport-sse';
+
+export { ExtendedMcpTools } from './lib/mcp-tools-extended';
+export type { IBudget, ITokenManager, ExtendedMcpToolsOptions } from './lib/mcp-tools-extended';
+
+export { ControlMcpTools } from './lib/mcp-tools-control';
+export type { IConfig, IAgentStatus, ControlMcpToolsOptions } from './lib/mcp-tools-control';

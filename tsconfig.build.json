@@ -4,6 +4,7 @@
     "node_modules",
     "dist",
     "test*.ts",
-    "setup.ts"
+    "setup.ts",
+    "run-tests.ts"
   ]
 }

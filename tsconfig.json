@@ -23,6 +23,6 @@
     "typeRoots": ["./types", "./node_modules/@types"],
     "types": ["node"]
   },
-  "include": ["*.ts", "lib/**/*.ts", "adapters/**/*.ts", "types/**/*.d.ts"],
+  "include": ["*.ts", "lib/**/*.ts", "adapters/**/*.ts", "bin/**/*.ts", "types/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "**/fixed-*.ts", "examples/output"]
 }

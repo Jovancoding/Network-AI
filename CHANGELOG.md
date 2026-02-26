@@ -5,6 +5,43 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-02-25
+
+### Added — Phase 6: Full AI Control
+- **Pre-work: No hard concurrency limit** — `maxParallelAgents` now defaults to `Infinity`; the previous hard cap of 3 is removed; AI agents choose their own parallelism
+- **`getConfig(key?)` / `setConfig(key, value)`** — exported from package root; AI can read and mutate live config at runtime via `ControlMcpTools` or directly
+- **`McpSseServer`** — production-ready HTTP/SSE MCP server; `GET /sse` (Server-Sent Events stream), `POST /mcp` (JSON-RPC 2.0), `GET /health`, `GET /tools`; CORS-enabled; 4 MB body limit; configurable heartbeat; `broadcast(event, data)` to all SSE clients
+- **`McpSseTransport`** — implements `McpTransport` over HTTP POST; supports http and https; optional 30 s timeout; drop-in replacement for `McpInProcessTransport`
+- **`McpCombinedBridge`** — aggregates multiple `McpToolProvider` instances and routes `tools/list` (merged) and `tools/call` (by tool name) across all of them
+- **`McpBlackboardBridgeAdapter`** — wraps `McpBlackboardBridge` as a `McpToolProvider` for use in `McpCombinedBridge`
+- **`McpToolProvider` interface** — any tool set that exposes `getDefinitions()` + `call()`; makes it trivial to plug in new tool groups
+- **`ExtendedMcpTools`** — 10 MCP tools for AI budget + token + audit control:
+  - Budget (5): `budget_status`, `budget_spend`, `budget_reset`, `budget_set_ceiling`, `budget_get_log`
+  - Token (3): `token_create`, `token_validate`, `token_revoke`
+  - Audit (2): `audit_query` (with agentId, eventType, outcome, since_iso, limit filters), `audit_tail`
+- **`ControlMcpTools`** — 7 MCP tools for AI orchestrator control-plane:
+  - `config_get` — read any CONFIG key (or all)
+  - `config_set` — mutate CONFIG at runtime (number, string, boolean, null)
+  - `agent_list` — list all registered + stopped agents with optional status filter
+  - `agent_spawn` — write a task to the blackboard so an agent picks it up
+  - `agent_stop` — mark an agent stopped in the registry and on the blackboard
+  - `fsm_transition` — drive any FSM to a new state and append history on the blackboard
+  - `orchestrator_info` — version, live config snapshot, agent counts, blackboard availability
+- **`bin/mcp-server.ts`** — full CLI entry point: `network-ai-server`; args: `--port`, `--host`, `--board`, `--ceiling`, `--no-budget`, `--no-token`, `--no-extended`, `--no-control`, `--audit-log`, `--heartbeat`, `--help`; graceful SIGINT/SIGTERM shutdown
+- **`network-ai-server` binary** added to `package.json` pointing to `dist/bin/mcp-server.js`
+- **121 new tests** in `test-phase6.ts`
+
+### Changed
+- `maxParallelAgents` default: `3` → `Infinity` (no hard limit; AI is in full control)
+- `package.json` version: `3.9.0` → `4.0.0`
+
+### Breaking Changes
+- `ParallelLimitError` is no longer thrown when `maxParallelAgents` is `Infinity` (the default). Code that previously caught this error for the default-3 limit will never trigger it. Setting `maxParallelAgents` to a finite number still enforces the limit.
+
+### Notes
+- All Phase 6 exports (`McpSseServer`, `McpSseTransport`, `McpCombinedBridge`, `McpBlackboardBridgeAdapter`, `ExtendedMcpTools`, `ControlMcpTools`) available from package root
+- Total test count: **1216 passing**
+
 ## [3.9.0] - 2026-02-25
 
 ### Added -- Phase 5 Part 7: MCP Networking

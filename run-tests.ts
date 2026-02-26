@@ -22,6 +22,7 @@ const SUITES = [
   'test-phase5e.ts',
   'test-phase5f.ts',
   'test-phase5g.ts',
+  'test-phase6.ts',
 ];
 
 const WIDTH = 60;
@@ -52,11 +53,11 @@ for (const suite of SUITES) {
     }
   );
 
-  // Count pass/fail markers — suites use either [PASS]/[FAIL] or [v]/[x]
+  // Count pass/fail markers — suites use either [PASS]/[FAIL], [v]/[x], or ✓/✗
   const stdout = result.stdout ?? '';
   const stderr = result.stderr ?? '';
-  const passed = (stdout.match(/\[PASS\]|\[v\]/g) ?? []).length;
-  const failed  = (stdout.match(/\[FAIL\]|\[x\]/g) ?? []).length;
+  const passed = (stdout.match(/\[PASS\]|\[v\]|✓/g) ?? []).length;
+  const failed  = (stdout.match(/\[FAIL\]|\[x\]|✗/g) ?? []).length;
   const ok = result.status === 0 && failed === 0;
 
   totalPassed += passed;
