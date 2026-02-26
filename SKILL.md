@@ -130,7 +130,7 @@ python {baseDir}/scripts/blackboard.py write "task:001:final" \
 
 - **Task Delegation**: Route work to specialized agents (data_analyst, strategy_advisor, risk_assessor)
 - **Parallel Execution**: Run multiple agents simultaneously and synthesize results
-- **Permission Wall**: Gate access to SAP_API, FINANCIAL_API, or DATA_EXPORT operations
+- **Permission Wall**: Gate access to DATABASE, PAYMENTS, EMAIL, or FILE_EXPORT operations (abstract local resource types — no external credentials required)
 - **Shared Blackboard**: Coordinate agent state via persistent markdown file
 
 ## Quick Start
@@ -170,7 +170,7 @@ Before accessing SAP or Financial APIs, evaluate the request:
 # Run the permission checker script
 python {baseDir}/scripts/check_permission.py \
   --agent "data_analyst" \
-  --resource "SAP_API" \
+  --resource "DATABASE" \
   --justification "Need Q4 invoice data for quarterly report" \
   --scope "read:invoices"
 ```
@@ -262,10 +262,12 @@ sessions_history data_analyst  # Get the response
 ## Permission Wall (AuthGuardian)
 
 **CRITICAL**: Always check permissions before accessing:
-- `SAP_API` - SAP system connections
-- `FINANCIAL_API` - Financial data services
-- `EXTERNAL_SERVICE` - Third-party APIs
-- `DATA_EXPORT` - Exporting sensitive data
+- `DATABASE` - Internal database / data store access
+- `PAYMENTS` - Financial/payment data services
+- `EMAIL` - Email sending capability
+- `FILE_EXPORT` - Exporting data to local files
+
+> **Note**: These are abstract local resource type names used by `check_permission.py`. No external API credentials are required or used — all permission evaluation runs locally.
 
 ### Permission Evaluation Criteria
 
@@ -281,7 +283,7 @@ sessions_history data_analyst  # Get the response
 # Request permission
 python {baseDir}/scripts/check_permission.py \
   --agent "your_agent_id" \
-  --resource "FINANCIAL_API" \
+  --resource "PAYMENTS" \
   --justification "Generating quarterly financial summary for board presentation" \
   --scope "read:revenue,read:expenses"
 
@@ -300,10 +302,10 @@ python {baseDir}/scripts/check_permission.py \
 
 | Resource | Default Restrictions |
 |----------|---------------------|
-| SAP_API | `read_only`, `max_records:100` |
-| FINANCIAL_API | `read_only`, `no_pii_fields`, `audit_required` |
-| EXTERNAL_SERVICE | `rate_limit:10_per_minute` |
-| DATA_EXPORT | `anonymize_pii`, `local_only` |
+| DATABASE | `read_only`, `max_records:100` |
+| PAYMENTS | `read_only`, `no_pii_fields`, `audit_required` |
+| EMAIL | `rate_limit:10_per_minute` |
+| FILE_EXPORT | `anonymize_pii`, `local_only` |
 
 ## Shared Blackboard Pattern
 

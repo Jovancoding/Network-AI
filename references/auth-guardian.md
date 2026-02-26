@@ -5,10 +5,12 @@ Complete documentation for the AuthGuardian permission system that protects sens
 ## Overview
 
 AuthGuardian is the security layer that evaluates all permission requests before allowing access to:
-- **SAP_API** - SAP system connections
-- **FINANCIAL_API** - Financial data services  
-- **EXTERNAL_SERVICE** - Third-party API integrations
-- **DATA_EXPORT** - Exporting sensitive data
+- **DATABASE** - Internal database / data store access
+- **PAYMENTS** - Financial/payment data services
+- **EMAIL** - Email sending capability
+- **FILE_EXPORT** - Exporting data to local files
+
+> **Note**: These are abstract local resource type names. No external API credentials are required — all evaluation is local.
 
 ## Evaluation Algorithm
 
@@ -58,10 +60,10 @@ Base risk scores by resource type:
 
 | Resource | Base Risk | Reason |
 |----------|-----------|--------|
-| `EXTERNAL_SERVICE` | 0.4 | Lower sensitivity |
-| `SAP_API` | 0.5 | Business data access |
-| `DATA_EXPORT` | 0.6 | Data exfiltration risk |
-| `FINANCIAL_API` | 0.7 | Financial data sensitivity |
+| `EMAIL` | 0.4 | Lower sensitivity |
+| `DATABASE` | 0.5 | Business data access |
+| `FILE_EXPORT` | 0.6 | Data exfiltration risk |
+| `PAYMENTS` | 0.7 | Financial data sensitivity |
 
 **Risk modifiers:**
 - Broad scope ("*", "all", empty) → +0.2
@@ -77,7 +79,7 @@ Base risk scores by resource type:
 {
   "token": "grant_a1b2c3d4e5f6...",
   "agent_id": "data_analyst",
-  "resource_type": "SAP_API",
+  "resource_type": "DATABASE",
   "scope": "read:invoices",
   "expires_at": "2026-02-04T15:30:00Z",
   "restrictions": ["read_only", "max_records:100"],
@@ -96,7 +98,7 @@ Base risk scores by resource type:
 
 ```bash
 # 1. Request permission
-result=$(python scripts/check_permission.py --agent data_analyst --resource SAP_API \
+result=$(python scripts/check_permission.py --agent data_analyst --resource DATABASE \
   --justification "Need Q4 invoices for report" --json)
 
 # 2. Extract token
@@ -113,19 +115,19 @@ python scripts/revoke_token.py $token
 
 ## Restrictions by Resource
 
-### SAP_API
+### DATABASE
 - `read_only` - No write operations
 - `max_records:100` - Limit result set size
 
-### FINANCIAL_API  
+### PAYMENTS
 - `read_only` - No write operations
 - `no_pii_fields` - Exclude personally identifiable information
 - `audit_required` - All access logged
 
-### EXTERNAL_SERVICE
+### EMAIL
 - `rate_limit:10_per_minute` - Request throttling
 
-### DATA_EXPORT
+### FILE_EXPORT
 - `anonymize_pii` - Must anonymize personal data
 - `local_only` - No external transmission
 

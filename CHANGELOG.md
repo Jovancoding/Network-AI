@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.3] - 2026-02-26
+
+### Fixed
+- **OpenClaw security scan**: resolved "Suspicious / MEDIUM CONFIDENCE" verdict
+  - Replaced misleading resource names `SAP_API`, `FINANCIAL_API`, `EXTERNAL_SERVICE`, `DATA_EXPORT` with the actual names used by `check_permission.py`: `DATABASE`, `PAYMENTS`, `EMAIL`, `FILE_EXPORT` — across `SKILL.md` and `references/auth-guardian.md`
+  - Added explicit note that all permission evaluation is local; no external credentials are required or used
+  - Risk table, grant token examples, restriction docs, and all code snippets now match the script
+
 ## [4.0.2] - 2026-02-26
 
 ### Fixed
