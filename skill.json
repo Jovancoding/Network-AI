@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "3.7.1",
+  "version": "4.0.4",
   "description": "Multi-agent orchestrator and behavioral control plane for TypeScript/Node.js. Connects 12 AI frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw) with shared blackboard coordination, permission gating, audit trails, AES-256 encryption, and token budget enforcement.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",
@@ -118,7 +118,7 @@
       "parameters": {
         "resourceType": {
           "type": "string",
-          "enum": ["SAP_API", "FINANCIAL_API", "EXTERNAL_SERVICE", "DATA_EXPORT"],
+          "enum": ["DATABASE", "PAYMENTS", "EMAIL", "FILE_EXPORT"],
           "required": true,
           "description": "The type of protected resource being requested"
         },
@@ -174,7 +174,7 @@
     "optional": ["external_api_access"],
     "authGuardian": {
       "enabled": true,
-      "protectedResources": ["SAP_API", "FINANCIAL_API", "EXTERNAL_SERVICE", "DATA_EXPORT"]
+      "protectedResources": ["DATABASE", "PAYMENTS", "EMAIL", "FILE_EXPORT"]
     }
   },
   "dependencies": {
