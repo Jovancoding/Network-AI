@@ -228,9 +228,15 @@ export class AdapterRegistry {
     }
 
     // Regex pattern (wrapped in /.../)
+    // Safety: reject patterns with catastrophic-backtracking constructs before
+    // building the RegExp, so attacker-controlled input cannot trigger ReDoS.
     if (pattern.startsWith('/') && pattern.endsWith('/')) {
       try {
-        return new RegExp(pattern.slice(1, -1)).test(agentId);
+        const inner = pattern.slice(1, -1);
+        // Block nested quantifiers and excessively complex patterns
+        if (/(\(.*[+*]\))[+*?]|(\[[^\]]*\])[+*]{2}|([+*]){2,}/.test(inner)) return false;
+        if (inner.length > 200) return false;
+        return new RegExp(inner).test(agentId);
       } catch {
         return false;
       }
