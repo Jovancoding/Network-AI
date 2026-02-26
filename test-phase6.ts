@@ -475,7 +475,7 @@ async function testControlTools(): Promise<void> {
   const info = await tools.call('orchestrator_info', {});
   assert(info.ok, 'orchestrator_info ok');
   const infoData = info.data as { version: string; blackboard: { available: boolean } };
-  assert(infoData.version === '4.0.0', 'orchestrator_info version === 4.0.0');
+  assert(infoData.version === '4.0.1', 'orchestrator_info version === 4.0.1');
   assert(infoData.blackboard.available === true, 'orchestrator_info blackboard.available === true');
 }
 

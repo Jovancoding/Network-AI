@@ -427,7 +427,7 @@ export class ControlMcpTools implements McpToolProvider {
       ok: true,
       tool: 'orchestrator_info',
       data: {
-        version: '4.0.0',
+        version: '4.0.1',
         config: snapshot,
         agents: {
           registered: this._agentRegistry?.size ?? 0,
