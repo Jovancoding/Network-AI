@@ -429,7 +429,9 @@ export class McpSseTransport implements McpTransport {
    *                 The transport will POST to `<baseUrl>/mcp`.
    */
   constructor(baseUrl: string) {
-    const clean = baseUrl.replace(/\/+$/, '');
+    // Strip trailing slashes without regex to avoid ReDoS on adversarial input.
+    let clean = baseUrl;
+    while (clean.endsWith('/')) clean = clean.slice(0, -1);
     this._postUrl = clean.endsWith('/mcp') ? clean : `${clean}/mcp`;
   }
 

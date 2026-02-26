@@ -25,7 +25,6 @@ import {
   IdentityVerificationError,
   NamespaceViolationError,
   ValidationError,
-  ParallelLimitError,
   TimeoutError as NetworkAITimeoutError,
 } from './lib/errors';
 import type { ValidationResult, QualityGateResult, ValidationConfig, AIReviewCallback, CustomValidationRule } from './lib/blackboard-validator';

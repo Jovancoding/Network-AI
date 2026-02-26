@@ -21,7 +21,7 @@ import { resolve } from 'node:path';
 
 import { MemoryBackend } from './lib/blackboard-backend';
 import { McpBlackboardBridge } from './lib/mcp-bridge';
-import { BlackboardMCPTools, type IBlackboard } from './lib/mcp-blackboard-tools';
+import { type IBlackboard } from './lib/mcp-blackboard-tools';
 import {
   McpSseServer,
   McpSseTransport,
