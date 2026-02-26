@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "issues": {
+  "ignore": {
     "evalDynamicCodeExecution": [
       {
         "path": "dist/lib/blackboard-validator.js",
