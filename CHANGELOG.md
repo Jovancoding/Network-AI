@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`debugger_agent`** — two-pass post-fix hardening in Phase 4 of `07`; persists `debugger:lastPass` to blackboard; triggers pre-DELIVER NO-GO report if gates still failing
 - **`--silent-summary` mode** — suppresses full logs and prints regex-extracted highlights (score gates, violations, completion markers); designed for press-kit / slide output
 
+### Fixed
+- **Socket.dev Supply Chain Security score** — `socket.json` was missing from the `files` array in `package.json`, so ignore entries were never included in the published npm package and all flagged patterns scored against the supply chain rating. Added `socket.json` to published files.
+- **`networkAccess` false positives** — added `dist/lib/mcp-transport-sse.js` and `dist/bin/mcp-server.js` to `socket.json` ignore list with documented reasons; both are intentional HTTP layers (`McpSseTransport` SSE server/client and `network-ai-server` CLI binary) added in v4.0.0 and not covered by the prior ignore entry.
+
 ### Changed
 - `package.json` version: `4.0.4` → `4.0.5`
 - `skill.json` version: `4.0.4` → `4.0.5`
