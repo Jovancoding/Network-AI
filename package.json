@@ -96,6 +96,7 @@
     "README.md",
     "QUICKSTART.md",
     "SKILL.md",
-    "LICENSE"
+    "LICENSE",
+    "socket.json"
   ]
 }
