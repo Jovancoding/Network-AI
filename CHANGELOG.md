@@ -5,6 +5,16 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.6] - 2026-02-27
+
+### Fixed
+- **npm package socket.json** — `socket.json` was not in the `files` array, so Socket.dev ignore entries were never included in published packages; added to `files` so Supply Chain Security score is restored
+- **`networkAccess` false positives** — added `dist/lib/mcp-transport-sse.js` and `dist/bin/mcp-server.js` to ignore list (both are intentional HTTP layers from v4.0.0)
+
+### Changed
+- `package.json` version: `4.0.5` → `4.0.6`
+- `skill.json` version: `4.0.5` → `4.0.6`
+
 ## [4.0.5] - 2026-02-26
 
 ### Added
