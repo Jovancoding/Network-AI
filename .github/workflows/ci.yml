@@ -117,3 +117,15 @@ jobs:
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to ClawHub
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          npm install -g clawhub-cli
+          if clawhub info network-ai@$PKG_VERSION 2>/dev/null | grep -q "$PKG_VERSION"; then
+            echo "network-ai@$PKG_VERSION already on ClawHub — skipping."
+          else
+            clawhub publish
+          fi
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
