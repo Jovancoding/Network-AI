@@ -59,3 +59,77 @@ We follow coordinated disclosure. We will:
 4. Credit the reporter (unless anonymity is requested)
 
 We ask that you give us reasonable time to address the issue before any public disclosure.
+
+
+---
+
+## Security Module
+
+The security module (`security.ts`) provides defense-in-depth protections:
+
+| Component | Class | Purpose |
+|---|---|---|
+| Token Manager | `SecureTokenManager` | HMAC-signed tokens with expiration |
+| Input Sanitizer | `InputSanitizer` | XSS, injection, path traversal prevention |
+| Rate Limiter | `RateLimiter` | Per-agent request throttling + lockout |
+| Encryptor | `DataEncryptor` | AES-256-GCM encryption for sensitive data |
+| Permission Hardener | `PermissionHardener` | Trust-ceiling & privilege escalation prevention |
+| Audit Logger | `SecureAuditLogger` | Cryptographically signed audit entries |
+| Gateway | `SecureSwarmGateway` | Integrated security layer wrapping all ops |
+
+---
+
+## Permission System
+
+The AuthGuardian evaluates permission requests using weighted scoring:
+
+| Factor | Weight | Description |
+|---|---|---|
+| Justification quality | 40% | Business reason (hardened against prompt injection) |
+| Agent trust level | 30% | Agent's established trust score |
+| Resource risk | 30% | Resource sensitivity + scope |
+
+Approval threshold: **0.5**
+
+### Resource Types
+
+| Resource | Base Risk | Default Restrictions |
+|---|---|---|
+| `DATABASE` | 0.5 | `read_only`, `max_records:100` |
+| `PAYMENTS` | 0.7 | `read_only`, `no_pii_fields`, `audit_required` |
+| `EMAIL` | 0.4 | `rate_limit:10_per_minute` |
+| `FILE_EXPORT` | 0.6 | `anonymize_pii`, `local_only` |
+
+### Check Permissions (CLI)
+
+```bash
+python scripts/check_permission.py \
+  --agent data_analyst \
+  --resource DATABASE \
+  --justification "Need customer order history for sales report"
+
+# View all active grants
+python scripts/check_permission.py --active-grants
+
+# Audit summary
+python scripts/check_permission.py --audit-summary --last 50
+```
+
+---
+
+## Audit Trail
+
+The `SecureAuditLogger` produces HMAC-signed entries in `data/audit_log.jsonl`.
+
+Logged events: `permission_granted`, `permission_denied`, `permission_revoked`, `ttl_cleanup`, `result_validated`, and all blackboard writes.
+
+Each entry contains: `agentId`, `action`, `timestamp`, `outcome`, `resource`. No PII, no API keys, no message content.
+
+To disable: pass `--no-audit` flag to `network-ai-server`, or set `auditLogPath: undefined` in `createSwarmOrchestrator` config.
+
+Token revocation and TTL cleanup:
+
+```bash
+python scripts/revoke_token.py --list-expired
+python scripts/revoke_token.py --cleanup
+```

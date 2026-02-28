@@ -5,6 +5,25 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.13] - 2026-02-28
+
+### Changed
+- **README restructured** — cut from 1,158 lines to 187 lines; README is now a decision page, not a docs site
+  - Hero, proof table, architecture, 2-agent coordination example, adapter table, "Works with" comparison, testing, and doc links
+  - Replaced single-agent hello world with a 2-agent concurrent coordination example showing the real differentiator
+  - Renamed "Why not just use LangGraph / CrewAI / AutoGen alone?" → "Works with LangGraph, CrewAI, and AutoGen" (complementary framing)
+  - Removed: Related Concepts (SEO block), Keywords details block, race condition essay, full Python CLI walkthroughs, PowerShell guide, project structure, configuration section, exports section, competitive table, demos section (trimmed to one), deep feature catalog
+- **Test count contradiction fixed** — badge and hero previously said "1,216 passing tests" while the Testing section said "315 total" (only 4 suites counted); corrected to **1,184 passing assertions across 15 test suites** (verified by counting `assert()` / `pass()` calls per file)
+- **New docs files created** (content moved from README, nothing deleted):
+  - `ARCHITECTURE.md` — race condition problem, component overview, FSM journey, handoff protocol, trust levels, project structure
+  - `BENCHMARKS.md` — BlackboardValidator throughput, cloud provider performance, rate limit patterns, local GPU, `max_completion_tokens` guide
+- **Existing docs extended**:
+  - `SECURITY.md` — Security Module table, Permission System scoring, resource types, audit trail, token management
+  - `QUICKSTART.md` — PowerShell guide, Python scripts CLI (budget, blackboard, permissions, tokens), fan-out/fan-in pattern, configuration, module exports
+- `package.json` version: `4.0.12` → `4.0.13`
+- `skill.json` version: `4.0.12` → `4.0.13`
+- README release badge updated to `v4.0.13`
+
 ## [4.0.12] - 2026-02-28
 
 ### Fixed

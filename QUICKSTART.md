@@ -258,3 +258,173 @@ Your App
 ---
 
 **Questions?** Open an issue at [github.com/jovanSAPFIONEER/Network-AI](https://github.com/jovanSAPFIONEER/Network-AI)
+
+---
+
+## PowerShell (Windows)
+
+All commands work in PowerShell. The only difference from bash is environment variable syntax.
+
+```powershell
+# Set your API key for the current session
+$env:OPENAI_API_KEY = "sk-..."
+
+# Or copy the template and fill it in
+Copy-Item .env.example .env
+
+# Run examples (no API key needed)
+npx ts-node examples/01-hello-swarm.ts
+npx ts-node examples/02-fsm-pipeline.ts
+npx ts-node examples/03-parallel-agents.ts
+
+# Interactive example launcher
+npx ts-node run.ts
+
+# Run tests
+npm test
+npm run test:all
+```
+
+To persist `OPENAI_API_KEY` across sessions, add it to your PowerShell profile or set it via *System Properties → Environment Variables*.
+
+---
+
+## Python Scripts CLI
+
+The Python scripts in `scripts/` implement the local governance layer. All run locally — no network calls.
+
+### Budget (always initialise first)
+
+```bash
+python scripts/swarm_guard.py budget-init   --task-id "task_001" --budget 10000
+python scripts/swarm_guard.py budget-check  --task-id "task_001"
+python scripts/swarm_guard.py budget-report --task-id "task_001"
+```
+
+### Budget-Aware Handoffs
+
+```bash
+python scripts/swarm_guard.py intercept-handoff \
+  --task-id "task_001" \
+  --from orchestrator \
+  --to data_analyst \
+  --message "Analyze Q4 revenue data"
+```
+
+### Blackboard
+
+```bash
+# Write
+python scripts/blackboard.py write "task:analysis" '{"status": "running"}'
+
+# Read
+python scripts/blackboard.py read "task:analysis"
+
+# Atomic commit workflow
+python scripts/blackboard.py propose "chg_001" "key" '{"value": 1}'
+python scripts/blackboard.py validate "chg_001"
+python scripts/blackboard.py commit "chg_001"
+
+# List all keys
+python scripts/blackboard.py list
+```
+
+### Permissions
+
+```bash
+# Request permission
+python scripts/check_permission.py \
+  --agent data_analyst \
+  --resource DATABASE \
+  --justification "Need customer order history for Q4 report"
+
+# View active grants
+python scripts/check_permission.py --active-grants
+python scripts/check_permission.py --active-grants --agent data_analyst --json
+
+# Audit summary
+python scripts/check_permission.py --audit-summary
+python scripts/check_permission.py --audit-summary --last 50 --json
+```
+
+### Token Management
+
+```bash
+python scripts/revoke_token.py --list-expired
+python scripts/revoke_token.py --cleanup
+python scripts/validate_token.py --token "grant_85364b44..."
+```
+
+---
+
+## Fan-Out / Fan-In Pattern
+
+```typescript
+import { LockedBlackboard } from 'network-ai';
+
+const board   = new LockedBlackboard('.', logger, { conflictResolution: 'first-commit-wins' });
+const pillars = ['reliability', 'security', 'cost', 'operations', 'performance'];
+
+// Fan-out: each agent writes to its own section independently
+for (const pillar of pillars) {
+  const id = board.propose(`eval:${pillar}`, { score: Math.random(), findings: [] }, pillar);
+  board.validate(id, 'orchestrator');
+  board.commit(id);
+}
+
+// Fan-in: orchestrator reads all results and synthesises
+const results = pillars.map(p => ({ pillar: p, ...board.read(`eval:${p}`) }));
+const id = board.propose('eval:summary', {
+  overall: results.reduce((s, r) => s + r.score, 0) / results.length,
+  pillars: results,
+}, 'orchestrator');
+board.validate(id, 'orchestrator');
+board.commit(id);
+```
+
+---
+
+## Configuration
+
+### Modify Trust Levels
+
+Edit `scripts/check_permission.py`:
+
+```python
+DEFAULT_TRUST_LEVELS = {
+    "orchestrator": 0.9,
+    "my_new_agent": 0.75,   # add your agent
+}
+GRANT_TOKEN_TTL_MINUTES = 5
+```
+
+---
+
+## Module Exports
+
+```typescript
+// Core classes
+import SwarmOrchestrator, {
+  SharedBlackboard, AuthGuardian, TaskDecomposer,
+  BlackboardValidator, QualityGateAgent,
+} from 'network-ai';
+
+// Factory
+import { createSwarmOrchestrator } from 'network-ai';
+
+// All 12 adapters
+import {
+  AdapterRegistry, BaseAdapter,
+  OpenClawAdapter, LangChainAdapter, AutoGenAdapter,
+  CrewAIAdapter, MCPAdapter, CustomAdapter,
+  LlamaIndexAdapter, SemanticKernelAdapter, OpenAIAssistantsAdapter,
+  HaystackAdapter, DSPyAdapter, AgnoAdapter,
+} from 'network-ai';
+
+// Types
+import type {
+  IAgentAdapter, AgentPayload, AgentContext, AgentResult, AgentInfo,
+  AdapterConfig, TaskPayload, HandoffMessage, PermissionGrant, SwarmState,
+  ParallelTask, ParallelExecutionResult, SynthesisStrategy,
+} from 'network-ai';
+```

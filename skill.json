@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.0.12",
+  "version": "4.0.13",
   "description": "Python-based local multi-agent orchestrator. Coordinates specialized agents through a file-backed blackboard (swarm-blackboard.md), enforces HMAC-gated AuthGuardian permissions, tracks per-agent token budgets, and writes a local audit log. All execution is local — no external network calls from the bundled Python scripts. A companion Node.js MCP server (network-ai-server) is available separately on npm (npm install -g network-ai) for IDE/MCP integration; it is not bundled here and does not run automatically.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",

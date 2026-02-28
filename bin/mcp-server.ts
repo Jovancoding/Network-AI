@@ -29,7 +29,7 @@
  *   http://localhost:3001/tools     (list all tools)
  *
  * @module bin/mcp-server
- * @version 4.0.12
+ * @version 4.0.13
  */
 
 import {
@@ -106,7 +106,7 @@ function parseArgs(argv: string[]): ServerArgs {
 
 function printHelp(): void {
   console.log(`
-network-ai-server — Network-AI MCP Server v4.0.12
+network-ai-server — Network-AI MCP Server v4.0.13
 
 Usage: npx ts-node bin/mcp-server.ts [options]
 
@@ -144,7 +144,7 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  console.log(`\n[network-ai-server] Starting MCP Server v4.0.12`);
+  console.log(`\n[network-ai-server] Starting MCP Server v4.0.13`);
   console.log(`[network-ai-server] Board: ${args.board} | Port: ${args.port}`);
 
   // --------------------------------------------------------------------------

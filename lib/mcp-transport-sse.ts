@@ -121,7 +121,7 @@ export class McpCombinedBridge {
           return this._ok(id, {
             protocolVersion: '2024-11-05',
             capabilities: { tools: {} },
-            serverInfo: { name: this.name ?? 'network-ai', version: '4.0.12' },
+            serverInfo: { name: this.name ?? 'network-ai', version: '4.0.13' },
           });
 
         // Client signals it's ready — notification (no response needed, but
