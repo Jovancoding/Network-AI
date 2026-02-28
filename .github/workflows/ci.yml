@@ -117,18 +117,3 @@ jobs:
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish to ClawHub
-        run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          npm install -g clawhub
-          # Write config file from secret (clawhub reads config, not a bare env var)
-          mkdir -p /tmp/clawhub
-          echo "{\"registry\":\"https://clawhub.ai\",\"token\":\"$CLAWHUB_TOKEN\"}" > /tmp/clawhub/config.json
-          if CLAWHUB_CONFIG_PATH=/tmp/clawhub/config.json clawhub info network-ai@$PKG_VERSION 2>/dev/null | grep -q "$PKG_VERSION"; then
-            echo "network-ai@$PKG_VERSION already on ClawHub — skipping."
-          else
-            CLAWHUB_CONFIG_PATH=/tmp/clawhub/config.json clawhub publish . --slug network-ai --name "Network-AI" --version $PKG_VERSION --tags latest
-          fi
-        env:
-          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
