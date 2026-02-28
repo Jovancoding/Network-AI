@@ -5,6 +5,22 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.8] - 2026-02-28
+
+### Fixed
+- **`skill.json` `maxParallelAgents` config drift** — value was stale at `3`; corrected to `null` (runtime default is `Infinity` since v4.0.0); `maxParallelAgents_default` annotation added explaining the opt-in finite-limit behaviour
+- **`index.ts` module header** — identity updated from "Multi-Agent Swarm Orchestration Skill" to "Multi-Agent Orchestration Framework for TypeScript/Node.js" to match current package scope; `@version` corrected from `3.1.0` to `4.0.8`
+- **`lib/mcp-transport-sse.ts` MCP handshake** — added `initialize`, `notifications/initialized`, `resources/list`, and `prompts/list` handlers so clients (Cursor, Claude Desktop) complete the MCP handshake before tool calls; fixes "method not found" on connect
+- **`lib/mcp-transport-sse.ts` CORS** — added `Access-Control-Allow-Origin: *` / `Allow-Methods` / `Allow-Headers` and `OPTIONS` preflight handler; enables browser-based MCP clients
+- **`lib/mcp-transport-sse.ts` route aliases** — `GET /` now aliases `/sse`, `POST /` aliases `/mcp`; reduces friction for clients that POST to the root
+- **`serverInfo.version`** — corrected stale `4.0.4` → `4.0.8` in `initialize` response payload
+
+### Changed
+- `package.json` version: `4.0.7` → `4.0.8`
+- `skill.json` version: `4.0.7` → `4.0.8`
+- `bin/mcp-server.ts` version strings updated to `v4.0.8`
+- README release badge updated to `v4.0.8`
+
 ## [4.0.7] - 2026-02-28
 
 ### Added

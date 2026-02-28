@@ -116,6 +116,26 @@ export class McpCombinedBridge {
 
     try {
       switch (method) {
+        // MCP handshake — required before any tool calls
+        case 'initialize':
+          return this._ok(id, {
+            protocolVersion: '2024-11-05',
+            capabilities: { tools: {} },
+            serverInfo: { name: this.name ?? 'network-ai', version: '4.0.7' },
+          });
+
+        // Client signals it's ready — notification (no response needed, but
+        // some clients send it as a request with an id)
+        case 'notifications/initialized':
+          return this._ok(id, {});
+
+        // Return empty lists so clients don't abort on missing methods
+        case 'resources/list':
+          return this._ok(id, { resources: [] });
+
+        case 'prompts/list':
+          return this._ok(id, { prompts: [] });
+
         case 'tools/list':
           return this._ok(id, { tools: this.allDefinitions() });
 
@@ -292,9 +312,19 @@ export class McpSseServer {
 
     const path = parsed.pathname;
 
-    if (req.method === 'GET' && path === '/sse') {
+    // CORS — allow Cursor / Claude Desktop / browser clients
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    if (req.method === 'GET' && (path === '/sse' || path === '/')) {
       this._handleSse(req, res);
-    } else if (req.method === 'POST' && path === '/mcp') {
+    } else if (req.method === 'POST' && (path === '/mcp' || path === '/')) {
       this._handlePost(req, res);
     } else if (req.method === 'GET' && path === '/health') {
       this._handleHealth(res);
@@ -302,7 +332,7 @@ export class McpSseServer {
       this._handleTools(res);
     } else {
       res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Not found', endpoints: ['/sse', '/mcp', '/health', '/tools'] }));
+      res.end(JSON.stringify({ error: 'Not found', endpoints: ['/', '/sse', '/mcp', '/health', '/tools'] }));
     }
   }
 

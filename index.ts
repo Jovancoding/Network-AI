@@ -1,11 +1,13 @@
 /**
- * SwarmOrchestrator - Multi-Agent Swarm Orchestration Skill
- * 
- * This module implements the core logic for agent-to-agent communication,
- * task decomposition, permission management, and shared blackboard coordination.
- * 
+ * SwarmOrchestrator - Multi-Agent Orchestration Framework for TypeScript/Node.js
+ *
+ * Connects 12 AI frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex,
+ * Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw) via a shared atomic blackboard,
+ * FSM governance, per-agent token budget enforcement, and HMAC audit trails.
+ * OpenClaw skill interface is implemented for backward compatibility.
+ *
  * @module SwarmOrchestrator
- * @version 3.1.0
+ * @version 4.0.8
  * @license MIT
  */
 

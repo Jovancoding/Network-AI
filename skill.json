@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.0.7",
+  "version": "4.0.8",
   "description": "Multi-agent orchestrator and behavioral control plane for TypeScript/Node.js. Connects 12 AI frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw) with shared blackboard coordination, permission gating, audit trails, AES-256 encryption, and token budget enforcement.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",
@@ -188,7 +188,8 @@
   },
   "config": {
     "blackboardPath": "./swarm-blackboard.md",
-    "maxParallelAgents": 3,
+    "maxParallelAgents": null,
+    "maxParallelAgents_default": "Infinity (no hard cap since v4.0.0 — set to a positive integer to enforce a limit)",
     "defaultTimeout": 30000,
     "enableTracing": true
   }
