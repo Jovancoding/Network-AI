@@ -8,7 +8,8 @@ metadata:
     requires:
       bins:
         - python3
-        - node
+      optional_bins:
+        - node  # Only needed if you separately install and run the Node.js MCP server (network-ai-server via npm). Not required for this skill's Python instructions.
     env:
       SWARM_TOKEN_SECRET:
         required: false
@@ -27,6 +28,8 @@ metadata:
 ---
 
 # Swarm Orchestrator Skill
+
+> **Scope of this skill bundle:** All instructions below run local Python scripts (`scripts/*.py`). No network calls are made by this skill. The Node.js MCP server (`network-ai-server`) is a **separate optional component** — install it with `npm install -g network-ai` only if you want MCP/IDE integration. It does **not** run automatically and is not part of this skill bundle.
 
 Multi-agent coordination system for complex workflows requiring task delegation, parallel execution, and permission-controlled access to sensitive APIs.
 

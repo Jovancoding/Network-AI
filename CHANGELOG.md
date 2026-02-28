@@ -5,6 +5,26 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.12] - 2026-02-28
+
+### Fixed
+- **OpenClaw scanner: documentation/bundle mismatch (core issue)** — scanner correctly identified that `skill.json` declared `"runtime": "node"` and `"entrypoint": "index.ts"` while the actual SKILL.md instructions only execute Python scripts; fixed by changing runtime to `"python"` and entrypoint to `"scripts/swarm_guard.py"`
+- **OpenClaw scanner: node listed as required binary** — `node` removed from `requires.bins` in SKILL.md since no instruction calls Node; moved to `optional_bins` with an explicit note that it is only needed if the user separately installs the npm MCP server
+- **OpenClaw scanner: description implies a full Node.js ecosystem is bundled** — `skill.json` description rewritten to accurately describe the bundled Python scripts as the primary runtime, with an explicit callout that the Node MCP server is a separate optional npm package
+- **OpenClaw scanner: install block claimed the npm package was bundled** — `install` block restructured to clearly separate bundled Python scripts (instruction-only, nothing downloaded) from the optional Node server (separate npm package, must be installed manually)
+- **SKILL.md scope ambiguity** — added a prominent scope notice at the top of the instructions section: explains Python-only execution, confirms no automatic network calls, and describes the Node MCP server as a separate opt-in component
+
+### Changed
+- `skill.json` `runtime`: `"node"` → `"python"`
+- `skill.json` `entrypoint`: `"index.ts"` → `"scripts/swarm_guard.py"`
+- `skill.json` `description`: rewritten to accurately reflect Python-based local orchestration
+- `skill.json` `install`: restructured — Python scripts listed as bundled, Node server listed as `optional_node_server` with explicit "not auto-fetched" note
+- `SKILL.md` `requires.bins`: removed `node`; added `optional_bins` section
+- `SKILL.md` instructions header: added scope notice block
+- `package.json` version: `4.0.11` → `4.0.12`
+- `skill.json` version: `4.0.11` → `4.0.12`
+- README release badge updated to `v4.0.12`
+
 ## [4.0.11] - 2026-02-28
 
 ### Fixed
