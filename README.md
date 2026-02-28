@@ -16,6 +16,7 @@
 [![Tests](https://img.shields.io/badge/tests-1216%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-12%20supported-blueviolet.svg)](#adapter-system)
 [![RSS Feed](https://img.shields.io/badge/RSS-releases-orange?logo=rss)](https://github.com/jovanSAPFIONEER/Network-AI/releases.atom)
+[![Integration Guide](https://img.shields.io/badge/docs-integration%20guide-informational.svg)](INTEGRATION_GUIDE.md)
 
 > **Legacy Users:** This skill works with **Clawdbot** and **Moltbot** (now OpenClaw). If you're searching for *Moltbot Security*, *Clawdbot Swarm*, or *Moltbot multi-agent* -- you're in the right place!
 

@@ -95,6 +95,7 @@
     "scripts/",
     "README.md",
     "QUICKSTART.md",
+    "INTEGRATION_GUIDE.md",
     "SKILL.md",
     "LICENSE",
     "socket.json"
