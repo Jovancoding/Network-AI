@@ -1,7 +1,7 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.0.13",
-  "description": "Python-based local multi-agent orchestrator. Coordinates specialized agents through a file-backed blackboard (swarm-blackboard.md), enforces HMAC-gated AuthGuardian permissions, tracks per-agent token budgets, and writes a local audit log. All execution is local — no external network calls from the bundled Python scripts. A companion Node.js MCP server (network-ai-server) is available separately on npm (npm install -g network-ai) for IDE/MCP integration; it is not bundled here and does not run automatically.",
+  "version": "4.0.14",
+  "description": "Python-based local multi-agent orchestrator. Coordinates specialized agents through a file-backed blackboard (swarm-blackboard.md), enforces weighted permission gating (justification quality + agent trust score + resource risk scoring), tracks per-agent token budgets, and writes a plain-JSON local audit log. All execution is local — no external network calls from the bundled Python scripts. HMAC-signed tokens and AES-256 encryption are features of the companion Node.js package (network-ai on npm) and are NOT implemented in the Python scripts. A companion Node.js MCP server (network-ai-server) is available separately on npm for IDE/MCP integration; it is not bundled here and does not run automatically.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",
   "repository": "https://github.com/jovanSAPFIONEER/Network-AI",  "source": "https://github.com/jovanSAPFIONEER/Network-AI",  "license": "MIT",
@@ -212,15 +212,15 @@
   "env": {
     "SWARM_TOKEN_SECRET": {
       "required": false,
-      "description": "HMAC secret for AuthGuardian permission tokens. If not set, a cryptographically random secret is generated per process start (ephemeral tokens — not persistent across restarts)."
+      "description": "Node.js MCP server only — NOT used by the Python scripts in this skill bundle. Used by the optional network-ai npm package (network-ai-server) as the HMAC secret for its AuthGuardian token implementation. The Python scripts use UUID-based grant tokens stored in data/active_grants.json."
     },
     "SWARM_ENCRYPTION_KEY": {
       "required": false,
-      "description": "AES-256 encryption key for blackboard at-rest encryption. If not set, a cryptographically random key is generated per process start."
+      "description": "Node.js MCP server only — NOT used by the Python scripts in this skill bundle. Used by the optional network-ai npm package for AES-256 blackboard encryption. The Python scripts do not encrypt blackboard data."
     },
     "OPENAI_API_KEY": {
       "required": false,
-      "description": "Only used by the optional setup.ts interactive setup wizard and demo examples (07-full-showcase.ts). Not required for the core orchestrator, adapters, MCP server, or any Python scripts."
+      "description": "Not used by the Python scripts in this skill bundle. Only used by the optional Node.js demo examples (07-full-showcase.ts) when running the companion npm package."
     }
   },
   "privacy": {

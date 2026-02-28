@@ -13,13 +13,13 @@ metadata:
     env:
       SWARM_TOKEN_SECRET:
         required: false
-        description: "HMAC secret for AuthGuardian tokens. Auto-generated per process if not set (ephemeral)."
+        description: "Node.js MCP server only — not used by these Python scripts. The Python permission layer uses UUID-based tokens stored in data/active_grants.json."
       SWARM_ENCRYPTION_KEY:
         required: false
-        description: "AES-256 key for blackboard encryption. Auto-generated per process if not set."
+        description: "Node.js MCP server only — not used by these Python scripts. The Python blackboard does not encrypt data at rest."
       OPENAI_API_KEY:
         required: false
-        description: "Only used by optional demo examples (07-full-showcase.ts) and the setup wizard. Not required for the core orchestrator or MCP server."
+        description: "Not used by these Python scripts. Only used by the optional Node.js demo examples when running the companion npm package."
     privacy:
       audit_log:
         path: data/audit_log.jsonl
@@ -29,7 +29,7 @@ metadata:
 
 # Swarm Orchestrator Skill
 
-> **Scope of this skill bundle:** All instructions below run local Python scripts (`scripts/*.py`). No network calls are made by this skill. The Node.js MCP server (`network-ai-server`) is a **separate optional component** — install it with `npm install -g network-ai` only if you want MCP/IDE integration. It does **not** run automatically and is not part of this skill bundle.
+> **Scope of this skill bundle:** All instructions below run local Python scripts (`scripts/*.py`). No network calls are made by this skill. Tokens are UUID-based (`grant_{uuid4().hex}`) stored in `data/active_grants.json`. Audit logging is plain JSONL (`data/audit_log.jsonl`) — no HMAC signing in the Python layer. HMAC-signed tokens, AES-256 encryption, and the standalone MCP server are all features of the **companion Node.js package** (`npm install -g network-ai`) — they are **not** implemented in these Python scripts and do **not** run automatically.
 
 Multi-agent coordination system for complex workflows requiring task delegation, parallel execution, and permission-controlled access to sensitive APIs.
 

@@ -5,6 +5,20 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.14] - 2026-02-28
+
+### Fixed
+- **OpenClaw scanner: HMAC/signing overclaims in Python skill bundle docs** — scanner flagged that HMAC-signed audit logs, signed tokens, and a standalone MCP server are "not implemented or overstated" in the shipped scripts; all three claims were correct — they are features of the Node.js package (`network-ai` on npm), not the Python bundle
+  - `skill.json` description: removed "enforces HMAC-gated AuthGuardian permissions"; replaced with accurate description of UUID-based grants + plain JSONL audit logging; added explicit callout that HMAC-signed tokens and AES-256 encryption are Node.js-only features
+  - `skill.json` env block: `SWARM_TOKEN_SECRET` and `SWARM_ENCRYPTION_KEY` now state "Node.js MCP server only — NOT used by the Python scripts"
+  - `SKILL.md` env block: same corrections for all three env vars
+  - `SKILL.md` scope notice: added explicit statement that tokens are UUID-based (`grant_{uuid4().hex}`), audit logging is plain JSONL (no HMAC signing), and HMAC-signed tokens / AES-256 encryption / standalone MCP server are all features of the companion Node.js package
+  - `.github/SECURITY.md`: split "Security Measures" section into two layers — Python skill bundle (UUID tokens, plain JSONL, weighted scoring) vs Node.js package (AES-256-GCM, HMAC-SHA256)
+- **`.github/SECURITY.md` sync** — kept in sync with root `SECURITY.md` (both split by layer)
+- `package.json` version: `4.0.13` → `4.0.14`
+- `skill.json` version: `4.0.13` → `4.0.14`
+- README release badge updated to `v4.0.14`
+
 ## [4.0.13] - 2026-02-28
 
 ### Changed
