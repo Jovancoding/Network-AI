@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.11] - 2026-02-28
+
+### Fixed
+- **OpenClaw scanner: missing install spec** — added `install` block to `skill.json` declaring both the npm package (`network-ai`, `registry.npmjs.org`, source repo link, binary `network-ai-server`) and local Python scripts; resolves "no install spec in registry entry" and "missing server artifacts" warnings
+- **OpenClaw scanner: no source repo in registry metadata** — added `source` field alongside existing `homepage` and `repository` fields in `skill.json`
+- **OpenClaw scanner: undeclared npx fetch** — `install.npm.note` explicitly states that `npx network-ai-server` fetches only from `registry.npmjs.org` and links to the public source repository
+
+### Changed
+- `package.json` version: `4.0.10` → `4.0.11`
+- `skill.json` version: `4.0.10` → `4.0.11`
+- README release badge updated to `v4.0.11`
+
 ## [4.0.10] - 2026-02-28
 
 ### Fixed

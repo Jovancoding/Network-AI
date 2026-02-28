@@ -7,7 +7,7 @@
  * OpenClaw skill interface is implemented for backward compatibility.
  *
  * @module SwarmOrchestrator
- * @version 4.0.10
+ * @version 4.0.11
  * @license MIT
  */
 
