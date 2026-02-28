@@ -31,6 +31,34 @@ Connect agents across **12 frameworks** through a shared blackboard with built-i
 - **Production security** -- AES-256 encryption, HMAC audit logs, rate limiting, input sanitization
 - **Zero config** -- Works out of the box with `createSwarmOrchestrator()`
 
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Your Application                        │
+└──────────────────────────┬──────────────────────────────────┘
+                           │  createSwarmOrchestrator()
+┌──────────────────────────▼──────────────────────────────────┐
+│                  SwarmOrchestrator                          │
+│  ┌──────────────┐  ┌───────────────┐  ┌─────────────────┐  │
+│  │ AdapterRegistry│  │ AuthGuardian  │  │ FederatedBudget │  │
+│  │ (route tasks) │  │ (permissions) │  │ (token ceilings)│  │
+│  └──────┬───────┘  └───────────────┘  └─────────────────┘  │
+│         │                                                    │
+│  ┌──────▼──────────────────────────────────────────────┐   │
+│  │            LockedBlackboard (shared state)           │   │
+│  │   propose → validate → commit  (file-system mutex)  │   │
+│  └──────────────────────────────────────────────────────┘   │
+│         │                                                    │
+│  ┌──────▼───────────────────────────────────────────────┐  │
+│  │  Adapters (plug any framework in, swap out freely)   │  │
+│  │  LangChain │ AutoGen │ CrewAI │ MCP │ LlamaIndex │…  │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                           │
+              HMAC-signed audit log
+```
+
 ## Hello World -- Get Running in 60 Seconds
 
 ```typescript
@@ -163,7 +191,19 @@ blackboard.commitChange(changeId);     // Atomic write with file-system mutex
 python scripts/swarm_guard.py budget-init --task-id "task_001" --budget 10000
 ```
 
-Network-AI wraps your agent swarm with **file-system mutexes**, **atomic commits**, and **token budget ceilings** so race conditions, double-spends, and split-brain writes simply cannot happen. This works with any framework -- LangChain, CrewAI, AutoGen, or anything else connected through the adapter system.
+Network-AI wraps your agent swarm with **file-system mutexes**, **atomic commits**, and **token budget ceilings** so race conditions, double-spends, and split-brain writes are prevented — validated by [1,216 passing tests](#testing) across 9 test suites. This works with any framework — LangChain, CrewAI, AutoGen, or anything else connected through the adapter system.
+
+### Why not just use LangGraph / CrewAI / AutoGen alone?
+
+| Problem | LangGraph | CrewAI | AutoGen | Network-AI |
+|---|---|---|---|---|
+| Two agents write the same key simultaneously | ❌ Last write wins silently | ❌ Last write wins silently | ❌ Last write wins silently | ✅ Atomic mutex + conflict resolution |
+| Budget overrun across parallel agents | ⚠️ Callbacks only | ❌ None | ❌ None | ✅ Hard ceiling per agent + task |
+| Cross-framework agents in one swarm | ❌ LangChain only | ❌ CrewAI only | ❌ AutoGen only | ✅ 12 frameworks via adapters |
+| Tamper-evident audit trail | ❌ None | ❌ None | ❌ None | ✅ HMAC-signed log |
+| Permission gating per API | ❌ None | ❌ None | ❌ None | ✅ AuthGuardian |
+
+> **Use Network-AI as the coordination layer on top of your existing framework** — keep your LangChain chains, CrewAI crews, and AutoGen agents, and add shared state + governance around them.
 
 ## Features
 
@@ -191,11 +231,21 @@ Network-AI wraps your agent swarm with **file-system mutexes**, **atomic commits
 - **BaseAdapter** -- Extend to write your own adapter in minutes
 
 ### Content Quality Gate (AI Safety)
-- **BlackboardValidator (Layer 1)** -- Rule-based validation at ~159K-1M ops/sec
+- **BlackboardValidator (Layer 1)** -- Rule-based validation (see benchmarks below)
 - **QualityGateAgent (Layer 2)** -- AI-assisted review with quarantine system
 - **Hallucination Detection** -- Catches vague, unsupported, or fabricated content
 - **Dangerous Code Detection** -- Blocks `eval()`, `exec()`, `rm -rf`, and other risky patterns
 - **Placeholder Rejection** -- Rejects TODO/FIXME/stub content from entering the blackboard
+
+**BlackboardValidator throughput** (measured on Node.js 20, Apple M2, single-thread):
+
+| Input size | Ops/sec | Latency |
+|---|---|---|
+| Small entry (~100 chars) | ~1,000,000 | < 1 µs |
+| Medium entry (~1 KB) | ~500,000 | ~2 µs |
+| Large entry (~10 KB) | ~159,000 | ~6 µs |
+
+Layer 2 (QualityGateAgent) adds LLM latency and is async — intended for high-value writes, not every write.
 
 ### Security Module (Defense-in-Depth)
 - **HMAC-Signed Tokens** -- Cryptographic token generation with expiration
@@ -290,6 +340,10 @@ npm install network-ai
 ```
 
 That's it. No native dependencies, no build step.
+
+> **One package, two entry points:**
+> - `import { createSwarmOrchestrator } from 'network-ai'` — TypeScript/Node.js orchestration API
+> - `npx network-ai-server --port 3001` — MCP server binary (bundled in the same package)
 
 ### For Development (contributing / running tests)
 
@@ -1044,6 +1098,8 @@ If you find Network-AI useful, **give it a star** -- it helps others discover th
 **Compatible with 12 agent frameworks: OpenClaw, LangChain, AutoGen, CrewAI, MCP, LlamaIndex, Semantic Kernel, OpenAI Assistants, Haystack, DSPy, Agno, and any custom adapter**
 
 ## Competitive Comparison
+
+> **TL;DR** — LangGraph, CrewAI, and AutoGen are excellent agent builders. Network-AI is the coordination layer you add on top when those agents need to share state, stay within budget, and leave an audit trail. They are complementary, not competing.
 
 How Network-AI compares to other multi-agent frameworks:
 
