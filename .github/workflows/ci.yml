@@ -125,7 +125,7 @@ jobs:
           if clawhub info network-ai@$PKG_VERSION 2>/dev/null | grep -q "$PKG_VERSION"; then
             echo "network-ai@$PKG_VERSION already on ClawHub — skipping."
           else
-            clawhub publish
+            clawhub publish . --slug network-ai --name "Network-AI" --version $PKG_VERSION --tags latest
           fi
         env:
           CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}

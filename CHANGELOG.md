@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.9] - 2026-02-28
+
+### Fixed
+- **ClawHub publish artefact mismatch** — v4.0.8 was published to ClawHub without running a build first; `dist/bin/mcp-server.js` was absent from the uploaded zip, causing the OpenClaw scanner to flag "Node/npm MCP server components not present — suspicious overclaiming (MEDIUM CONFIDENCE)". Re-publishing with a full `npm run build` output resolves the mismatch.
+- **CI `clawhub publish` command** — missing path (`.`) and `--slug`/`--name` arguments caused the automated ClawHub step to fail silently; corrected in `.github/workflows/ci.yml`
+- **`serverInfo.version` in `mcp-transport-sse.ts`** — corrected stale `4.0.7` → `4.0.9` in `initialize` response
+
+### Changed
+- `package.json` version: `4.0.8` → `4.0.9`
+- `skill.json` version: `4.0.8` → `4.0.9`
+- `bin/mcp-server.ts` version strings updated to `v4.0.9`
+- README release badge updated to `v4.0.9`
+
 ## [4.0.8] - 2026-02-28
 
 ### Fixed
