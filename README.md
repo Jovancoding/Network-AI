@@ -1,35 +1,42 @@
-# Network-AI: Multi-Agent Orchestration Framework
+# Network-AI
 
-**The plug-and-play AI agent orchestrator for TypeScript/Node.js -- connect 12 agent frameworks with zero glue code**
+**TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination**
 
 [![CI](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/badge/release-v4.0.8-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
-[![Python](https://img.shields.io/badge/python-3.9+-green.svg)](https://python.org)
-[![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
-[![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
-[![AgentSkills](https://img.shields.io/badge/AgentSkills-compatible-orange.svg)](https://agentskills.io)
 [![Tests](https://img.shields.io/badge/tests-1216%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-12%20supported-blueviolet.svg)](#adapter-system)
-[![RSS Feed](https://img.shields.io/badge/RSS-releases-orange?logo=rss)](https://github.com/jovanSAPFIONEER/Network-AI/releases.atom)
+[![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
+[![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
 [![Integration Guide](https://img.shields.io/badge/docs-integration%20guide-informational.svg)](INTEGRATION_GUIDE.md)
 
-> **Legacy Users:** This skill works with **Clawdbot** and **Moltbot** (now OpenClaw). If you're searching for *Moltbot Security*, *Clawdbot Swarm*, or *Moltbot multi-agent* -- you're in the right place!
+Network-AI is a TypeScript/Node.js multi-agent orchestrator for teams that need shared state, guardrails, budgets, and cross-framework coordination.
 
-If network-ai saves you time, a ⭐ on GitHub helps others find it.
+- **Shared blackboard with locking** — atomic commits prevent race conditions and split-brain failures across parallel agents
+- **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC audit trails, and permission gating
+- **12 framework adapters** — LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, and more in one orchestrator — no glue code, no lock-in
 
-Connect agents across **12 frameworks** through a shared blackboard with built-in security, compliance enforcement, and behavioral governance -- in a single `npm install`. No glue code, no lock-in.
+If network-ai saves you time, a ⭐ helps others find it. &nbsp;|&nbsp; [**60-second quickstart →**](#hello-world----get-running-in-60-seconds) &nbsp;|&nbsp; [**Architecture →**](#architecture) &nbsp;|&nbsp; [**All adapters →**](#adapter-system)
 
-**Why Network-AI?**
-- **Framework-agnostic** -- LangChain, AutoGen, CrewAI, MCP, OpenAI Assistants, and 7 more in one orchestrator
-- **Governed coordination** -- FSM-controlled agent turns, permission gating, audit trails, budget ceilings
-- **Shared state** -- Atomic blackboard with conflict resolution for safe parallel agent coordination
-- **Production security** -- AES-256 encryption, HMAC audit logs, rate limiting, input sanitization
-- **Zero config** -- Works out of the box with `createSwarmOrchestrator()`
+---
+
+## Why teams use Network-AI
+
+| Problem | How Network-AI solves it |
+|---|---|
+| Race conditions in parallel agents | Atomic blackboard: `propose → validate → commit` with file-system mutex |
+| Agent overspend / runaway costs | `FederatedBudget` — hard per-agent token ceilings with live spend tracking |
+| No visibility into what agents did | HMAC-signed audit log on every write, permission grant, and FSM transition |
+| Locked into one AI framework | 12 adapters — mix LangChain + AutoGen + CrewAI + custom in one swarm |
+| Agents escalating beyond their scope | `AuthGuardian` — scoped permission tokens required before sensitive operations |
+
+> Validated by **1,216 passing tests** across 9 test suites — [see testing section](#testing)
+
+---
 
 ## Architecture
 
