@@ -29,14 +29,23 @@ You will receive an acknowledgment within 48 hours and a detailed response withi
 
 ## Security Measures in Network-AI
 
-Network-AI includes built-in security features:
+Network-AI has two delivery layers with different security implementations:
 
-- **AES-256-GCM encryption** for blackboard data at rest
-- **HMAC-SHA256 signed tokens** via AuthGuardian with trust levels and scope restrictions
-- **Rate limiting** to prevent abuse
+### Python skill bundle (OpenClaw, `scripts/`)
+
+- **UUID-based grant tokens** (`grant_{uuid4().hex}`) stored in `data/active_grants.json` — no HMAC signing in the Python layer
+- **Plain JSONL audit logging** appended to `data/audit_log.jsonl` — no signature in the Python layer
+- **Weighted permission scoring** — justification quality + agent trust score + resource risk score
 - **Path traversal protection** in the Python blackboard (regex + resolved-path boundary checks)
+- **Prompt-injection detection** — 16 patterns screened in justification hardening
+
+### Node.js package (`network-ai` on npm)
+
+- **AES-256-GCM encryption** for blackboard data at rest (`DataEncryptor` in `security.ts`)
+- **HMAC-SHA256 signed tokens** via `SecureTokenManager` with trust levels and scope restrictions
+- **Rate limiting** to prevent abuse
 - **Input validation** on all 20+ public API entry points
-- **Secure audit logging** with tamper-resistant event trails
+- **Secure audit logging** with tamper-resistant event trails (`SecureAuditLogger`)
 - **Justification hardening** (v3.2.1) -- prompt-injection detection (16 patterns), keyword-stuffing defense, repetition/padding detection, structural coherence validation
 - **FSM Behavioral Control Plane** (v3.3.0) -- state-scoped agent and tool authorization via `JourneyFSM` and `ToolAuthorizationMatrix`; unauthorized actions blocked with `ComplianceViolationError`
 - **ComplianceMonitor** (v3.3.0) -- real-time agent behavior surveillance with configurable violation policies, severity classification, and async audit loop
@@ -119,7 +128,9 @@ python scripts/check_permission.py --audit-summary --last 50
 
 ## Audit Trail
 
-The `SecureAuditLogger` produces HMAC-signed entries in `data/audit_log.jsonl`.
+**Python layer:** The Python scripts append plain JSON lines to `data/audit_log.jsonl` — no HMAC signing. Each entry is `json.dumps(event) + "\n"`.
+
+**Node.js layer:** The `SecureAuditLogger` class (`security.ts`) produces HMAC-SHA256-signed entries when used via TypeScript/Node.js.
 
 Logged events: `permission_granted`, `permission_denied`, `permission_revoked`, `ttl_cleanup`, `result_validated`, and all blackboard writes.
 
