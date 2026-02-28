@@ -5,6 +5,20 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.10] - 2026-02-28
+
+### Fixed
+- **OpenClaw scanner: undeclared env usage** — `SWARM_TOKEN_SECRET`, `SWARM_ENCRYPTION_KEY`, and `OPENAI_API_KEY` are now declared in `skill.json` (`env` block) and `SKILL.md` frontmatter with `required: false` and accurate descriptions
+- **OpenClaw scanner: persistent local logging** — `audit_log.jsonl` privacy scope now declared in `skill.json` (`privacy` block) and `SKILL.md` frontmatter; explicitly states local-only, no external transmission, what fields are written, and how to disable
+- **`bin/mcp-server.ts`: missing `--no-audit` flag** — added `--no-audit` CLI flag; when set, `auditLogPath` is passed as `undefined` to disable all audit file writes
+- **CI: `clawhub-cli` package name** — corrected to `clawhub` (the actual npm package name); was `clawhub-cli` (E404) in prior workflow
+
+### Changed
+- `package.json` version: `4.0.9` → `4.0.10`
+- `skill.json` version: `4.0.9` → `4.0.10`; added `env` and `privacy` declarations
+- `SKILL.md` frontmatter: added `env` and `privacy` blocks; added `node` to required bins
+- README release badge updated to `v4.0.10`
+
 ## [4.0.9] - 2026-02-28
 
 ### Fixed

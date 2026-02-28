@@ -8,6 +8,22 @@ metadata:
     requires:
       bins:
         - python3
+        - node
+    env:
+      SWARM_TOKEN_SECRET:
+        required: false
+        description: "HMAC secret for AuthGuardian tokens. Auto-generated per process if not set (ephemeral)."
+      SWARM_ENCRYPTION_KEY:
+        required: false
+        description: "AES-256 key for blackboard encryption. Auto-generated per process if not set."
+      OPENAI_API_KEY:
+        required: false
+        description: "Only used by optional demo examples (07-full-showcase.ts) and the setup wizard. Not required for the core orchestrator or MCP server."
+    privacy:
+      audit_log:
+        path: data/audit_log.jsonl
+        scope: local-only
+        description: "Local append-only JSONL file recording operation metadata (agentId, action, timestamp, outcome). No data leaves the machine. Disable with --no-audit flag on network-ai-server, or pass auditLogPath: undefined in createSwarmOrchestrator config."
 ---
 
 # Swarm Orchestrator Skill

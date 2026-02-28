@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.0.9",
+  "version": "4.0.10",
   "description": "Multi-agent orchestrator and behavioral control plane for TypeScript/Node.js. Connects 12 AI frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw) with shared blackboard coordination, permission gating, audit trails, AES-256 encryption, and token budget enforcement.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",
@@ -192,5 +192,28 @@
     "maxParallelAgents_default": "Infinity (no hard cap since v4.0.0 — set to a positive integer to enforce a limit)",
     "defaultTimeout": 30000,
     "enableTracing": true
+  },
+  "env": {
+    "SWARM_TOKEN_SECRET": {
+      "required": false,
+      "description": "HMAC secret for AuthGuardian permission tokens. If not set, a cryptographically random secret is generated per process start (ephemeral tokens — not persistent across restarts)."
+    },
+    "SWARM_ENCRYPTION_KEY": {
+      "required": false,
+      "description": "AES-256 encryption key for blackboard at-rest encryption. If not set, a cryptographically random key is generated per process start."
+    },
+    "OPENAI_API_KEY": {
+      "required": false,
+      "description": "Only used by the optional setup.ts interactive setup wizard and demo examples (07-full-showcase.ts). Not required for the core orchestrator, adapters, MCP server, or any Python scripts."
+    }
+  },
+  "privacy": {
+    "audit_log": {
+      "path": "data/audit_log.jsonl",
+      "scope": "local-only",
+      "description": "Append-only JSONL audit log recording operation metadata (agentId, action, timestamp, outcome). Stays in the local data/ directory. No data is sent externally. Can be disabled with --no-audit flag or audit_log: false in config.",
+      "contains": ["agentId", "action", "timestamp", "outcome", "resource"],
+      "does_not_contain": ["user PII", "API keys", "message content", "external endpoints"]
+    }
   }
 }

@@ -29,7 +29,7 @@
  *   http://localhost:3001/tools     (list all tools)
  *
  * @module bin/mcp-server
- * @version 4.0.9
+ * @version 4.0.10
  */
 
 import {
@@ -61,6 +61,7 @@ interface ServerArgs {
   noToken: boolean;
   noExtended: boolean;
   noControl: boolean;
+  noAudit: boolean;
   auditLog: string;
   heartbeat: number;
   help: boolean;
@@ -76,6 +77,7 @@ function parseArgs(argv: string[]): ServerArgs {
     noToken: false,
     noExtended: false,
     noControl: false,
+    noAudit: false,
     auditLog: './data/audit_log.jsonl',
     heartbeat: 15000,
     help: false,
@@ -95,6 +97,7 @@ function parseArgs(argv: string[]): ServerArgs {
       case '--no-token':     args.noToken = true; break;
       case '--no-extended':  args.noExtended = true; break;
       case '--no-control':   args.noControl = true; break;
+      case '--no-audit':     args.noAudit = true; break;
       case '--help': case '-h': args.help = true; break;
     }
   }
@@ -103,7 +106,7 @@ function parseArgs(argv: string[]): ServerArgs {
 
 function printHelp(): void {
   console.log(`
-network-ai-server — Network-AI MCP Server v4.0.9
+network-ai-server — Network-AI MCP Server v4.0.10
 
 Usage: npx ts-node bin/mcp-server.ts [options]
 
@@ -113,6 +116,7 @@ Options:
   --board <name>       Named blackboard to expose (default: main)
   --ceiling <n>        Budget token ceiling (default: 1000000)
   --audit-log <path>   Audit log path (default: ./data/audit_log.jsonl)
+  --no-audit           Disable audit logging entirely
   --heartbeat <ms>     SSE heartbeat interval (default: 15000)
   --no-budget          Disable budget tools
   --no-token           Disable token tools
@@ -140,7 +144,7 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  console.log(`\n[network-ai-server] Starting MCP Server v4.0.9`);
+  console.log(`\n[network-ai-server] Starting MCP Server v4.0.10`);
   console.log(`[network-ai-server] Board: ${args.board} | Port: ${args.port}`);
 
   // --------------------------------------------------------------------------
@@ -171,7 +175,7 @@ async function main(): Promise<void> {
     extendedTools = new ExtendedMcpTools({
       budget,
       tokenManager,
-      auditLogPath: args.auditLog,
+      auditLogPath: args.noAudit ? undefined : args.auditLog,
     });
 
     const toolsEnabled: string[] = [];
