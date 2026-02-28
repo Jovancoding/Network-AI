@@ -2,6 +2,7 @@
   "name": "network-ai",
   "version": "4.0.7",
   "description": "AI agent orchestration framework for TypeScript/Node.js - plug-and-play multi-agent coordination with 12 frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw). Built-in security, swarm intelligence, and agentic workflow patterns.",
+  "homepage": "https://github.com/jovanSAPFIONEER/Network-AI#readme",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
