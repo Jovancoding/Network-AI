@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.15] - 2026-03-02
+
+### Added
+- **`ENTERPRISE.md`** — enterprise evaluation guide: no-call evaluation checklist (offline, data ownership, audit trail, adapter compatibility, security, cost), architecture summary, security/supply chain table, versioning and support policy, stability signals, integration entry points
+- **`AUDIT_LOG_SCHEMA.md`** — complete audit log field reference: envelope schema, all 9 event types (`permission_request`, `permission_granted`, `permission_denied`, `permission_revoked`, `ttl_cleanup`, `budget_initialized`, `handoff_allowed`, `handoff_blocked`, `safety_shutdown`), per-event `details` schemas with field tables, scoring formula, retention/privacy notes
+- **`ADOPTERS.md`** — adopters registry with instructions for adding your organization or project via pull request
+- README documentation table updated with links to all three new files
+
 ## [4.0.14] - 2026-02-28
 
 ### Fixed

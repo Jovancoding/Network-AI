@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.0.14-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.0.15-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![Tests](https://img.shields.io/badge/tests-1184%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-12%20supported-blueviolet.svg)](#adapter-system)
@@ -226,6 +226,9 @@ npm run test:priority     # Priority & preemption
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Race condition problem, FSM design, handoff protocol, project structure |
 | [BENCHMARKS.md](BENCHMARKS.md) | Provider performance, rate limits, local GPU, `max_completion_tokens` guide |
 | [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail |
+| [ENTERPRISE.md](ENTERPRISE.md) | Evaluation checklist, stability policy, security summary, integration entry points |
+| [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md) | Audit log field reference, all event types, scoring formula |
+| [ADOPTERS.md](ADOPTERS.md) | Known adopters — open a PR to add yourself |
 | [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | End-to-end integration walkthrough |
 | [references/adapter-system.md](references/adapter-system.md) | Adapter architecture, writing custom adapters |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission scoring, resource types |
