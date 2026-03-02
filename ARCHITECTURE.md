@@ -33,31 +33,29 @@ blackboard.commitChange(changeId);     // atomic write with file-system mutex
 
 ## Component Overview
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Your Application                        │
-└──────────────────────────┬──────────────────────────────────┘
-                           │  createSwarmOrchestrator()
-┌──────────────────────────▼──────────────────────────────────┐
-│                    SwarmOrchestrator                        │
-│                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌────────────┐  │
-│  │ AdapterRegistry │  │  AuthGuardian   │  │ Federated  │  │
-│  │  (route tasks)  │  │  (permissions)  │  │  Budget    │  │
-│  └─────────────────┘  └─────────────────┘  └────────────┘  │
-│                           all write to ↓                   │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │          LockedBlackboard  (shared state)            │  │
-│  │  propose → validate → commit  (filesystem mutex)    │  │
-│  └──────────────────────────┬───────────────────────────┘  │
-│                             │                               │
-│  ┌──────────────────────────▼───────────────────────────┐  │
-│  │  Adapters — plug any framework in, swap out freely   │  │
-│  │  LangChain · AutoGen · CrewAI · MCP · LlamaIndex · … │  │
-│  └──────────────────────────────────────────────────────┘  │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-                  data/audit_log.jsonl
+```mermaid
+flowchart TD
+    App["Your Application"]
+
+    App -->|"createSwarmOrchestrator()"| SO
+
+    subgraph SO["SwarmOrchestrator"]
+        AR["AdapterRegistry\n(route tasks)"]
+        AG["AuthGuardian\n(permissions)"]
+        FB["FederatedBudget\n(token ceiling)"]
+
+        AR --> LB
+        AG --> LB
+        FB --> LB
+
+        LB["LockedBlackboard — shared state\npropose → validate → commit\nfilesystem mutex"]
+
+        LB --> AD
+
+        AD["Adapters — plug any framework in, swap freely\nLangChain · AutoGen · CrewAI · MCP · LlamaIndex · …"]
+    end
+
+    SO --> AUDIT["data/audit_log.jsonl"]
 ```
 
 ### LockedBlackboard
