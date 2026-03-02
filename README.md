@@ -1,4 +1,4 @@
-﻿# Network-AI
+# Network-AI
 
 **TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination**
 
