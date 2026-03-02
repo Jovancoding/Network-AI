@@ -12,6 +12,8 @@
  *
  * Run:
  *   npx ts-node examples/08-control-plane-stress-demo.ts
+ *
+ * Demo video: https://www.youtube.com/watch?v=niVRZJu1MEo
  */
 
 import * as path from 'node:path';

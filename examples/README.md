@@ -133,6 +133,18 @@ Output files are saved to `examples/output/`. See the [YouTube demo](https://you
 
 ---
 
+## 08 · Control-Plane Stress Demo
+
+No API key required. Proves every guardrail in ~3 seconds.
+
+```bash
+npx ts-node examples/08-control-plane-stress-demo.ts
+```
+
+[![Control Plane Demo](https://img.youtube.com/vi/niVRZJu1MEo/0.jpg)](https://www.youtube.com/watch?v=niVRZJu1MEo)
+
+---
+
 ## Next steps
 
 | Goal | Starting point |

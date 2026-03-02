@@ -129,13 +129,15 @@ Add budgets, permissions, and cross-framework agents with the same pattern. → 
 
 ## Demo — Control-Plane Stress Test *(no API key)*
 
-Runs in ~2 seconds. Proves the coordination primitives without any LLM calls.
+Runs in ~3 seconds. Proves the coordination primitives without any LLM calls.
 
 ```bash
 npm run demo -- --08
 ```
 
-What it shows: atomic blackboard locking, priority preemption (priority-3 wins over priority-0 on same key), FSM hard-stop at 700 ms, live compliance violation capture (TOOL_ABUSE, TURN_TAKING, RESPONSE_TIMEOUT, JOURNEY_TIMEOUT), and `FederatedBudget` tracking — all without a single API call.
+What it shows: atomic blackboard locking, priority preemption (priority-3 wins over priority-0 on same key), **AuthGuardian permission gate** (blocked → justified → granted with token), FSM hard-stop at 700 ms, live compliance violation capture (TOOL_ABUSE, TURN_TAKING, RESPONSE_TIMEOUT, JOURNEY_TIMEOUT), and `FederatedBudget` tracking — all without a single API call.
+
+[![Control Plane Demo](https://img.youtube.com/vi/niVRZJu1MEo/0.jpg)](https://www.youtube.com/watch?v=niVRZJu1MEo)
 
 **8-agent AI pipeline** (requires `OPENAI_API_KEY` — builds a Payment Processing Service end-to-end):
 
