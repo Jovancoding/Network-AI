@@ -51,23 +51,25 @@ flowchart TD
     App -->|"createSwarmOrchestrator()"| SO
 
     subgraph SO["SwarmOrchestrator"]
-        AR["AdapterRegistry\n(route tasks)"]
-        AG["AuthGuardian\n(permissions)"]
-        FB["FederatedBudget\n(token ceiling)"]
+        AR["AdapterRegistry\n(route tasks to frameworks)"]
+        AG["AuthGuardian\n(permission gating)"]
+        QG["QualityGateAgent\n(validate blackboard writes)"]
 
-        AR --> LB
-        AG --> LB
-        FB --> LB
+        AR -->|tasks dispatched| AD
+        AG -->|grant / deny| AR
+        QG -->|validates| BB
 
-        LB["LockedBlackboard — shared state\npropose → validate → commit\nfilesystem mutex"]
+        BB["SharedBlackboard\n(shared agent state)\npropose → validate → commit\nfilesystem mutex"]
 
-        LB --> AD
+        AD -->|writes results| BB
 
         AD["Adapters — plug any framework in, swap freely\nLangChain · AutoGen · CrewAI · MCP · LlamaIndex · …"]
     end
 
     SO --> AUDIT["data/audit_log.jsonl"]
 ```
+
+> `FederatedBudget` is a standalone export — instantiate it separately and optionally wire it to a blackboard backend for cross-node token budget enforcement.
 
 → [Full architecture, FSM journey, and handoff protocol](ARCHITECTURE.md)
 
