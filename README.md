@@ -184,12 +184,12 @@ Extend `BaseAdapter` to add your own in minutes. See [references/adapter-system.
 
 | Capability | Network-AI | LangGraph | CrewAI | AutoGen |
 |---|---|---|---|---|
-| Cross-framework agents in one swarm | ✅ 12 adapters | ❌ LangChain only | ❌ CrewAI only | ❌ AutoGen only |
-| Atomic shared state (conflict-safe) | ✅ `propose → validate → commit` | ⚠️ Last-write-wins | ⚠️ Last-write-wins | ⚠️ Last-write-wins |
-| Hard budget ceiling per agent | ✅ `FederatedBudget` | ⚠️ Callbacks only | ❌ | ❌ |
-| Permission gating before sensitive ops | ✅ `AuthGuardian` | ❌ | ❌ | ❌ |
-| Tamper-evident audit trail | ✅ HMAC-signed | ❌ | ❌ | ❌ |
-| Encryption at rest | ✅ AES-256-GCM | ❌ | ❌ | ❌ |
+| Cross-framework agents in one swarm | ✅ 12 built-in adapters | ⚠️ Nodes can call any code; no adapter abstraction | ⚠️ Extensible via tools; CrewAI-native agents only | ⚠️ Extensible via plugins; AutoGen-native agents only |
+| Atomic shared state (conflict-safe) | ✅ `propose → validate → commit` mutex | ⚠️ State passed between nodes; last-write-wins | ⚠️ Shared memory available; no conflict resolution | ⚠️ Shared context available; no conflict resolution |
+| Hard token ceiling per agent | ✅ `FederatedBudget` (first-class API) | ⚠️ Via callbacks / custom middleware | ⚠️ Via callbacks / custom middleware | ⚠️ Built-in token tracking in v0.4+; no swarm-level ceiling |
+| Permission gating before sensitive ops | ✅ `AuthGuardian` (built-in) | ⚠️ Possible via custom node logic | ⚠️ Possible via custom tools | ⚠️ Possible via custom middleware |
+| Append-only audit log | ✅ plain JSONL (`data/audit_log.jsonl`) | ⚠️ Not built-in | ⚠️ Not built-in | ⚠️ Not built-in |
+| Encryption at rest | ✅ AES-256-GCM (TypeScript layer) | ⚠️ Not built-in | ⚠️ Not built-in | ⚠️ Not built-in |
 | Language | TypeScript / Node.js | Python | Python | Python |
 
 ---
