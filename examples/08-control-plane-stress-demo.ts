@@ -5,6 +5,7 @@
  *
  * - LockedBlackboard atomic workflow: propose → validate → commit
  * - Priority preemption with conflictResolution='priority-wins'
+ * - AuthGuardian permission gate: blocked → justified → granted
  * - JourneyFSM state governance + timeout detection
  * - ComplianceMonitor real-time violations (tool abuse, turn-taking, response timeout, journey timeout)
  * - FederatedBudget spend enforcement snapshot
@@ -18,6 +19,7 @@ import {
   JourneyFSM,
   WORKFLOW_STATES,
   ComplianceMonitor,
+  AuthGuardian,
 } from '..';
 import { FederatedBudget } from '../lib/federated-budget';
 import { LockedBlackboard } from '../lib/locked-blackboard';
@@ -71,6 +73,9 @@ async function main() {
     onTransition: t => tag('FSM', `${t.previousState} → ${t.currentState}`, c.yellow),
   });
 
+  // Track first occurrence per violation type+agent — suppress duplicates for clean output
+  const seenViolations = new Map<string, number>();
+
   const monitor = new ComplianceMonitor({
     pollIntervalMs: 200,
     fsm,
@@ -78,7 +83,14 @@ async function main() {
       { agentId: 'executor', responseTimeoutMs: 500, maxToolCallsPerWindow: 3, toolRateWindowMs: 1000 },
       { agentId: 'debugger', responseTimeoutMs: 500, maxToolCallsPerWindow: 2, toolRateWindowMs: 1000 },
     ],
-    onViolation: v => tag('COMPLIANCE', `${v.type} | ${v.agentId} | ${v.message}`, c.red),
+    onViolation: v => {
+      const key = `${v.type}|${v.agentId}`;
+      const count = seenViolations.get(key) ?? 0;
+      seenViolations.set(key, count + 1);
+      if (count === 0) {
+        tag('COMPLIANCE', `${v.type} | ${v.agentId} | ${v.message}`, c.red);
+      }
+    },
   });
   monitor.start();
 
@@ -99,7 +111,32 @@ async function main() {
   const entry = bb.read('task:invoice-42');
   tag('blackboard', `final value: ${JSON.stringify(entry?.value ?? null)}`, c.magenta);
 
-  banner('Phase 2 — FSM + Compliance Violations');
+  banner('Phase 2 — Permission Gate (AuthGuardian)');
+
+  const guardian = new AuthGuardian({
+    trustLevels: [
+      { agentId: 'executor', trustLevel: 0.5, allowedResources: ['FILESYSTEM', 'PAYMENTS'] },
+    ],
+  });
+
+  // Attempt 1: weak justification → BLOCKED
+  const denied = await guardian.requestPermission('executor', 'PAYMENTS', 'need it', 'read');
+  tag('auth', `executor → PAYMENTS: ${denied.granted ? 'GRANTED' : 'BLOCKED'} — "${denied.reason}"`, c.red);
+
+  // Attempt 2: strong justification → GRANTED
+  const granted = await guardian.requestPermission(
+    'executor', 'PAYMENTS',
+    'Processing invoice-42 settlement: need to read the PAYMENTS transaction ledger in order to verify the exact balance before committing blackboard state.',
+    'read'
+  );
+  if (granted.granted) {
+    tag('auth', `executor → PAYMENTS: GRANTED (token=${granted.grantToken?.slice(0, 16)}… expires=${granted.expiresAt?.slice(11, 19)} UTC)`, c.green);
+    tag('auth', `restrictions: ${JSON.stringify(granted.restrictions)}`, c.dim);
+  } else {
+    tag('auth', `executor → PAYMENTS: DENIED — ${granted.reason}`, c.red);
+  }
+
+  banner('Phase 3 — FSM + Compliance Violations');
   fsm.transition('start_exec', 'orchestrator');
 
   for (let i = 1; i <= 6; i++) {
@@ -123,11 +160,13 @@ async function main() {
   tag('budget', `executor spend allowed=${spendExec.allowed}`, spendExec.allowed ? c.green : c.red);
   tag('budget', `debugger spend allowed=${spendDbg.allowed}`, spendDbg.allowed ? c.green : c.red);
 
-  banner('Phase 3 — Summary');
+  banner('Phase 4 — Summary');
   const summary = monitor.getSummary();
   tag('summary', `violations total=${summary.total}`, c.magenta);
   tag('summary', `byType=${JSON.stringify(summary.byType)}`, c.dim);
   tag('summary', `byAgent=${JSON.stringify(summary.byAgent)}`, c.dim);
+  const suppressed = [...seenViolations.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${k.split('|')[0]}×${n}`).join(', ');
+  if (suppressed) tag('summary', `duplicate violations suppressed: ${suppressed}`, c.dim);
 
   const keys = bb.listKeys();
   tag('blackboard', `keys=${JSON.stringify(keys)}`, c.dim);

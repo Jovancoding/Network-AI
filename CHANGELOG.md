@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.16] - 2026-03-02
+
+### Changed
+- **`examples/08-control-plane-stress-demo.ts`** — enterprise demo improvements:
+  - Added **AuthGuardian permission gate** as new Phase 2: agent attempts `PAYMENTS` access with weak justification → `BLOCKED`; retries with specific task-scoped justification → `GRANTED` with token + restrictions
+  - Added **violation deduplication** in `ComplianceMonitor` output: first occurrence of each `type+agentId` pair printed once; duplicates suppressed, count shown in Phase 4 summary (eliminates 12 near-identical timeout lines that looked like bugs on video)
+  - Phases renumbered: Priority Preemption (1), Permission Gate (2), FSM + Compliance (3), Summary (4)
+  - `AuthGuardian` added to imports
+- `package.json` version: `4.0.15` → `4.0.16`
+- `skill.json` version: `4.0.15` → `4.0.16`
+- README release badge updated to `v4.0.16`
+
 ## [4.0.15] - 2026-03-02
 
 ### Added
