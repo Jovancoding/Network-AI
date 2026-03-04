@@ -21,12 +21,27 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 - **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC audit trails, and permission gating
 - **12 framework adapters** — LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, and more in one orchestrator — no glue code, no lock-in
 
+> **The silent failure mode in multi-agent systems:** parallel agents writing to the same key
+> use last-write-wins by default — one agent's result silently overwrites another's mid-flight.
+> The outcome is split-brain state: double-spends, contradictory decisions, corrupted context,
+> no error thrown. Network-AI's `propose → validate → commit` mutex prevents this at the
+> coordination layer, before any write reaches shared state.
+
 **Use Network-AI as:**
 - A **TypeScript/Node.js library** — `import { createSwarmOrchestrator } from 'network-ai'`
 - An **MCP server** — `npx network-ai-server --port 3001`
 - An **OpenClaw skill** — `clawhub install network-ai`
 
 [**5-minute quickstart →**](QUICKSTART.md) &nbsp;|&nbsp; [**Architecture →**](ARCHITECTURE.md) &nbsp;|&nbsp; [**All adapters →**](#adapter-system) &nbsp;|&nbsp; [**Benchmarks →**](BENCHMARKS.md)
+
+> **Try the control-plane stress test — no API key, ~3 seconds:**
+> ```bash
+> npx ts-node examples/08-control-plane-stress-demo.ts
+> ```
+> Runs priority preemption, AuthGuardian permission gating, FSM governance, and compliance
+> monitoring against a live swarm. No external services required.
+>
+> If it saves you from a race condition, a ⭐ helps others find it.
 
 ---
 
