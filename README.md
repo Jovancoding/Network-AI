@@ -263,9 +263,6 @@ npm run test:priority     # Priority & preemption
 
 1. Fork → feature branch → `npm run test:all` → pull request
 2. Bugs and feature requests via [Issues](https://github.com/jovanSAPFIONEER/Network-AI/issues)
-3. If Network-AI saves you time, a ⭐ helps others find it
-
-[![Star on GitHub](https://img.shields.io/github/stars/jovanSAPFIONEER/Network-AI?style=social)](https://github.com/jovanSAPFIONEER/Network-AI)
 
 ---
 
