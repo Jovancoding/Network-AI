@@ -105,6 +105,64 @@ No native dependencies, no build step. Adapters are dependency-free (BYOC — br
 
 ---
 
+## Use as MCP Server
+
+Start the server (no config required, zero dependencies):
+
+```bash
+npx network-ai-server --port 3001
+# or from source:
+npx ts-node bin/mcp-server.ts --port 3001
+```
+
+Then wire any MCP-compatible client to it.
+
+**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "network-ai": {
+      "url": "http://localhost:3001/sse"
+    }
+  }
+}
+```
+
+**Cursor / Cline / any SSE-based MCP client** — point to the same URL:
+
+```json
+{
+  "mcpServers": {
+    "network-ai": {
+      "url": "http://localhost:3001/sse"
+    }
+  }
+}
+```
+
+Verify it's running:
+
+```bash
+curl http://localhost:3001/health   # { "status": "ok", "tools": <n>, "uptime": <ms> }
+curl http://localhost:3001/tools    # full tool list
+```
+
+**Tools exposed over MCP:**
+- `blackboard_read` / `blackboard_write` / `blackboard_list` / `blackboard_delete` / `blackboard_exists`
+- `budget_status` / `budget_spend` / `budget_reset` — federated token tracking
+- `token_create` / `token_validate` / `token_revoke` — HMAC-signed permission tokens
+- `audit_query` — query the append-only audit log
+- `config_get` / `config_set` — live orchestrator configuration
+- `agent_list` / `agent_spawn` / `agent_stop` — agent lifecycle
+- `fsm_transition` — write FSM state transitions to the blackboard
+
+Each tool takes an `agent_id` parameter — all writes are identity-verified and namespace-scoped, exactly as they are in the TypeScript API.
+
+Options: `--no-budget`, `--no-token`, `--no-control`, `--ceiling <n>`, `--board <name>`, `--audit-log <path>`.
+
+---
+
 ## Two agents, one shared state — without race conditions
 
 The real differentiator is coordination. Here is what no single-framework solution handles: two agents writing to the same resource concurrently, atomically, without corrupting each other.
