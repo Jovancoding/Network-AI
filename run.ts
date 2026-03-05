@@ -15,6 +15,7 @@ const DEMOS = [
   { id: '03', file: 'examples/03-parallel-agents.ts',title: 'Parallel Agents',        desc: 'Fan-out + merge pattern'                        },
   { id: '04', file: 'examples/04-live-swarm.ts',     title: 'AI Safety Swarm',        desc: '9-agent live research swarm + executive summary'},
   { id: '05', file: 'examples/05-code-review-swarm.ts', title: 'Code Review Swarm',  desc: '5 specialist reviewers + coordinator verdict'   },
+  { id: '09', file: 'examples/09-real-langchain.ts',    title: 'Real LangChain',       desc: 'LangChain chain + Custom adapter in one swarm'  },
 ];
 
 // ─── Colours ──────────────────────────────────────────────────────────────────

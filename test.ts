@@ -440,9 +440,7 @@ async function runAllTests() {
     log('    * AuthGuardian: Permission Wall enforcement [PASS]', 'cyan');
     log('    * SwarmOrchestrator: All capabilities [PASS]', 'cyan');
     log('    * File persistence: Markdown blackboard [PASS]', 'cyan');
-    
-    log('\n  Note: Full agent-to-agent calls require the openclaw-core', 'yellow');
-    log('  runtime. The delegation logic is ready for integration.\n', 'yellow');
+    log('', 'reset');
     
   } catch (error) {
     header('TEST FAILURE');

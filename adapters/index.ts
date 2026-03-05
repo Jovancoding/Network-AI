@@ -71,6 +71,26 @@ export type {
   AgnoFunction,
 } from './agno-adapter';
 
+// Streaming adapters
+export { StreamingBaseAdapter, collectStream } from './streaming-base-adapter';
+export { LangChainStreamingAdapter } from './langchain-streaming-adapter';
+export { CustomStreamingAdapter } from './custom-streaming-adapter';
+export type { StreamingAgentHandler } from './custom-streaming-adapter';
+
+// A2A (Agent-to-Agent) adapter
+export { A2AAdapter } from './a2a-adapter';
+export type {
+  A2AAgentCard,
+  A2ATask,
+  A2ATaskResponse,
+  A2ATaskState,
+  A2AArtifact,
+  A2AAdapterConfig,
+} from './a2a-adapter';
+
+// Streaming types
+export type { StreamingChunk, IStreamingAdapter, StreamCollector } from '../types/streaming-adapter';
+
 // Re-export types for convenience
 export type {
   IAgentAdapter,

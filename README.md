@@ -4,10 +4,10 @@
 
 [![CI](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.0.17-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.1.0-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-1216%20passing-brightgreen.svg)](#testing)
-[![Adapters](https://img.shields.io/badge/frameworks-12%20supported-blueviolet.svg)](#adapter-system)
+[![Tests](https://img.shields.io/badge/tests-1283%20passing-brightgreen.svg)](#testing)
+[![Adapters](https://img.shields.io/badge/frameworks-13%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -19,7 +19,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 
 - **Shared blackboard with locking** — atomic `propose → validate → commit` prevents race conditions and split-brain failures across parallel agents
 - **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC audit trails, and permission gating
-- **12 framework adapters** — LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, and more in one orchestrator — no glue code, no lock-in
+- **13 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, and A2A — no glue code, no lock-in
 
 > **The silent failure mode in multi-agent systems:** parallel agents writing to the same key
 > use last-write-wins by default — one agent's result silently overwrites another's mid-flight.
@@ -52,7 +52,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 | Race conditions in parallel agents | Atomic blackboard: `propose → validate → commit` with file-system mutex |
 | Agent overspend / runaway costs | `FederatedBudget` — hard per-agent token ceilings with live spend tracking |
 | No visibility into what agents did | HMAC-signed audit log on every write, permission grant, and FSM transition |
-| Locked into one AI framework | 12 adapters — mix LangChain + AutoGen + CrewAI + custom in one swarm |
+| Locked into one AI framework | 13 adapters — mix LangChain + AutoGen + CrewAI + A2A + custom in one swarm |
 | Agents escalating beyond their scope | `AuthGuardian` — scoped permission tokens required before sensitive operations |
 
 ---
@@ -230,12 +230,12 @@ npm run demo -- --07
 
 ## Adapter System
 
-12 frameworks, zero adapter dependencies. You bring your own SDK objects.
+13 adapters, zero adapter dependencies. You bring your own SDK objects.
 
-| Adapter | Framework | Register method |
+| Adapter | Framework / Protocol | Register method |
 |---|---|---|
 | `CustomAdapter` | Any function or HTTP endpoint | `registerHandler(name, fn)` |
-| `LangChainAdapter` | LangChain | `registerRunnable(name, runnable)` |
+| `LangChainAdapter` | LangChain | `registerAgent(name, runnable)` |
 | `AutoGenAdapter` | AutoGen / AG2 | `registerAgent(name, agent)` |
 | `CrewAIAdapter` | CrewAI | `registerAgent` or `registerCrew` |
 | `MCPAdapter` | Model Context Protocol | `registerTool(name, handler)` |
@@ -246,8 +246,16 @@ npm run demo -- --07
 | `DSPyAdapter` | Stanford DSPy | `registerModule()`, `registerProgram()` |
 | `AgnoAdapter` | Agno (formerly Phidata) | `registerAgent()`, `registerTeam()` |
 | `OpenClawAdapter` | OpenClaw | `registerSkill(name, skillRef)` |
+| `A2AAdapter` | Google A2A Protocol | `registerRemoteAgent(name, url)` |
 
-Extend `BaseAdapter` to add your own in minutes. See [references/adapter-system.md](references/adapter-system.md).
+**Streaming variants** (drop-in replacements with `.stream()` support):
+
+| Adapter | Extends | Streaming source |
+|---|---|---|
+| `LangChainStreamingAdapter` | `LangChainAdapter` | Calls `.stream()` on the Runnable if available; falls back to `.invoke()` |
+| `CustomStreamingAdapter` | `CustomAdapter` | Pipes `AsyncIterable<string>` handlers; falls back to single-chunk for plain Promises |
+
+Extend `BaseAdapter` (or `StreamingBaseAdapter` for streaming) to add your own in minutes. See [references/adapter-system.md](references/adapter-system.md).
 
 ---
 
@@ -257,7 +265,7 @@ Extend `BaseAdapter` to add your own in minutes. See [references/adapter-system.
 
 | Capability | Network-AI | LangGraph | CrewAI | AutoGen |
 |---|---|---|---|---|
-| Cross-framework agents in one swarm | ✅ 12 built-in adapters | ⚠️ Nodes can call any code; no adapter abstraction | ⚠️ Extensible via tools; CrewAI-native agents only | ⚠️ Extensible via plugins; AutoGen-native agents only |
+| Cross-framework agents in one swarm | ✅ 13 built-in adapters | ⚠️ Nodes can call any code; no adapter abstraction | ⚠️ Extensible via tools; CrewAI-native agents only | ⚠️ Extensible via plugins; AutoGen-native agents only |
 | Atomic shared state (conflict-safe) | ✅ `propose → validate → commit` mutex | ⚠️ State passed between nodes; last-write-wins | ⚠️ Shared memory available; no conflict resolution | ⚠️ Shared context available; no conflict resolution |
 | Hard token ceiling per agent | ✅ `FederatedBudget` (first-class API) | ⚠️ Via callbacks / custom middleware | ⚠️ Via callbacks / custom middleware | ⚠️ Built-in token tracking in v0.4+; no swarm-level ceiling |
 | Permission gating before sensitive ops | ✅ `AuthGuardian` (built-in) | ⚠️ Possible via custom node logic | ⚠️ Possible via custom tools | ⚠️ Possible via custom middleware |
@@ -273,11 +281,13 @@ Extend `BaseAdapter` to add your own in minutes. See [references/adapter-system.
 npm run test:all          # All suites in sequence
 npm test                  # Core orchestrator
 npm run test:security     # Security module
-npm run test:adapters     # All 12 adapters
+npm run test:adapters     # All 13 adapters
+npm run test:streaming    # Streaming adapters
+npm run test:a2a          # A2A protocol adapter
 npm run test:priority     # Priority & preemption
 ```
 
-**1,216 passing assertions across 13 test suites** (`npm run test:all`):
+**1,283 passing assertions across 15 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -286,13 +296,15 @@ npm run test:priority     # Priority & preemption
 | `test-phase5g.ts` | 121 | CRDT backend, vector clocks, bidirectional sync |
 | `test-phase6.ts` | 121 | MCP server, control-plane tools, audit tools |
 | `test-phase5d.ts` | 117 | Pluggable backend (Redis, CRDT, Memory) |
-| `test-adapters.ts` | 140 | All 12 adapters, registry routing, integration, edge cases |
+| `test-adapters.ts` | 139 | All 13 adapters, registry routing, integration, edge cases |
 | `test-standalone.ts` | 88 | Blackboard, auth, integration, persistence, parallelisation, quality gate |
 | `test-phase5e.ts` | 87 | Federated budget tracking |
 | `test-phase5c.ts` | 73 | Named multi-blackboard, isolation, backend options |
 | `test-priority.ts` | 64 | Priority preemption, conflict resolution, backward compat |
-| `test-phase5.ts` | 42 | Named multi-blackboard base |
+| `test-a2a.ts` | 34 | A2A protocol: register, execute, mock fetch, error paths |
+| `test-streaming.ts` | 31 | Streaming adapters, chunk shapes, fallback, collectStream |
 | `test-phase5b.ts` | 55 | Pluggable backend part 2, consistency levels |
+| `test-phase5.ts` | 42 | Named multi-blackboard base |
 | `test-security.ts` | 34 | Tokens, sanitization, rate limiting, encryption, audit |
 
 ---

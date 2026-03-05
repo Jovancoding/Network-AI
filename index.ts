@@ -2572,3 +2572,23 @@ export type { IBudget, ITokenManager, ExtendedMcpToolsOptions } from './lib/mcp-
 
 export { ControlMcpTools } from './lib/mcp-tools-control';
 export type { IConfig, IAgentStatus, ControlMcpToolsOptions } from './lib/mcp-tools-control';
+
+// Streaming adapters
+export { StreamingBaseAdapter, collectStream } from './adapters/streaming-base-adapter';
+export { LangChainStreamingAdapter } from './adapters/langchain-streaming-adapter';
+export { CustomStreamingAdapter } from './adapters/custom-streaming-adapter';
+export type { StreamingAgentHandler } from './adapters/custom-streaming-adapter';
+
+// A2A (Agent-to-Agent) protocol adapter
+export { A2AAdapter } from './adapters/a2a-adapter';
+export type {
+  A2AAgentCard,
+  A2ATask,
+  A2ATaskResponse,
+  A2ATaskState,
+  A2AArtifact,
+  A2AAdapterConfig,
+} from './adapters/a2a-adapter';
+
+// Streaming types
+export type { StreamingChunk, IStreamingAdapter, StreamCollector } from './types/streaming-adapter';

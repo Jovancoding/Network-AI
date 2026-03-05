@@ -37,7 +37,7 @@ Transform the AuthGuardian permission system into an **MCP Server** that allows 
 ## 📋 Implementation Phases
 
 ### Phase 1: MCP Server Foundation (Weeks 1-2)
-**Status:** 🔴 Not Started
+**Status:** ✅ Done — `lib/mcp-bridge.ts`
 
 #### 1.1 AuthGuardian MCP Server
 Create `lib/mcp-server.ts`:
@@ -118,15 +118,15 @@ class AuthGuardianMCPServer {
 }
 ```
 
-#### 1.2 Files to Create
-- [ ] `lib/mcp-server.ts` - Core MCP server implementation
-- [ ] `lib/mcp-types.ts` - Type definitions for MCP protocol
-- [ ] `lib/mcp-transport.ts` - SSE/WebSocket transport layer
+#### 1.2 Files Shipped
+- [x] `lib/mcp-bridge.ts` — `McpBlackboardBridge` (server), `McpBridgeClient`, `McpBridgeRouter`, `McpInProcessTransport`, full JSON-RPC 2.0
+- [x] `lib/mcp-blackboard-tools.ts` — MCP tool definitions for all blackboard operations
+- [x] `lib/mcp-tools-extended.ts` — Budget, token, and audit tools over MCP
 
 ---
 
 ### Phase 2: Transport Layer (Weeks 3-4)
-**Status:** 🔴 Not Started
+**Status:** ✅ Done — `lib/mcp-transport-sse.ts`
 
 #### 2.1 SSE Transport (Server-Sent Events)
 Primary transport for browser-compatible clients:
@@ -187,7 +187,7 @@ class WebSocketTransport {
 ---
 
 ### Phase 3: Cross-Machine Agent Discovery (Weeks 5-6)
-**Status:** 🔴 Not Started
+**Status:** ✅ Done — `McpBridgeRouter` + `lib/mcp-tools-control.ts` (`agent_list`, `agent_spawn`)
 
 #### 3.1 Agent Registry
 Track agents across machines:
@@ -226,7 +226,7 @@ Options for agent discovery:
 ---
 
 ### Phase 4: Distributed Blackboard (Weeks 7-8)
-**Status:** 🔴 Not Started
+**Status:** ✅ Done — `lib/blackboard-backend-crdt.ts` + `lib/consistency.ts` + `lib/crdt.ts`
 
 #### 4.1 CRDT-Based Synchronization
 For eventual consistency across machines:
@@ -264,7 +264,7 @@ Support configurable consistency:
 ---
 
 ### Phase 5: Budget Federation (Weeks 9-10)
-**Status:** 🔴 Not Started
+**Status:** ✅ Done — `lib/federated-budget.ts`
 
 #### 5.1 Federated Budget Tracking
 Track token spending across machines:
@@ -357,9 +357,9 @@ scripts/
 
 ---
 
-## 🚀 Quick Start (Future)
+## 🚀 Quick Start
 
-Once implemented, usage will be:
+Usage:
 
 ```bash
 # Start MCP Server (Machine A - Orchestrator)
@@ -379,14 +379,15 @@ python scripts/mcp_client.py request-permission \
 
 ## 📊 Milestones
 
-| Milestone | Target Date | Status |
-|-----------|-------------|--------|
-| Phase 1: MCP Server Foundation | Week 2 | 🔴 Not Started |
-| Phase 2: SSE/WS Transport | Week 4 | 🔴 Not Started |
-| Phase 3: Agent Discovery | Week 6 | 🔴 Not Started |
-| Phase 4: Distributed Blackboard | Week 8 | 🔴 Not Started |
-| Phase 5: Budget Federation | Week 10 | 🔴 Not Started |
-| **Production Ready** | **Week 12** | 🔴 Not Started |
+| Milestone | Shipped in | Status | Key files |
+|-----------|------------|--------|-----------|
+| Phase 1: MCP Server Foundation | v4.x | ✅ Done | `lib/mcp-bridge.ts` — `McpBlackboardBridge`, `McpBridgeClient`, `McpBridgeRouter`, `McpInProcessTransport`, full JSON-RPC 2.0 |
+| Phase 2: SSE/WS Transport | v4.x | ✅ Done | `lib/mcp-transport-sse.ts` — `McpSseServer` (HTTP + SSE, port 3001), `McpCombinedBridge`, `McpSseTransport` |
+| Phase 3: Agent Discovery | v4.x | ✅ Done | `McpBridgeRouter` (multi-board routing), `lib/mcp-tools-control.ts` (`agent_list`, `agent_spawn` over MCP) |
+| Phase 4: Distributed Blackboard | v4.x | ✅ Done | `lib/blackboard-backend-crdt.ts` (vector clocks, tombstones, bidirectional sync), `lib/consistency.ts` (`eventual`/`session`/`strong`), `lib/crdt.ts` |
+| Phase 5: Budget Federation | v4.x | ✅ Done | `lib/federated-budget.ts` — global ceiling, per-agent spend tracking, blackboard persistence |
+| Phase 6: Extended MCP Tools | v4.x | ✅ Done | `lib/mcp-tools-extended.ts` (budget/token/audit tools), `lib/mcp-tools-control.ts` (config/agent/FSM tools) |
+| **Production Ready** | **v4.0.17** | ✅ **Shipped** | All phases complete — 139 adapter tests, 79 standalone tests pass |
 
 ---
 
