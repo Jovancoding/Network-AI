@@ -6,7 +6,7 @@
 [![CodeQL](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/badge/release-v4.0.17-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-1184%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1216%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-12%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -277,25 +277,23 @@ npm run test:adapters     # All 12 adapters
 npm run test:priority     # Priority & preemption
 ```
 
-**1,184 passing assertions across 15 test suites** (verified by counting `assert()` / `pass()` calls in each file):
+**1,216 passing assertions across 13 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
-| `test-standalone.ts` | 83 | Blackboard, auth, integration, persistence, parallelisation, quality gate |
-| `test-adapters.ts` | 142 | All 12 adapters, registry routing, integration, edge cases |
-| `test-phase4.ts` | 133 | FSM, compliance monitor, adapter integration |
-| `test-phase5d.ts` | 119 | Pluggable backend |
-| `test-phase5f.ts` | 113 | Phase 5f extended |
-| `test-phase5g.ts` | 106 | Phase 5g extended |
-| `test-phase6.ts` | 122 | Latest feature coverage |
-| `test-phase5c.ts` | 74 | Named multi-blackboard |
-| `test-phase5e.ts` | 88 | Phase 5e |
-| `test-phase5b.ts` | 56 | Pluggable backend part 2 |
-| `test-priority.ts` | 65 | Priority preemption, conflict resolution, backward compat |
-| `test-security.ts` | 35 | Tokens, sanitization, rate limiting, encryption, audit |
-| `test-phase5.ts` | 24 | Named multi-blackboard base |
-| `test.ts` | 24 | Full integration |
-| `test-phase4.ts` (stubs) | 4 | FSM stub coverage |
+| `test-phase4.ts` | 147 | FSM governance, compliance monitor, adapter integration |
+| `test-phase5f.ts` | 127 | SSE transport, `McpCombinedBridge`, extended MCP tools |
+| `test-phase5g.ts` | 121 | CRDT backend, vector clocks, bidirectional sync |
+| `test-phase6.ts` | 121 | MCP server, control-plane tools, audit tools |
+| `test-phase5d.ts` | 117 | Pluggable backend (Redis, CRDT, Memory) |
+| `test-adapters.ts` | 140 | All 12 adapters, registry routing, integration, edge cases |
+| `test-standalone.ts` | 88 | Blackboard, auth, integration, persistence, parallelisation, quality gate |
+| `test-phase5e.ts` | 87 | Federated budget tracking |
+| `test-phase5c.ts` | 73 | Named multi-blackboard, isolation, backend options |
+| `test-priority.ts` | 64 | Priority preemption, conflict resolution, backward compat |
+| `test-phase5.ts` | 42 | Named multi-blackboard base |
+| `test-phase5b.ts` | 55 | Pluggable backend part 2, consistency levels |
+| `test-security.ts` | 34 | Tokens, sanitization, rate limiting, encryption, audit |
 
 ---
 
