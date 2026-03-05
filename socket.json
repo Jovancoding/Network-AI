@@ -3,11 +3,23 @@
   "ignore": {
     "evalDynamicCodeExecution": [
       {
+        "path": "lib/blackboard-validator.ts",
+        "reason": "False positive — new RegExp('eval' + '\\\\s*\\\\(') is a security detection pattern that scans for eval() usage in untrusted agent code submitted to the blackboard. It is not dynamic code execution."
+      },
+      {
         "path": "dist/lib/blackboard-validator.js",
         "reason": "False positive — this is a security detection pattern that scans for eval() usage in untrusted agent code. It is not dynamic code execution."
       }
     ],
     "networkAccess": [
+      {
+        "path": "adapters/a2a-adapter.ts",
+        "reason": "Intentional — A2AAdapter implements the Google Agent-to-Agent protocol; fetch() calls are made to remote agent endpoints that users explicitly register via registerRemoteAgent(). Network access is the purpose of this adapter."
+      },
+      {
+        "path": "dist/adapters/a2a-adapter.js",
+        "reason": "Intentional — A2AAdapter implements the Google Agent-to-Agent protocol; fetch() calls are made to remote agent endpoints that users explicitly register via registerRemoteAgent(). Network access is the purpose of this adapter."
+      },
       {
         "path": "dist/adapters/custom-adapter.js",
         "reason": "Intentional — CustomAdapter is a user-configured HTTP adapter that calls a user-supplied URL (config.url) to connect to external AI endpoints. Network access is the explicit purpose of this adapter."
