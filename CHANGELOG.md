@@ -5,6 +5,28 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-03-06
+
+### Added
+
+- **`CodexAdapter`** — new adapter for OpenAI Codex / code-focused models with three execution modes:
+  - `chat` — `/v1/chat/completions` (gpt-4o, o4-mini, any OpenAI chat model); BYOC client or built-in `fetch`
+  - `completion` — `/v1/completions` (code-davinci-002 legacy); BYOC client or built-in `fetch`
+  - `cli` — wraps the Codex CLI tool via a user-supplied `executor` function
+- **`registerCodexAgent(id, config)`** — register agents per-mode with model, systemPrompt, maxTokens, temperature, stop sequences, and optional BYOC OpenAI SDK client
+- **`CodexChatClient` / `CodexCompletionClient`** — minimal interfaces matching the OpenAI SDK shape; no hard dependency on any OpenAI package
+- **`CodexCLIExecutor`** — type for user-supplied Codex CLI wrapper functions
+- **`test-codex.ts`** — 51 new assertions covering lifecycle, chat/completion/CLI modes, BYOC clients, blackboard snapshot in prompt, unregistered agent, client error capture, multi-agent, type exports
+- **`test:codex`** script added to `package.json`
+
+### Changed
+
+- Total adapter count: 13 → **14** (CodexAdapter added)
+- Total test assertions: 1,283 → **1,334** (51 new in `test-codex.ts`)
+- Test suites: 15 → **16**
+- `README.md`: adapter table, comparison table, badge, testing section, script list updated
+- `adapters/index.ts` + `index.ts`: `CodexAdapter` and Codex type exports appended
+
 ## [4.1.0] - 2026-03-05
 
 ### Added

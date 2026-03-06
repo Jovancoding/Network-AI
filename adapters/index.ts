@@ -88,6 +88,16 @@ export type {
   A2AAdapterConfig,
 } from './a2a-adapter';
 
+// Codex adapter (OpenAI Codex CLI / chat / completion)
+export { CodexAdapter } from './codex-adapter';
+export type {
+  CodexMode,
+  CodexAgentConfig,
+  CodexChatClient,
+  CodexCompletionClient,
+  CodexCLIExecutor,
+} from './codex-adapter';
+
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from '../types/streaming-adapter';
 

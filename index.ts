@@ -2590,5 +2590,15 @@ export type {
   A2AAdapterConfig,
 } from './adapters/a2a-adapter';
 
+// Codex adapter (OpenAI Codex CLI / chat / completion)
+export { CodexAdapter } from './adapters/codex-adapter';
+export type {
+  CodexMode,
+  CodexAgentConfig,
+  CodexChatClient,
+  CodexCompletionClient,
+  CodexCLIExecutor,
+} from './adapters/codex-adapter';
+
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from './types/streaming-adapter';

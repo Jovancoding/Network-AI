@@ -25,6 +25,7 @@ const SUITES = [
   'test-phase6.ts',
   'test-streaming.ts',
   'test-a2a.ts',
+  'test-codex.ts',
 ];
 
 const WIDTH = 60;
