@@ -14,7 +14,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Integration Guide](https://img.shields.io/badge/docs-integration%20guide-informational.svg)](INTEGRATION_GUIDE.md)
-[![Glama](https://glama.ai/mcp/servers/@jovanSAPFIONEER/network-ai/badge)](https://glama.ai/mcp/servers/@jovanSAPFIONEER/network-ai)
+[![Glama](https://img.shields.io/badge/Glama-listed-8A2BE2.svg)](https://glama.ai/mcp/servers/@jovanSAPFIONEER/network-ai)
 
 Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordination, guardrails, and governance to any AI agent stack.
 
