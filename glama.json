@@ -1,0 +1,71 @@
+{
+  "$schema": "https://glama.ai/mcp/servers/schema.json",
+  "name": "Network AI",
+  "description": "Multi-agent swarm orchestrator for AI workflows. Exposes blackboard read/write, agent dispatch, permission gating (AuthGuardian), token budget enforcement (FederatedBudget), and audit log tools over MCP. Supports 14 AI framework adapters including LangChain, AutoGen, CrewAI, Codex, and A2A — mix any frameworks in one swarm with race-condition-safe shared state.",
+  "license": "MIT",
+  "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",
+  "runtime": "node",
+  "env": {},
+  "tools": [
+    {
+      "name": "blackboard_read",
+      "description": "Read a value from the shared agent blackboard by key"
+    },
+    {
+      "name": "blackboard_write",
+      "description": "Write a value to the shared agent blackboard (propose → validate → commit)"
+    },
+    {
+      "name": "blackboard_list",
+      "description": "List all keys currently stored on the blackboard"
+    },
+    {
+      "name": "blackboard_delete",
+      "description": "Delete a key from the shared blackboard"
+    },
+    {
+      "name": "agent_spawn",
+      "description": "Spawn a new agent in the swarm"
+    },
+    {
+      "name": "agent_stop",
+      "description": "Stop a running agent in the swarm"
+    },
+    {
+      "name": "agent_list",
+      "description": "List all registered agents and their current status"
+    },
+    {
+      "name": "auth_issue_token",
+      "description": "Issue a scoped permission token for an agent (AuthGuardian)"
+    },
+    {
+      "name": "auth_revoke_token",
+      "description": "Revoke a previously issued permission token"
+    },
+    {
+      "name": "auth_check_permission",
+      "description": "Check whether an agent token has a specific permission"
+    },
+    {
+      "name": "budget_get",
+      "description": "Get current token spend for an agent (FederatedBudget)"
+    },
+    {
+      "name": "budget_set_ceiling",
+      "description": "Set a hard token ceiling for an agent"
+    },
+    {
+      "name": "audit_log_query",
+      "description": "Query the HMAC-signed audit log for blackboard writes, permission events, and FSM transitions"
+    },
+    {
+      "name": "fsm_transition",
+      "description": "Trigger a finite-state-machine governance transition for an agent workflow"
+    },
+    {
+      "name": "fsm_get_state",
+      "description": "Get the current FSM state of a workflow"
+    }
+  ]
+}
