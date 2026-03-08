@@ -4,18 +4,12 @@
 
 | Version | Supported |
 |---------|-----------|
-| 4.0.x   | Yes (latest) |
-| 3.9.x   | Security fixes only |
-| 3.8.x   | Security fixes only |
-| 3.7.x   | Security fixes only |
-| 3.6.x   | Security fixes only |
-| 3.5.x   | Security fixes only |
-| 3.4.x   | Security fixes only |
-| 3.3.x   | No |
-| 3.2.x   | No |
-| 3.1.x   | No |
-| 3.0.x   | No |
-| < 3.0   | No |
+| 4.3.x   | ✅ Yes — full support (current) |
+| 4.2.x   | ✅ Security fixes only |
+| 4.1.x   | ✅ Security fixes only |
+| 4.0.x   | ✅ Security fixes only |
+| 3.5.x – 3.9.x | ⚠️ Security fixes only |
+| < 3.5   | ❌ No support |
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
@@ -29,23 +23,14 @@ You will receive an acknowledgment within 48 hours and a detailed response withi
 
 ## Security Measures in Network-AI
 
-Network-AI has two delivery layers with different security implementations:
+Network-AI includes built-in security features:
 
-### Python skill bundle (OpenClaw, `scripts/`)
-
-- **UUID-based grant tokens** (`grant_{uuid4().hex}`) stored in `data/active_grants.json` — no HMAC signing in the Python layer
-- **Plain JSONL audit logging** appended to `data/audit_log.jsonl` — no signature in the Python layer
-- **Weighted permission scoring** — justification quality + agent trust score + resource risk score
-- **Path traversal protection** in the Python blackboard (regex + resolved-path boundary checks)
-- **Prompt-injection detection** — 16 patterns screened in justification hardening
-
-### Node.js package (`network-ai` on npm)
-
-- **AES-256-GCM encryption** for blackboard data at rest (`DataEncryptor` in `security.ts`)
-- **HMAC-SHA256 signed tokens** via `SecureTokenManager` with trust levels and scope restrictions
+- **AES-256-GCM encryption** for blackboard data at rest
+- **HMAC-SHA256 signed tokens** via AuthGuardian with trust levels and scope restrictions
 - **Rate limiting** to prevent abuse
+- **Path traversal protection** in the Python blackboard (regex + resolved-path boundary checks)
 - **Input validation** on all 20+ public API entry points
-- **Secure audit logging** with tamper-resistant event trails (`SecureAuditLogger`)
+- **Secure audit logging** with tamper-resistant event trails
 - **Justification hardening** (v3.2.1) -- prompt-injection detection (16 patterns), keyword-stuffing defense, repetition/padding detection, structural coherence validation
 - **FSM Behavioral Control Plane** (v3.3.0) -- state-scoped agent and tool authorization via `JourneyFSM` and `ToolAuthorizationMatrix`; unauthorized actions blocked with `ComplianceViolationError`
 - **ComplianceMonitor** (v3.3.0) -- real-time agent behavior surveillance with configurable violation policies, severity classification, and async audit loop
@@ -55,7 +40,8 @@ Network-AI has two delivery layers with different security implementations:
 
 - **VirusTotal**: Benign (0/64 engines)
 - **OpenClaw Scanner**: Benign, HIGH CONFIDENCE
-- **CodeQL**: v3.3.0 -- all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed; v3.4.0 clean; v3.4.1 -- #65–#68 HIGH (insecure temporary file) resolved via `path.resolve()` sanitization and `mode: 0o700` directory permissions
+- **CodeQL**: v4.3.2 clean — A2A bearer tokens transmitted only via `Authorization` header; no URL embedding; streaming paths carry no credential material; `AbortController` guards prevent hanging fetch calls; CLI layer adds no new network surface (fully in-process); CWE-367 TOCTOU alerts #86/#87 resolved — `audit tail` and CLI test now open fd first and use `fs.fstatSync(fd)` instead of `fs.statSync(filename)`
+- **CodeQL** (historical): v3.3.0 — all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed; v3.4.0 clean; v3.4.1 — #65–#68 HIGH (insecure temporary file) resolved via `path.resolve()` sanitization and `mode: 0o700` directory permissions
 - **Snyk**: All High/Medium findings resolved in v3.0.3
 
 ## Disclosure Policy
@@ -128,9 +114,7 @@ python scripts/check_permission.py --audit-summary --last 50
 
 ## Audit Trail
 
-**Python layer:** The Python scripts append plain JSON lines to `data/audit_log.jsonl` — no HMAC signing. Each entry is `json.dumps(event) + "\n"`.
-
-**Node.js layer:** The `SecureAuditLogger` class (`security.ts`) produces HMAC-SHA256-signed entries when used via TypeScript/Node.js.
+The `SecureAuditLogger` produces HMAC-signed entries in `data/audit_log.jsonl`.
 
 Logged events: `permission_granted`, `permission_denied`, `permission_revoked`, `ttl_cleanup`, `result_validated`, and all blackboard writes.
 
@@ -143,4 +127,12 @@ Token revocation and TTL cleanup:
 ```bash
 python scripts/revoke_token.py --list-expired
 python scripts/revoke_token.py --cleanup
+```
+
+The audit log can also be queried and live-streamed via the CLI (no server required):
+
+```bash
+network-ai audit log --limit 50   # print recent entries
+network-ai audit tail             # live-stream as new events arrive
+network-ai audit clear            # reset the log
 ```
