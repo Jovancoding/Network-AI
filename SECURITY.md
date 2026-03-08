@@ -4,18 +4,12 @@
 
 | Version | Supported |
 |---------|-----------|
-| 4.0.x   | Yes (latest) |
-| 3.9.x   | Security fixes only |
-| 3.8.x   | Security fixes only |
-| 3.7.x   | Security fixes only |
-| 3.6.x   | Security fixes only |
-| 3.5.x   | Security fixes only |
-| 3.4.x   | Security fixes only |
-| 3.3.x   | No |
-| 3.2.x   | No |
-| 3.1.x   | No |
-| 3.0.x   | No |
-| < 3.0   | No |
+| 4.3.x   | ✅ Yes — full support (current) |
+| 4.2.x   | ✅ Security fixes only |
+| 4.1.x   | ✅ Security fixes only |
+| 4.0.x   | ✅ Security fixes only |
+| 3.5.x – 3.9.x | ⚠️ Security fixes only |
+| < 3.5   | ❌ No support |
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
@@ -46,7 +40,7 @@ Network-AI includes built-in security features:
 
 - **VirusTotal**: Benign (0/64 engines)
 - **OpenClaw Scanner**: Benign, HIGH CONFIDENCE
-- **CodeQL**: v4.1.0 clean — A2A bearer tokens transmitted only via `Authorization` header; no URL embedding; streaming paths carry no credential material; `AbortController` guards prevent hanging fetch calls
+- **CodeQL**: v4.3.2 clean — A2A bearer tokens transmitted only via `Authorization` header; no URL embedding; streaming paths carry no credential material; `AbortController` guards prevent hanging fetch calls; CLI layer adds no new network surface (fully in-process)
 - **CodeQL** (historical): v3.3.0 — all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed; v3.4.0 clean; v3.4.1 — #65–#68 HIGH (insecure temporary file) resolved via `path.resolve()` sanitization and `mode: 0o700` directory permissions
 - **Snyk**: All High/Medium findings resolved in v3.0.3
 
