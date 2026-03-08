@@ -5,7 +5,25 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.2.0] - 2026-03-06
+## [4.3.0] - 2026-03-08
+
+### Added
+
+- **Full CLI** (`network-ai` command) — direct in-process control over all Network-AI internals, no server required:
+  - `bb get/set/delete/list/snapshot` — full blackboard CRUD with JSON output support
+  - `bb propose/commit/abort` — atomic propose → validate → commit workflow from the terminal
+  - `auth token/revoke/check` — issue, revoke, and check permission tokens via AuthGuardian
+  - `budget status/set-ceiling` — token budget inspection and ceiling control via FederatedBudget
+  - `audit log/tail/clear` — audit log viewing, live-streaming tail, and clearing
+  - Global `--data <path>` and `--json` flags on all commands
+  - Available as `npx network-ai` or `npm install -g network-ai` → `network-ai`
+- **`test-cli.ts`** — 65 new assertions covering all CLI-layer behaviour
+- **`commander`** added as production dependency (v13)
+
+### Changed
+
+- `package.json` bin: added `"network-ai": "./dist/bin/cli.js"` alongside existing `network-ai-server`
+- Test runner: 17 suites, 1,399 passing (was 16 / 1,334)
 
 ### Added
 
