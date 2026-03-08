@@ -5,6 +5,21 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.3] - 2026-03-08
+
+### Security
+
+- **Fixed CWE-367 TOCTOU (time-of-check to time-of-use) — CodeQL alerts #86 and #87** (High severity, `js/file-system-race`)
+  - `bin/cli.ts` audit `tail` command: eliminated race window by opening the file descriptor first (`fs.openSync`) and using `fs.fstatSync(fd)` on the open descriptor instead of `fs.statSync(filename)` → read
+  - `test-cli.ts` Section 9b: replaced `statSync` / `appendFileSync` / `statSync` pattern with a single `fs.openSync(logFile, 'a+')` descriptor, writing via `fs.writeSync(fd)` and measuring size via `fs.fstatSync(fd)` — no gap between check and use
+- **SECURITY.md** updated: Supported Versions table reflects current 4.3.x series; CodeQL note documents both TOCTOU resolutions
+
+### Changed
+
+- No functional changes — 1,399 passing assertions across 17 suites
+
+---
+
 ## [4.3.2] - 2026-03-08
 
 ### Changed
