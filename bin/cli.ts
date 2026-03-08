@@ -264,14 +264,18 @@ auditCmd.command('tail')
     console.log(`tailing ${logFile} — Ctrl+C to stop`);
     const interval = setInterval(() => {
       try {
-        const newSize = fs.statSync(logFile).size;
-        if (newSize > size) {
-          const fd = fs.openSync(logFile, 'r');
-          const buf = Buffer.alloc(newSize - size);
-          fs.readSync(fd, buf, 0, buf.length, size);
+        // Open fd first, then fstat the descriptor — eliminates TOCTOU (CWE-367)
+        const fd = fs.openSync(logFile, 'r');
+        try {
+          const newSize = fs.fstatSync(fd).size;
+          if (newSize > size) {
+            const buf = Buffer.alloc(newSize - size);
+            fs.readSync(fd, buf, 0, buf.length, size);
+            buf.toString('utf-8').trim().split('\n').filter(Boolean).forEach(l => console.log(l));
+            size = newSize;
+          }
+        } finally {
           fs.closeSync(fd);
-          buf.toString('utf-8').trim().split('\n').filter(Boolean).forEach(l => console.log(l));
-          size = newSize;
         }
       } catch { /* file may be briefly locked */ }
     }, 500);

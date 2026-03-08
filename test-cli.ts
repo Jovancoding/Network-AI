@@ -354,12 +354,17 @@ section('9b. Audit — tail detects new content');
   const logFile = path.join(dir, 'audit_log.jsonl');
   try {
     fs.writeFileSync(logFile, '');
-    const before = fs.statSync(logFile).size;
-    assert(before === 0, 'initial file size is 0');
-
-    fs.appendFileSync(logFile, JSON.stringify({ event: 'write', key: 'k' }) + '\n');
-    const after = fs.statSync(logFile).size;
-    assert(after > before, 'file size grew after append (tail would detect this)');
+    // Open fd once, use fstatSync on the descriptor — eliminates TOCTOU (CWE-367)
+    const fd = fs.openSync(logFile, 'a+');
+    try {
+      const before = fs.fstatSync(fd).size;
+      assert(before === 0, 'initial file size is 0');
+      fs.writeSync(fd, JSON.stringify({ event: 'write', key: 'k' }) + '\n');
+      const after = fs.fstatSync(fd).size;
+      assert(after > before, 'file size grew after append (tail would detect this)');
+    } finally {
+      fs.closeSync(fd);
+    }
   } finally {
     cleanup(dir);
   }
