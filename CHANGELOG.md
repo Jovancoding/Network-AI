@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.4] - 2026-03-08
+
+### Security
+
+- Synced `.github/SECURITY.md` with root `SECURITY.md` — GitHub's Security tab was reading a stale February copy; now reflects 4.3.x supported versions and all CWE-367 TOCTOU resolutions
+
+### Changed
+
+- No code changes — 1,399 passing assertions across 17 suites
+- First npm registry publish for the 4.3.x series
+
+---
+
 ## [4.3.3] - 2026-03-08
 
 ### Security

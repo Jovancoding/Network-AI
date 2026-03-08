@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.3.3",
+  "version": "4.3.4",
   "description": "Python-based local multi-agent orchestrator. Coordinates specialized agents through a file-backed blackboard (swarm-blackboard.md), enforces weighted permission gating (justification quality + agent trust score + resource risk scoring), tracks per-agent token budgets, and writes a plain-JSON local audit log. All execution is local — no external network calls from the bundled Python scripts. HMAC-signed tokens and AES-256 encryption are features of the companion Node.js package (network-ai on npm) and are NOT implemented in the Python scripts. A companion Node.js MCP server (network-ai-server) is available separately on npm for IDE/MCP integration; it is not bundled here and does not run automatically.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",

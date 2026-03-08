@@ -1,6 +1,6 @@
 {
   "name": "network-ai",
-  "version": "4.3.3",
+  "version": "4.3.4",
   "description": "AI agent orchestration framework for TypeScript/Node.js - 14 adapters (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex + streaming variants). Built-in CLI, security, swarm intelligence, real-time streaming, and agentic workflow patterns.",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI#readme",
   "main": "dist/index.js",
