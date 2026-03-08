@@ -1,5 +1,4 @@
 {
-  "$schema": "https://glama.ai/mcp/servers/schema.json",
   "name": "Network AI",
   "description": "Multi-agent swarm orchestrator for AI workflows. Exposes blackboard read/write, agent dispatch, permission gating (AuthGuardian), token budget enforcement (FederatedBudget), and audit log tools over MCP. Supports 14 AI framework adapters including LangChain, AutoGen, CrewAI, Codex, and A2A — mix any frameworks in one swarm with race-condition-safe shared state.",
   "license": "MIT",
