@@ -12,6 +12,15 @@ data/audit_log.jsonl
 
 One JSON object per line. The file is append-only. Each entry is a complete, self-contained record — no dependencies between lines.
 
+The CLI provides direct access without inspecting the file manually:
+
+```bash
+network-ai audit log            # print all entries (add --limit <n> to cap output)
+network-ai audit tail           # live-stream new entries as they are appended
+network-ai audit clear          # reset the log (irreversible)
+network-ai --json audit log     # machine-readable output
+```
+
 ---
 
 ## Envelope (all events)

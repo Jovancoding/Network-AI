@@ -98,6 +98,22 @@ python scripts/swarm_guard.py budget-check  --task-id "task_001"
 python scripts/swarm_guard.py budget-report --task-id "task_001"
 ```
 
+### CLI (bin/cli.ts)
+
+A full in-process command-line interface that imports `LockedBlackboard`, `AuthGuardian`, and `FederatedBudget` directly — no server process required. Useful for one-off inspection, CI assertions, and debugging without spinning up the MCP server.
+
+```bash
+network-ai bb list                    # inspect shared state
+network-ai audit tail                 # live-stream audit events
+network-ai auth token my-bot \
+  --resource DATABASE --action read   # issue a permission token
+network-ai budget status              # check spend across agents
+```
+
+Four command groups mirror the four core subsystems: `bb` (LockedBlackboard), `auth` (AuthGuardian), `budget` (FederatedBudget), `audit` (SecureAuditLogger). Global `--data <path>` and `--json` flags apply to every command.
+
+→ Full reference in [QUICKSTART.md § CLI](QUICKSTART.md)
+
 ### AdapterRegistry
 
 Routes tasks to the right agent/framework automatically. Register multiple adapters and the registry dispatches by agent ID.
@@ -211,6 +227,8 @@ Network-AI/
 ├── index.ts                      # Core orchestrator (SwarmOrchestrator, AuthGuardian, TaskDecomposer)
 ├── security.ts                   # Security module (tokens, encryption, rate limiting, audit)
 ├── setup.ts                      # Developer setup & installation checker
+├── bin/
+│   └── cli.ts                    # Full CLI — bb, auth, budget, audit commands (in-process)
 ├── adapters/                     # 12 plug-and-play agent framework adapters
 │   ├── adapter-registry.ts       # Multi-adapter routing & discovery
 │   ├── base-adapter.ts           # Abstract base class

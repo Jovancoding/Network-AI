@@ -457,6 +457,7 @@ Run these before declaring the integration production-ready:
 | Document | What It Covers |
 |----------|---------------|
 | [QUICKSTART.md](QUICKSTART.md) | Get running in 5 minutes |
+| [QUICKSTART.md § CLI](QUICKSTART.md) | CLI reference — bb, auth, budget, audit commands |
 | [references/adapter-system.md](references/adapter-system.md) | All 12 adapters with code examples |
 | [references/trust-levels.md](references/trust-levels.md) | Trust scoring formula and agent roles |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission system, justification scoring, token lifecycle |

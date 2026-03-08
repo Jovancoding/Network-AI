@@ -176,3 +176,21 @@ Consider implementing trust decay for agents that:
 - [ ] Check audit logs for unusual patterns
 - [ ] Remove trust for decommissioned agents
 - [ ] Document trust level changes
+
+## CLI and Trust Levels
+
+When issuing tokens via the CLI, trust level is resolved automatically from the agent ID:
+
+```bash
+# data_analyst has trust 0.8 — passes for DATABASE read
+network-ai auth token data_analyst \
+  --resource DATABASE --action read \
+  --justification "Need Q4 invoices for revenue report"
+
+# unknown_bot resolves to default trust 0.5 — may pass or fail depending on resource
+network-ai auth token unknown_bot \
+  --resource EMAIL --action read \
+  --justification "Send weekly summary digest"
+```
+
+Trust levels are numeric integers (`1`–`4`) in the CLI implementation, which map to the 0.5–0.9 scoring band. Configure agent trust in `scripts/check_permission.py` under `DEFAULT_TRUST_LEVELS`.

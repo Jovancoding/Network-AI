@@ -134,3 +134,11 @@ Token revocation and TTL cleanup:
 python scripts/revoke_token.py --list-expired
 python scripts/revoke_token.py --cleanup
 ```
+
+The audit log can also be queried and live-streamed via the CLI (no server required):
+
+```bash
+network-ai audit log --limit 50   # print recent entries
+network-ai audit tail             # live-stream as new events arrive
+network-ai audit clear            # reset the log
+```

@@ -215,7 +215,8 @@ export class MyFrameworkAdapter extends BaseAdapter {
 ```bash
 npx ts-node test-standalone.ts    # 79 core tests
 npx ts-node test-security.ts      # 33 security tests
-npx ts-node test-adapters.ts      # 100+ adapter tests (all 12 frameworks)
+npx ts-node test-adapters.ts      # 100+ adapter tests (all 14 frameworks)
+npx ts-node test-cli.ts           # 65 CLI tests
 ```
 
 ---
@@ -226,6 +227,95 @@ npx ts-node test-adapters.ts      # 100+ adapter tests (all 12 frameworks)
 npx ts-node setup.ts --check      # Verify installation
 npx ts-node setup.ts --list       # List all 12 adapters
 npx ts-node setup.ts --example    # Generate example.ts
+```
+
+---
+
+## 10. CLI
+
+Control Network-AI directly from the terminal — no server or running process required.  
+The CLI imports the same `LockedBlackboard`, `AuthGuardian`, and `FederatedBudget` core used everywhere else.
+
+### Install (global)
+
+```bash
+npm install -g network-ai
+network-ai --help
+```
+
+Or run from source without installing:
+
+```bash
+npx ts-node bin/cli.ts --help
+```
+
+### Blackboard (`bb`)
+
+```bash
+# Write / read / delete
+network-ai bb set agent:status running --agent orchestrator
+network-ai bb get agent:status
+network-ai bb delete agent:status
+
+# List all keys
+network-ai bb list
+
+# Snapshot (pretty-print full state)
+network-ai bb snapshot
+
+# Atomic propose → commit workflow
+network-ai bb propose agent:status complete --agent orchestrator   # prints changeId
+network-ai bb commit  <changeId>
+network-ai bb abort   <changeId>
+```
+
+### Auth (`auth`)
+
+```bash
+# Issue a permission token
+network-ai auth token my-bot --resource DATABASE --action read \
+  --justification "Need Q4 invoices for report"
+
+# Validate a token
+network-ai auth check grant_a1b2c3...
+
+# Revoke a token
+network-ai auth revoke grant_a1b2c3...
+```
+
+### Budget (`budget`)
+
+```bash
+# View current spend across all agents
+network-ai budget status
+
+# Set a new ceiling
+network-ai budget set-ceiling 50000
+```
+
+### Audit (`audit`)
+
+```bash
+# Print recent entries (last 50 by default)
+network-ai audit log --limit 50
+
+# Live-stream new entries as they arrive
+network-ai audit tail
+
+# Clear the log (irreversible)
+network-ai audit clear
+```
+
+### Global flags
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--data <path>` | `./data` | Override the data directory |
+| `--json` | off | Machine-readable JSON output on every command |
+
+```bash
+# Example: point at a non-default data dir and get JSON output
+network-ai --data /var/swarm/data --json bb list
 ```
 
 ---

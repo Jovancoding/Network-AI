@@ -31,6 +31,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 **Use Network-AI as:**
 - A **TypeScript/Node.js library** — `import { createSwarmOrchestrator } from 'network-ai'`
 - An **MCP server** — `npx network-ai-server --port 3001`
+- A **CLI** — `network-ai bb get status` / `network-ai audit tail`
 - An **OpenClaw skill** — `clawhub install network-ai`
 
 [**5-minute quickstart →**](QUICKSTART.md) &nbsp;|&nbsp; [**Architecture →**](ARCHITECTURE.md) &nbsp;|&nbsp; [**All adapters →**](#adapter-system) &nbsp;|&nbsp; [**Benchmarks →**](BENCHMARKS.md)
@@ -164,6 +165,35 @@ Options: `--no-budget`, `--no-token`, `--no-control`, `--ceiling <n>`, `--board 
 
 ---
 
+## CLI
+
+Control Network-AI directly from the terminal — no server required. The CLI imports the same core engine used by the MCP server.
+
+```bash
+# One-off commands (no server needed)
+npx ts-node bin/cli.ts bb set status running --agent cli
+npx ts-node bin/cli.ts bb get status
+npx ts-node bin/cli.ts bb snapshot
+
+# After npm install -g network-ai:
+network-ai bb list
+network-ai audit tail          # live-stream the audit log
+network-ai auth token my-bot --resource blackboard
+```
+
+| Command group | What it controls |
+|---|---|
+| `network-ai bb` | Blackboard — get, set, delete, list, snapshot, propose, commit, abort |
+| `network-ai auth` | AuthGuardian — issue tokens, revoke, check permissions |
+| `network-ai budget` | FederatedBudget — spend status, set ceiling |
+| `network-ai audit` | Audit log — print, live-tail, clear |
+
+Global flags on every command: `--data <path>` (data directory, default `./data`) · `--json` (machine-readable output)
+
+→ Full reference in [QUICKSTART.md § CLI](QUICKSTART.md)
+
+---
+
 ## Two agents, one shared state — without race conditions
 
 The real differentiator is coordination. Here is what no single-framework solution handles: two agents writing to the same resource concurrently, atomically, without corrupting each other.
@@ -288,9 +318,10 @@ npm run test:streaming    # Streaming adapters
 npm run test:a2a          # A2A protocol adapter
 npm run test:codex        # Codex adapter
 npm run test:priority     # Priority & preemption
+npm run test:cli          # CLI layer
 ```
 
-**1,334 passing assertions across 16 test suites** (`npm run test:all`):
+**1,399 passing assertions across 17 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -310,6 +341,7 @@ npm run test:priority     # Priority & preemption
 | `test-phase5b.ts` | 55 | Pluggable backend part 2, consistency levels |
 | `test-phase5.ts` | 42 | Named multi-blackboard base |
 | `test-security.ts` | 34 | Tokens, sanitization, rate limiting, encryption, audit |
+| `test-cli.ts` | 65 | CLI layer: bb, auth, budget, audit commands |
 
 ---
 
@@ -317,7 +349,7 @@ npm run test:priority     # Priority & preemption
 
 | Doc | Contents |
 |---|---|
-| [QUICKSTART.md](QUICKSTART.md) | Installation, first run, PowerShell guide, Python scripts CLI |
+| [QUICKSTART.md](QUICKSTART.md) | Installation, first run, CLI reference, PowerShell guide, Python scripts CLI |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Race condition problem, FSM design, handoff protocol, project structure |
 | [BENCHMARKS.md](BENCHMARKS.md) | Provider performance, rate limits, local GPU, `max_completion_tokens` guide |
 | [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail |

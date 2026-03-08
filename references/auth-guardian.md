@@ -201,3 +201,34 @@ When permission is denied:
 2. Modify request (justification/scope)
 3. If still denied, escalate to human operator
 4. Human can manually create grant in `data/active_grants.json`
+
+## CLI Usage
+
+The `auth` command group exposes AuthGuardian directly from the terminal — no server required.
+
+```bash
+# Issue a permission token
+network-ai auth token <agentId> --resource <TYPE> --action <read|write> \
+  --justification "Reason for access"
+
+# Example: data analyst requesting database read
+network-ai auth token data_analyst \
+  --resource DATABASE --action read \
+  --justification "Need Q4 invoices for revenue report"
+
+# Validate a token before use
+network-ai auth check grant_a1b2c3d4e5f6...
+
+# Revoke a token (e.g., after the task completes)
+network-ai auth revoke grant_a1b2c3d4e5f6...
+```
+
+All commands support `--json` for machine-readable output:
+
+```bash
+network-ai --json auth token data_analyst --resource DATABASE --action read \
+  --justification "Need Q4 invoices for revenue report"
+# → { "grantToken": "grant_...", "agentId": "...", "resource": "DATABASE", ... }
+```
+
+Trust level is a numeric value (`0`–`4`) mapped internally to the 0.5–0.9 scoring range — configure agent trust in `scripts/check_permission.py`.

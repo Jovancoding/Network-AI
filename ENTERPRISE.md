@@ -112,6 +112,7 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 | Add budget enforcement | `FederatedBudget` in [QUICKSTART.md](QUICKSTART.md) |
 | Add FSM workflow governance | `JourneyFSM` in [ARCHITECTURE.md](ARCHITECTURE.md) |
 | MCP server (model context protocol) | `npx network-ai-mcp` — see [QUICKSTART.md](QUICKSTART.md) |
+| Inspect / manage state from terminal | `network-ai bb` CLI — see [QUICKSTART.md § CLI](QUICKSTART.md) |
 | Full working example (no API key) | `npx ts-node examples/08-control-plane-stress-demo.ts` |
 | Full working example (with API key) | `npx ts-node examples/07-full-showcase.ts` |
 
