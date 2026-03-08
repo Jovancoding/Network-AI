@@ -5,6 +5,27 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.1] - 2026-03-08
+
+### Added
+
+- **CLI documentation** across all docs — README, QUICKSTART, ARCHITECTURE, SECURITY, ENTERPRISE, AUDIT_LOG_SCHEMA, INTEGRATION_GUIDE, references/auth-guardian, references/trust-levels
+- New `## CLI` section in README with command-group table and global flags
+- New `## 10. CLI` section in QUICKSTART with full command reference for `bb`, `auth`, `budget`, `audit`
+- New `### CLI (bin/cli.ts)` subsection in ARCHITECTURE Component Overview; `bin/cli.ts` added to Project Structure tree
+- CLI access commands in SECURITY Audit Trail section, AUDIT_LOG_SCHEMA File Location section
+- `network-ai bb` CLI row added to ENTERPRISE Integration Entry Points table
+- CLI row added to INTEGRATION_GUIDE Further Reading table
+- New `## CLI Usage` section in references/auth-guardian — `auth token/check/revoke` with JSON output examples
+- New `## CLI and Trust Levels` section in references/trust-levels — numeric trust mapping and agent examples
+
+### Changed
+
+- QUICKSTART test counts updated to include `test-cli.ts` (65 tests, 14 frameworks)
+- `skill.json` version bumped to 4.3.1
+
+---
+
 ## [4.3.0] - 2026-03-08
 
 ### Added
