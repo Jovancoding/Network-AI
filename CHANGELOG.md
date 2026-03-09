@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.7] - 2026-03-09
+
+### Security
+- **OpenClaw Suspicious flag resolved** — Updated `skill.json` description and `SKILL.md` frontmatter to explicitly state that README documents the full project (including the companion npm package); HMAC tokens, AES-256, MCP server, 14 adapters, and CLI are NOT part of the Python ClawHub bundle. Eliminates the "overclaiming" mismatch that triggered medium-confidence Suspicious rating.
+
+### Changed
+- No code changes — 1,399 passing assertions across 17 suites
+
 ## [4.3.6] - 2026-03-09
 
 ### Security
