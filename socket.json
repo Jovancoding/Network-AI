@@ -36,6 +36,56 @@
         "path": "dist/bin/mcp-server.js",
         "reason": "Intentional — network-ai-server is an opt-in CLI binary that starts an HTTP/SSE server to expose the Network-AI tool suite over MCP. Users invoke it explicitly; it is not a background side-effect."
       }
+    ],
+    "urlStrings": [
+      {
+        "path": "dist/adapters/custom-adapter.js",
+        "reason": "Intentional — CustomAdapter accepts user-supplied endpoint URLs (config.url) as its core function. URLs are provided by the caller at runtime, not hard-coded."
+      },
+      {
+        "path": "dist/adapters/mcp-adapter.js",
+        "reason": "Intentional — MCPAdapter documents example MCP endpoint URL patterns in comments. No runtime URL is hard-coded."
+      },
+      {
+        "path": "dist/bin/mcp-server.js",
+        "reason": "Intentional — mcp-server.js is the MCP server binary; localhost URLs are for the server it starts (e.g. http://localhost:3001/sse) and are documented in help text and comments."
+      }
+    ],
+    "envVars": [
+      {
+        "path": "dist/security.js",
+        "reason": "Intentional — security.ts reads NETWORK_AI_ENCRYPTION_KEY and similar env vars as an opt-in mechanism for users to supply secrets without hard-coding them. This is the recommended pattern."
+      }
+    ],
+    "filesystemAccess": [
+      {
+        "path": "dist/index.js",
+        "reason": "Intentional — the blackboard uses a file-backed store (data/ directory) as its persistence layer. Filesystem access is the explicit purpose of the local-first architecture."
+      },
+      {
+        "path": "dist/run.js",
+        "reason": "Intentional — run.ts bootstraps the local blackboard and reads/writes the data directory. File I/O is the core mechanism."
+      },
+      {
+        "path": "dist/security.js",
+        "reason": "Intentional — security module writes the HMAC-signed audit log to data/audit_log.jsonl. Append-only filesystem writes are the audit trail mechanism."
+      },
+      {
+        "path": "dist/lib/locked-blackboard.js",
+        "reason": "Intentional — LockedBlackboard uses atomic file rename + fsync for its mutex. Filesystem access is the locking primitive."
+      },
+      {
+        "path": "dist/lib/mcp-tools-extended.js",
+        "reason": "Intentional — extended MCP tools expose blackboard snapshot and audit log query over MCP; these read from the data/ directory."
+      },
+      {
+        "path": "dist/lib/mcp-transport-sse.js",
+        "reason": "Intentional — SSE transport reads config from the filesystem. File access is for configuration loading only."
+      },
+      {
+        "path": "dist/lib/swarm-utils.js",
+        "reason": "Intentional — swarm-utils reads/writes the shared blackboard file and audit log. Filesystem I/O is the persistence layer."
+      }
     ]
   }
 }

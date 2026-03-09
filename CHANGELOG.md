@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.6] - 2026-03-09
+
+### Security
+- Extended `socket.json` ignore rules with `urlStrings`, `envVars`, and `filesystemAccess` entries for all dist files that legitimately access URLs, environment variables, and the filesystem — restores Socket.dev Supply Chain Security score to 80
+
+### Changed
+- No code changes — 1,399 passing assertions across 17 suites
+
 ## [4.3.5] - 2026-03-09
 
 ### Security
