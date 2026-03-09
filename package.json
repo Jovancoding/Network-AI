@@ -107,6 +107,6 @@
     "socket.json"
   ],
   "dependencies": {
-    "commander": "^13.1.0"
+    "commander": "^14.0.3"
   }
 }
