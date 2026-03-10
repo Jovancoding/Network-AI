@@ -6,11 +6,12 @@ metadata:
     emoji: "\U0001F41D"
     homepage: https://github.com/jovanSAPFIONEER/Network-AI
     bundle_scope: "Python scripts only (scripts/*.py). The README.md in this repo describes the FULL project including the companion Node.js npm package — features documented there (HMAC tokens, AES-256 encryption, MCP server, 14 adapters, CLI) are NOT implemented in these Python scripts and are NOT part of this ClawHub skill. Install the npm package separately for those features."
+    network_calls: none
+    sessions_ops: "platform-provided — sessions_send, sessions_list, and sessions_history are OpenClaw host platform built-ins, not implemented or invoked by this skill's Python scripts"
     requires:
       bins:
         - python3
-      optional_bins:
-        - node  # Only needed if you separately install and run the Node.js MCP server (network-ai-server via npm). Not required for this skill's Python instructions.
+      optional_bins: []  # No optional binaries required. Node.js is only needed for the SEPARATE companion npm package (not part of this skill).
     env:
       SWARM_TOKEN_SECRET:
         required: false
@@ -168,17 +169,26 @@ python {baseDir}/scripts/swarm_guard.py budget-init \
 
 ### 2. Delegate a Task to Another Session
 
-Use OpenClaw's built-in session tools to delegate work:
+> **Platform note:** `sessions_list`, `sessions_send`, and `sessions_history` are **OpenClaw host platform built-ins** — they are part of the OpenClaw runtime, not provided or invoked by this skill's Python scripts. This skill only runs local `python scripts/*.py` commands. The guidance below describes how to combine the platform's session tools with this skill's budget guard.
 
-```
-sessions_list    # See available sessions/agents
-sessions_send    # Send task to another session
-sessions_history # Check results from delegated work
+First check budget, then use the OpenClaw platform operation:
+
+```bash
+# 1. Check budget (this skill's Python script)
+python {baseDir}/scripts/swarm_guard.py intercept-handoff \
+  --task-id "task_001" --from orchestrator --to data_analyst \
+  --message "Analyze Q4 revenue data"
+
+# 2. If allowed, delegate using the OpenClaw platform tool (not this skill):
+#    sessions_list    → see available sessions/agents
+#    sessions_send    → send task to another session
+#    sessions_history → check results from delegated work
 ```
 
 **Example delegation prompt:**
 ```
-Use sessions_send to ask the data_analyst session to:
+After running swarm_guard.py intercept-handoff and getting result.allowed == true,
+use the OpenClaw sessions_send platform tool to ask the data_analyst session:
 "Analyze Q4 revenue trends from the SAP export data and summarize key insights"
 ```
 
@@ -212,33 +222,9 @@ python {baseDir}/scripts/blackboard.py read "task:q4_analysis"
 python {baseDir}/scripts/blackboard.py list
 ```
 
-### 5. Use the Node.js CLI (optional — requires `npm install -g network-ai`)
+### 5. Optional: Use the Node.js CLI
 
-The CLI gives direct terminal access to all four subsystems without running a server:
-
-```bash
-# Blackboard
-network-ai bb get task:q4_analysis
-network-ai bb set task:q4_analysis '{"status": "complete"}' --agent orchestrator
-network-ai bb list
-network-ai bb snapshot
-
-# Permissions
-network-ai auth token data_analyst --resource DATABASE --action read \
-  --justification "Need Q4 invoices for revenue report"
-network-ai auth check grant_a1b2c3...
-network-ai auth revoke grant_a1b2c3...
-
-# Budget
-network-ai budget status
-network-ai budget set-ceiling 50000
-
-# Audit log
-network-ai audit log --limit 50
-network-ai audit tail          # live-stream as events arrive
-```
-
-Global flags: `--data <path>` (override data directory) · `--json` (machine-readable output)
+> **Scope note:** The `network-ai` CLI is part of the **companion npm package** — it is a completely separate project and is NOT part of this ClawHub skill bundle. This skill's Python scripts work fully without it. See the [Appendix](#appendix-optional-nodejs-companion-npm) at the bottom of this file for details.
 
 ## Agent-to-Agent Handoff Protocol
 
@@ -254,8 +240,11 @@ python {baseDir}/scripts/swarm_guard.py budget-check --task-id "task_001"
 ```
 
 ### Step 2: Identify Target Agent
+
+> **Platform note:** `sessions_list` is an **OpenClaw host platform built-in**, not provided by this skill.
+
 ```
-sessions_list  # Find available agents
+sessions_list  # OpenClaw platform operation — find available agents
 ```
 
 Common agent types:
@@ -289,9 +278,12 @@ Include these fields in your delegation:
 - **constraints**: Any limitations or requirements
 - **expectedOutput**: What format/content you need back
 
-### Step 5: Send via sessions_send
+### Step 5: Send via OpenClaw Platform Session Tool
+
+> **Platform note:** `sessions_send` is an **OpenClaw host platform built-in** — it is NOT implemented by this skill. This skill only provides the budget guard (`swarm_guard.py`) that must be run first.
 
 ```
+# OpenClaw platform operation (not this skill):
 sessions_send to data_analyst:
 "[HANDOFF]
 Instruction: Analyze Q4 revenue by product category
@@ -301,10 +293,12 @@ Expected Output: JSON summary with category, revenue, growth_pct
 [/HANDOFF]"
 ```
 
-### Step 4: Check Results
+### Step 6: Check Results
+
+> **Platform note:** `sessions_history` is an **OpenClaw host platform built-in**, not provided by this skill.
 
 ```
-sessions_history data_analyst  # Get the response
+sessions_history data_analyst  # OpenClaw platform operation — get the response
 ```
 
 ## Permission Wall (AuthGuardian)
@@ -409,9 +403,14 @@ Sequential processing - output of one feeds into next.
 
 ### Example Parallel Workflow
 
+> **Platform note:** `sessions_send` and `sessions_history` are **OpenClaw host platform built-ins**, not provided by this skill. This skill provides only the `swarm_guard.py` budget/handoff check that runs before each delegation.
+
 ```
+# For each delegation below, first run:
+#   python {baseDir}/scripts/swarm_guard.py intercept-handoff --task-id "task_001" --from orchestrator --to <agent> --message "<task>"
+# Then, if allowed, use the OpenClaw platform tool:
 1. sessions_send to data_analyst: "Extract key metrics from Q4 data"
-2. sessions_send to risk_assessor: "Identify compliance risks in Q4 data"  
+2. sessions_send to risk_assessor: "Identify compliance risks in Q4 data"
 3. sessions_send to strategy_advisor: "Recommend actions based on Q4 trends"
 4. Wait for all responses via sessions_history
 5. Synthesize: Combine metrics + risks + recommendations into executive summary
@@ -618,7 +617,7 @@ python {baseDir}/scripts/swarm_guard.py supervisor-review --task-id "task_001"
 - Entry was never written
 
 ### Session Not Found
-- Run `sessions_list` to see available sessions
+- Run `sessions_list` (OpenClaw platform built-in) to see available sessions
 - Session may need to be started first
 
 ## References
@@ -627,3 +626,25 @@ python {baseDir}/scripts/swarm_guard.py supervisor-review --task-id "task_001"
 - [Blackboard Schema](references/blackboard-schema.md) - Data structure specifications
 - [Agent Trust Levels](references/trust-levels.md) - How trust is calculated
 - [CLI Reference](QUICKSTART.md) - Full `network-ai` CLI command reference (§ 10. CLI)
+
+---
+
+## Appendix: Optional Node.js Companion (npm)
+
+> **This section describes a SEPARATE project — not part of this ClawHub skill bundle.**
+> The Python scripts above work completely without any of this.
+> Install only if you want MCP server integration with Claude/Cursor/VS Code.
+
+```bash
+npm install -g network-ai
+npx network-ai-server --port 3001
+```
+
+The companion npm package (`network-ai`) provides:
+- HMAC-signed audit tokens (vs UUID tokens in the Python layer)
+- AES-256 blackboard encryption
+- A standalone MCP server for IDE integration (Claude, Cursor, VS Code)
+- 14 framework adapters (LangChain, AutoGen, CrewAI, DSPy, LlamaIndex, etc.)
+- A full CLI (`network-ai bb`, `network-ai auth`, `network-ai budget`, `network-ai audit`)
+
+None of the above are provided by this skill's Python scripts. No network calls are made by this skill.

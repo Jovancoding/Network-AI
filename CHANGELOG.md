@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.1] - 2026-03-10
+
+### Security
+- **OpenClaw Suspicious flag fix (attempt 2)** — Added `network_calls: none` and `sessions_ops: platform-provided` fields to SKILL.md frontmatter. Annotated every `sessions_send`, `sessions_list`, and `sessions_history` reference in the body with explicit "OpenClaw host platform built-in — NOT provided by this skill" notes. Moved Node.js CLI content out of the main workflow into a clearly-labeled "Appendix: Optional Node.js Companion" section at the bottom. Eliminates the scanner's "unimplemented operations causing network activity" and "inconsistent local-only claims" findings.
+
+### Changed
+- No code changes — 1,399 passing assertions across 17 suites
+
 ## [4.4.0] - 2026-03-10
 
 ### Added
