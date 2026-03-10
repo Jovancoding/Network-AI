@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-03-10
+
+### Added
+- **Claude API / Codex integration** — `claude-tools.json`: all 5 capabilities translated into Anthropic/OpenAI tool-use schema, ready to drop into the `tools` array
+- **Custom GPT Actions** — `openapi.yaml`: full OpenAPI 3.1 spec for all swarm endpoints, importable directly into the GPT editor
+- **Claude Projects system prompt** — `claude-project-prompt.md`: clean orchestrator instructions (decomposition protocol, permission wall, blackboard patterns, hard rules) ready to paste into Claude Project Custom Instructions
+- README: new "Use with Claude, ChatGPT & Codex" section with usage snippets for all three integration modes
+
+### Changed
+- No code changes — 1,399 passing assertions across 17 suites
+
 ## [4.3.7] - 2026-03-09
 
 ### Security
