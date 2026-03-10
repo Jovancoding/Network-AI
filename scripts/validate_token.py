@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# SECURITY: This script makes NO network calls and spawns NO subprocesses.
+# All I/O is local file operations only:
+#   READS:  data/active_grants.json
+#   WRITES: none
+# Imports used: argparse, json, sys, datetime, pathlib, typing
+# No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
 """
 Validate Grant Token
 

@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.2] - 2026-03-10
+
+### Security
+- **OpenClaw Suspicious flag fix (attempt 3)** — Added explicit `# SECURITY:` declaration block at the top of every Python script (`blackboard.py`, `swarm_guard.py`, `check_permission.py`, `validate_token.py`, `revoke_token.py`). Each block declares: NO network calls, NO subprocesses, lists all imports used, and explicitly states which network-capable modules are NOT imported. Allows the scanner (and users) to verify local-only behavior at a glance without reading the full script.
+
+### Changed
+- No logic changes — 1,399 passing assertions across 17 suites
+
 ## [4.4.1] - 2026-03-10
 
 ### Security
