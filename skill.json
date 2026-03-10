@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.4.2",
+  "version": "4.4.3",
   "description": "Python orchestration skill: local multi-agent workflows via blackboard file, permission gating, and token budget scripts. All execution is local — no network calls, no Node.js required. NOTE: The README describes the full project including the companion Node.js/TypeScript npm package (network-ai on npm). Features documented there — HMAC-signed tokens, AES-256 encryption, networked MCP server, 14 adapters, full CLI — are NOT implemented in these Python scripts and are NOT part of this ClawHub skill bundle. Install 'npm install -g network-ai' separately for those features.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",
@@ -10,11 +10,13 @@
   "entrypoint": "scripts/swarm_guard.py",
   "gateway": "local",
   "install": {
-    "description": "This skill is instruction-only for the Python runtime. All Python scripts are bundled in scripts/. No code is downloaded during install. The optional Node.js MCP server is a separate package (see below) and is not required to use this skill.",
+    "description": "No install step required. All Python scripts use standard library only (zero third-party packages). Simply ensure python3 is available and run scripts directly from the scripts/ directory.",
     "python": {
       "requirements": "requirements.txt",
+      "requirements_note": "requirements.txt contains ZERO required packages — all scripts use Python stdlib only. No pip install needed.",
+      "install_command": "# No install needed. Optionally: pip install -r requirements.txt (installs nothing required)",
       "scripts": ["scripts/blackboard.py", "scripts/swarm_guard.py", "scripts/check_permission.py", "scripts/validate_token.py", "scripts/revoke_token.py"],
-      "note": "All scripts run locally only. No external network calls."
+      "note": "All scripts run locally only. No external network calls. No third-party dependencies."
     },
     "optional_node_server": {
       "description": "Separate optional component — NOT part of this skill bundle. For MCP/IDE integration only.",

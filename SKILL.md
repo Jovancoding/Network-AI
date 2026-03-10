@@ -33,6 +33,24 @@ metadata:
 
 > **Scope of this skill bundle:** All instructions below run local Python scripts (`scripts/*.py`). No network calls are made by this skill. Tokens are UUID-based (`grant_{uuid4().hex}`) stored in `data/active_grants.json`. Audit logging is plain JSONL (`data/audit_log.jsonl`) — no HMAC signing in the Python layer. HMAC-signed tokens, AES-256 encryption, and the standalone MCP server are all features of the **companion Node.js package** (`npm install -g network-ai`) — they are **not** implemented in these Python scripts and do **not** run automatically.
 
+## Setup
+
+**No pip install required.** All 5 scripts use Python standard library only — zero third-party packages.
+
+```bash
+# Prerequisite: python3 (any version ≥ 3.8)
+python3 --version
+
+# That's it. Run any script directly:
+python3 scripts/blackboard.py list
+python3 scripts/swarm_guard.py budget-init --task-id "task_001" --budget 10000
+
+# Optional: for cross-platform file locking on Windows production hosts
+pip install filelock  # only needed if you see locking issues on Windows
+```
+
+The `data/` directory is created automatically on first run. No configuration files, environment variables, or credentials are required.
+
 Multi-agent coordination system for complex workflows requiring task delegation, parallel execution, and permission-controlled access to sensitive APIs.
 
 ## 🎯 Orchestrator System Instructions

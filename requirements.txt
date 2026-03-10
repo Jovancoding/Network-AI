@@ -1,14 +1,14 @@
 # Python dependencies for Swarm Orchestrator Skill
-# Install: pip install -r requirements.txt
-
-# Core dependencies (all optional - stdlib works on Unix)
-# filelock>=3.0.0  # Cross-platform file locking (recommended for Windows)
-
-# Note: The blackboard uses fcntl on Unix (built-in) with fallback for Windows.
-# For production Windows deployments, uncomment filelock above.
-
-# If you want to run type checking:
-# mypy>=1.0.0
-
-# If you want to run tests:
-# pytest>=7.0.0
+#
+# ZERO required third-party packages.
+# All 5 scripts (blackboard.py, swarm_guard.py, check_permission.py,
+# validate_token.py, revoke_token.py) use Python standard library only:
+#   argparse, json, os, re, sys, time, hashlib, uuid, datetime, pathlib,
+#   typing, contextlib, fcntl (Unix built-in, with file-lock fallback on Windows)
+#
+# No pip install is needed to run this skill.
+#
+# ── OPTIONAL (uncomment if needed) ──────────────────────────────────────────
+# filelock>=3.0.0  # Cross-platform file locking (recommended for Windows production)
+# mypy>=1.0.0      # Static type checking
+# pytest>=7.0.0    # Running the test suite

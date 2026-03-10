@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.3] - 2026-03-10
+
+### Security
+- **Closed install mechanism gap** — `requirements.txt` rewritten to explicitly state zero required packages and no pip install needed. `skill.json` install spec updated with `requirements_note` and `install_command` fields confirming stdlib-only. `SKILL.md` now has a `## Setup` section immediately after the scope disclaimer with a one-command readiness check (`python3 --version`) and no-install confirmation.
+
+### Changed
+- No logic changes — 1,399 passing assertions across 17 suites
+
 ## [4.4.2] - 2026-03-10
 
 ### Security
