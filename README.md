@@ -363,6 +363,31 @@ npm run test:cli          # CLI layer
 
 ---
 
+## Use with Claude, ChatGPT & Codex
+
+Three integration files are included in the repo root:
+
+| File | Use |
+|---|---|
+| [`claude-tools.json`](claude-tools.json) | Claude API tool use & OpenAI Codex — drop into the `tools` array |
+| [`openapi.yaml`](openapi.yaml) | Custom GPT Actions — import directly in the GPT editor |
+| [`claude-project-prompt.md`](claude-project-prompt.md) | Claude Projects — paste into Custom Instructions |
+
+**Claude API / Codex:**
+```js
+import tools from './claude-tools.json' assert { type: 'json' };
+// Pass tools array to anthropic.messages.create({ tools }) or OpenAI chat completions
+```
+
+**Custom GPT Actions:**
+In the GPT editor → Actions → Import from URL, or paste the contents of `openapi.yaml`.
+Set the server URL to your running `npx network-ai-server --port 3001` instance.
+
+**Claude Projects:**
+Copy the contents of `claude-project-prompt.md` (below the horizontal rule) into a Claude Project's Custom Instructions field. No server required for instruction-only mode.
+
+---
+
 ## Contributing
 
 1. Fork → feature branch → `npm run test:all` → pull request

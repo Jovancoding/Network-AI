@@ -1,0 +1,127 @@
+[
+  {
+    "name": "delegate_task",
+    "description": "Delegate a task to a specialized sub-agent within the Network-AI swarm. The swarm uses a shared blackboard for coordination. Use this to route work to agents like data_analyst, strategy_advisor, or risk_assessor.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "targetAgent": {
+          "type": "string",
+          "description": "The identifier of the target agent to receive the task (e.g. data_analyst, strategy_advisor, risk_assessor)"
+        },
+        "taskPayload": {
+          "type": "object",
+          "description": "The task context, instructions, and any required data"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high", "critical"],
+          "description": "Task priority level for queue ordering. Defaults to normal."
+        },
+        "timeout": {
+          "type": "number",
+          "description": "Maximum execution time in milliseconds. Defaults to 30000."
+        },
+        "requiresAuth": {
+          "type": "boolean",
+          "description": "Whether this task requires AuthGuardian permission grant before execution."
+        }
+      },
+      "required": ["targetAgent", "taskPayload"]
+    }
+  },
+  {
+    "name": "query_swarm_state",
+    "description": "Query the current state of the agent swarm — active tasks, blackboard contents, agent availability, and permission grants.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["all", "agents", "tasks", "blackboard", "permissions"],
+          "description": "The scope of state information to retrieve. Defaults to all."
+        },
+        "agentFilter": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional list of agent IDs to filter results"
+        },
+        "includeHistory": {
+          "type": "boolean",
+          "description": "Include historical task execution data. Defaults to false."
+        }
+      }
+    }
+  },
+  {
+    "name": "spawn_parallel_agents",
+    "description": "Spawn multiple sub-agents in parallel for complex task decomposition. Results are combined using a synthesis strategy.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "agentType": { "type": "string" },
+              "taskPayload": { "type": "object" }
+            },
+            "required": ["agentType", "taskPayload"]
+          },
+          "description": "Array of parallel tasks to execute simultaneously"
+        },
+        "synthesisStrategy": {
+          "type": "string",
+          "enum": ["merge", "vote", "chain", "first-success"],
+          "description": "How to combine results from parallel agents. Defaults to merge."
+        }
+      },
+      "required": ["tasks"]
+    }
+  },
+  {
+    "name": "request_permission",
+    "description": "Request permission from AuthGuardian before accessing a protected resource type. Always call this before DATABASE, PAYMENTS, EMAIL, or FILE_EXPORT operations.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "resourceType": {
+          "type": "string",
+          "enum": ["DATABASE", "PAYMENTS", "EMAIL", "FILE_EXPORT"],
+          "description": "The type of protected resource being requested"
+        },
+        "justification": {
+          "type": "string",
+          "description": "Clear reason for requesting access — must be specific to the current task"
+        },
+        "scope": {
+          "type": "string",
+          "description": "Specific scope of access needed (e.g. read:invoices, read:revenue)"
+        }
+      },
+      "required": ["resourceType", "justification"]
+    }
+  },
+  {
+    "name": "update_blackboard",
+    "description": "Write or update an entry on the shared blackboard for cross-agent coordination. The blackboard persists state between agents.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "The blackboard entry key (e.g. task:001:data_analyst)"
+        },
+        "value": {
+          "description": "The data to store — can be any JSON-serializable value"
+        },
+        "ttl": {
+          "type": "number",
+          "description": "Time-to-live in seconds. Entry expires and returns null after this duration."
+        }
+      },
+      "required": ["key", "value"]
+    }
+  }
+]

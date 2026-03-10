@@ -1,0 +1,294 @@
+openapi: 3.1.0
+info:
+  title: Network-AI Swarm Orchestrator
+  description: >
+    Multi-agent swarm orchestration API. Provides task delegation, shared
+    blackboard coordination, parallel agent spawning, and permission gating
+    via AuthGuardian. Requires the companion MCP server:
+    `npm install -g network-ai && npx network-ai-server --port 3001`
+  version: 4.3.7
+  license:
+    name: MIT
+    url: https://github.com/jovanSAPFIONEER/Network-AI/blob/main/LICENSE
+
+servers:
+  - url: http://localhost:3001
+    description: Local MCP server (default port)
+
+paths:
+  /swarm/delegate:
+    post:
+      operationId: delegateTask
+      summary: Delegate a task to a sub-agent
+      description: >
+        Route a task to a specialized sub-agent within the swarm. Common agent
+        types: data_analyst, strategy_advisor, risk_assessor, orchestrator.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DelegateTaskRequest'
+      responses:
+        '200':
+          description: Task accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegateTaskResponse'
+
+  /swarm/state:
+    get:
+      operationId: querySwarmState
+      summary: Query current swarm state
+      description: >
+        Returns active tasks, blackboard contents, agent availability, and
+        permission grants.
+      parameters:
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [all, agents, tasks, blackboard, permissions]
+            default: all
+          description: Scope of state information to retrieve
+        - name: agentFilter
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter results to specific agent IDs
+        - name: includeHistory
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include historical task execution data
+      responses:
+        '200':
+          description: Current swarm state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SwarmStateResponse'
+
+  /swarm/parallel:
+    post:
+      operationId: spawnParallelAgents
+      summary: Spawn multiple agents in parallel
+      description: >
+        Execute multiple sub-tasks simultaneously and synthesize results.
+        Useful for multi-perspective analysis.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParallelAgentsRequest'
+      responses:
+        '200':
+          description: Synthesized results from all parallel agents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParallelAgentsResponse'
+
+  /auth/permission:
+    post:
+      operationId: requestPermission
+      summary: Request AuthGuardian permission
+      description: >
+        Gate access to protected resource types. Always call before DATABASE,
+        PAYMENTS, EMAIL, or FILE_EXPORT operations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionRequest'
+      responses:
+        '200':
+          description: Permission decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResponse'
+
+  /blackboard/{key}:
+    get:
+      operationId: readBlackboard
+      summary: Read a blackboard entry
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Blackboard key (e.g. task:001:data_analyst)
+      responses:
+        '200':
+          description: Blackboard entry value (null if expired or not found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  value: {}
+                  expiresAt:
+                    type: string
+                    nullable: true
+    put:
+      operationId: updateBlackboard
+      summary: Write or update a blackboard entry
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlackboardWriteRequest'
+      responses:
+        '200':
+          description: Write confirmed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  previousValue: {}
+
+components:
+  schemas:
+    DelegateTaskRequest:
+      type: object
+      required: [targetAgent, taskPayload]
+      properties:
+        targetAgent:
+          type: string
+          description: Agent identifier (e.g. data_analyst, strategy_advisor)
+        taskPayload:
+          type: object
+          description: Task context, instructions, and required data
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+          default: normal
+        timeout:
+          type: number
+          default: 30000
+          description: Max execution time in milliseconds
+        requiresAuth:
+          type: boolean
+          default: false
+
+    DelegateTaskResponse:
+      type: object
+      properties:
+        taskId:
+          type: string
+        status:
+          type: string
+        result: {}
+        agentTrace:
+          type: array
+          items:
+            type: object
+
+    SwarmStateResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+        activeAgents:
+          type: array
+          items:
+            type: object
+        pendingTasks:
+          type: array
+          items:
+            type: object
+        blackboardSnapshot:
+          type: object
+        permissionGrants:
+          type: array
+          items:
+            type: object
+
+    ParallelAgentsRequest:
+      type: object
+      required: [tasks]
+      properties:
+        tasks:
+          type: array
+          items:
+            type: object
+            required: [agentType, taskPayload]
+            properties:
+              agentType:
+                type: string
+              taskPayload:
+                type: object
+        synthesisStrategy:
+          type: string
+          enum: [merge, vote, chain, first-success]
+          default: merge
+
+    ParallelAgentsResponse:
+      type: object
+      properties:
+        synthesizedResult: {}
+        individualResults:
+          type: array
+          items:
+            type: object
+        executionMetrics:
+          type: object
+
+    PermissionRequest:
+      type: object
+      required: [resourceType, justification]
+      properties:
+        resourceType:
+          type: string
+          enum: [DATABASE, PAYMENTS, EMAIL, FILE_EXPORT]
+        justification:
+          type: string
+          description: Specific reason for access — must relate to the current task
+        scope:
+          type: string
+          description: Specific access scope (e.g. read:invoices)
+
+    PermissionResponse:
+      type: object
+      properties:
+        granted:
+          type: boolean
+        grantToken:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          nullable: true
+        restrictions:
+          type: array
+          items:
+            type: string
+
+    BlackboardWriteRequest:
+      type: object
+      required: [value]
+      properties:
+        value: {}
+        ttl:
+          type: number
+          description: Time-to-live in seconds (optional)
