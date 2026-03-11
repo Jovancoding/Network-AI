@@ -4,12 +4,12 @@
 
 | Version | Supported |
 |---------|-----------|
-| 4.3.x   | ✅ Yes — full support (current) |
+| 4.5.x   | ✅ Yes — full support (current) |
+| 4.4.x   | ✅ Security fixes only |
+| 4.3.x   | ✅ Security fixes only |
 | 4.2.x   | ✅ Security fixes only |
-| 4.1.x   | ✅ Security fixes only |
-| 4.0.x   | ✅ Security fixes only |
-| 3.5.x – 3.9.x | ⚠️ Security fixes only |
-| < 3.5   | ❌ No support |
+| 4.0.x – 4.1.x | ⚠️ Security fixes only |
+| < 4.0   | ❌ No support |
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
