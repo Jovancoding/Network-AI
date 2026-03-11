@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.3] - 2026-03-11
+
+### Changed
+- GitHub username updated from `jovanSAPFIONEER` to `Jovancoding` across all repository URLs, links, and references (19 files)
+
+### Fixed
+- UTF-8 BOM removed from JSON files (`package.json`, `skill.json`, `glama.json`) that caused CI parse failures on Linux
+
 ## [4.5.2] - 2026-03-11
 
 ### Fixed
