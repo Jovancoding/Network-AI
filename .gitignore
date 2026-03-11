@@ -38,3 +38,6 @@ swarm-blackboard.md
 err.txt
 examples/output/*.ts
 examples/output/*.md
+
+# Local working notes (not for the repo)
+RELEASING.md
