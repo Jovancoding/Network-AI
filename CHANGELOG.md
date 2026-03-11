@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.1] - 2026-03-11
+
+### Fixed
+- Release badge in README updated from v4.3.7 to v4.5.1
+- Security policy supported versions table updated: 4.5.x marked as current, 4.4.x added, pre-4.0 dropped
+- README intro bullets and "Why teams use" table now include Layer 3 / `ProjectContextManager`
+- Architecture diagram in README committed (was updated locally but not pushed in v4.5.0)
+
 ## [4.5.0] - 2026-03-11
 
 ### Added
