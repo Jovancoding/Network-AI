@@ -35,7 +35,7 @@ metadata:
 
 ## Setup
 
-**No pip install required.** All 5 scripts use Python standard library only — zero third-party packages.
+**No pip install required.** All 6 scripts use Python standard library only — zero third-party packages.
 
 ```bash
 # Prerequisite: python3 (any version ≥ 3.8)

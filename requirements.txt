@@ -1,10 +1,10 @@
 # Python dependencies for Swarm Orchestrator Skill
 #
 # ZERO required third-party packages.
-# All 5 scripts (blackboard.py, swarm_guard.py, check_permission.py,
-# validate_token.py, revoke_token.py) use Python standard library only:
+# All 6 scripts (blackboard.py, swarm_guard.py, check_permission.py,
+# validate_token.py, revoke_token.py, context_manager.py) use Python standard library only:
 #   argparse, json, os, re, sys, time, hashlib, uuid, datetime, pathlib,
-#   typing, contextlib, fcntl (Unix built-in, with file-lock fallback on Windows)
+#   typing, contextlib, cast, fcntl (Unix built-in, with file-lock fallback on Windows)
 #
 # No pip install is needed to run this skill.
 #
