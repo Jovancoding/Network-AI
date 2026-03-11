@@ -1,4 +1,4 @@
-                                    # Changelog
+﻿                                    # Changelog
 
 All notable changes to Network-AI will be documented in this file.
 
@@ -751,7 +751,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **skill.json metadata** -- Version was frozen at `3.0.0` instead of tracking the release version; caused ClawHub scanner to flag "source unknown" because no `homepage` field existed
-- **Added `homepage` and `repository` fields to skill.json** -- Points to `https://github.com/jovanSAPFIONEER/Network-AI`; resolves "source unknown" warning in ClawHub security scan
+- **Added `homepage` and `repository` fields to skill.json** -- Points to `https://github.com/Jovancoding/Network-AI`; resolves "source unknown" warning in ClawHub security scan
 - **Updated skill.json description and tags** -- Reflects current 12-framework support, governance layer, and behavioral control plane vocabulary
 - **Excluded `scripts/__pycache__/` from npm package** -- Added `**/__pycache__/` and `**/*.pyc` to `.npmignore`; removes 14.3kB Python bytecode from published tarball (101 → 100 files)
 

@@ -1,4 +1,4 @@
-# Code of Conduct
+﻿# Code of Conduct
 
 ## Our Standards
 
@@ -24,7 +24,7 @@ This Code of Conduct applies to all project spaces: issues, pull requests, discu
 
 Violations may result in comments being removed, issues being locked, or users being blocked from the repository.
 
-Report issues to the maintainer via [GitHub Issues](https://github.com/jovanSAPFIONEER/Network-AI/issues) or email.
+Report issues to the maintainer via [GitHub Issues](https://github.com/Jovancoding/Network-AI/issues) or email.
 
 ## Attribution
 

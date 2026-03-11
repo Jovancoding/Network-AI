@@ -1,4 +1,4 @@
-# Contributing to Network-AI
+﻿# Contributing to Network-AI
 
 Network-AI is a solo-maintained project with high quality standards. Contributions are welcome but must meet strict requirements.
 
@@ -75,7 +75,7 @@ Unsolicited PRs without a linked, approved issue will be closed.
 ## Development Setup
 
 ```bash
-git clone https://github.com/jovanSAPFIONEER/Network-AI.git
+git clone https://github.com/Jovancoding/Network-AI.git
 cd Network-AI
 npm install
 npm run test:all  # Run all 462 tests (5 suites)

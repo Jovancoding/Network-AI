@@ -1,4 +1,4 @@
-# Security Policy
+﻿# Security Policy
 
 ## Supported Versions
 
@@ -15,7 +15,7 @@
 
 Instead, please report security issues privately:
 
-1. Go to the [Security Advisories](https://github.com/jovanSAPFIONEER/Network-AI/security/advisories) page
+1. Go to the [Security Advisories](https://github.com/Jovancoding/Network-AI/security/advisories) page
 2. Click **"Report a vulnerability"**
 3. Provide a clear description, reproduction steps, and impact assessment
 

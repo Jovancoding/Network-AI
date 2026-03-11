@@ -1,9 +1,9 @@
----
+﻿---
 name: Feature Request
 about: Suggest a feature for Network-AI
 title: "[FEATURE] "
 labels: enhancement
-assignees: jovanSAPFIONEER
+assignees: Jovancoding
 ---
 
 ## Problem Statement

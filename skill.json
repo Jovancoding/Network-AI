@@ -1,10 +1,10 @@
-{
+﻿{
   "name": "SwarmOrchestrator",
   "version": "4.5.2",
   "description": "Python orchestration skill: local multi-agent workflows via blackboard file, permission gating, and token budget scripts. All execution is local — no network calls, no Node.js required. NOTE: The README describes the full project including the companion Node.js/TypeScript npm package (network-ai on npm). Features documented there — HMAC-signed tokens, AES-256 encryption, networked MCP server, 14 adapters, full CLI — are NOT implemented in these Python scripts and are NOT part of this ClawHub skill bundle. Install 'npm install -g network-ai' separately for those features.",
   "author": "Network-AI Community",
-  "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",
-  "repository": "https://github.com/jovanSAPFIONEER/Network-AI",  "source": "https://github.com/jovanSAPFIONEER/Network-AI",  "license": "MIT",
+  "homepage": "https://github.com/Jovancoding/Network-AI",
+  "repository": "https://github.com/Jovancoding/Network-AI",  "source": "https://github.com/Jovancoding/Network-AI",  "license": "MIT",
   "tags": ["multi-agent", "A2A", "swarm", "orchestration", "plug-and-play", "adapter", "langchain", "autogen", "crewai", "mcp", "openclaw", "governance", "behavioral-control-plane", "audit", "permissions", "security"],
   "runtime": "python",
   "entrypoint": "scripts/swarm_guard.py",
@@ -22,7 +22,7 @@
       "description": "Separate optional component — NOT part of this skill bundle. For MCP/IDE integration only.",
       "package": "network-ai",
       "registry": "https://registry.npmjs.org",
-      "source": "https://github.com/jovanSAPFIONEER/Network-AI",
+      "source": "https://github.com/Jovancoding/Network-AI",
       "install_command": "npm install -g network-ai",
       "run_command": "npx network-ai-server --port 3001",
       "note": "This npm package contains the Node.js TypeScript server. It is NOT fetched automatically by this skill. Users who want MCP integration must install it manually."

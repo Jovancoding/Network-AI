@@ -1,4 +1,4 @@
-# Show HN: Network-AI — Multi-Agent Race Condition Prevention for TypeScript
+﻿# Show HN: Network-AI — Multi-Agent Race Condition Prevention for TypeScript
 
 **Post title:**
 > Show HN: Network-AI – plug-and-play orchestrator that prevents race conditions when AI agents share state
@@ -40,7 +40,7 @@ This is a split-brain problem, and it happens any time two LLM agents hit a shar
 **You can see the whole thing in 2 seconds with no API key:**
 
 ```bash
-git clone https://github.com/jovanSAPFIONEER/Network-AI
+git clone https://github.com/Jovancoding/Network-AI
 cd Network-AI
 npm install
 npm run demo -- --08
@@ -62,7 +62,7 @@ npm run demo -- --07
 
 **Stack:** TypeScript, Node.js 18+. Zero required external services. Works on-prem, air-gapped, or cloud.
 
-**Repo:** https://github.com/jovanSAPFIONEER/Network-AI  
+**Repo:** https://github.com/Jovancoding/Network-AI  
 **npm:** `npm install network-ai`  
 **MCP server:** `npx network-ai-server --port 3001`
 

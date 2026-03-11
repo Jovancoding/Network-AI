@@ -1,9 +1,9 @@
----
+﻿---
 name: Bug Report
 about: Report a bug in Network-AI
 title: "[BUG] "
 labels: bug
-assignees: jovanSAPFIONEER
+assignees: Jovancoding
 ---
 
 ## Describe the Bug

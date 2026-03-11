@@ -1,10 +1,10 @@
-# Network-AI
+﻿# Network-AI
 
 **TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination**
 
-[![CI](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.5.2-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/badge/release-v4.5.2-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![Tests](https://img.shields.io/badge/tests-1399%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-14%20supported-blueviolet.svg)](#adapter-system)
@@ -14,7 +14,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Integration Guide](https://img.shields.io/badge/docs-integration%20guide-informational.svg)](INTEGRATION_GUIDE.md)
-[![Glama](https://img.shields.io/badge/Glama-listed-8A2BE2.svg)](https://glama.ai/mcp/servers/@jovanSAPFIONEER/network-ai)
+[![Glama](https://img.shields.io/badge/Glama-listed-8A2BE2.svg)](https://glama.ai/mcp/servers/@Jovancoding/network-ai)
 
 Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordination, guardrails, and governance to any AI agent stack.
 
@@ -397,11 +397,11 @@ Copy the contents of `claude-project-prompt.md` (below the horizontal rule) into
 ## Contributing
 
 1. Fork → feature branch → `npm run test:all` → pull request
-2. Bugs and feature requests via [Issues](https://github.com/jovanSAPFIONEER/Network-AI/issues)
+2. Bugs and feature requests via [Issues](https://github.com/Jovancoding/Network-AI/issues)
 
 ---
 
-MIT License — [LICENSE](LICENSE) &nbsp;·&nbsp; [CHANGELOG](CHANGELOG.md) &nbsp;·&nbsp; [CONTRIBUTING](CONTRIBUTING.md) &nbsp;·&nbsp; [![RSS](https://img.shields.io/badge/RSS-releases-orange?logo=rss)](https://github.com/jovanSAPFIONEER/Network-AI/releases.atom)
+MIT License — [LICENSE](LICENSE) &nbsp;·&nbsp; [CHANGELOG](CHANGELOG.md) &nbsp;·&nbsp; [CONTRIBUTING](CONTRIBUTING.md) &nbsp;·&nbsp; [![RSS](https://img.shields.io/badge/RSS-releases-orange?logo=rss)](https://github.com/Jovancoding/Network-AI/releases.atom)
 
 <details>
 <summary>Keywords</summary>

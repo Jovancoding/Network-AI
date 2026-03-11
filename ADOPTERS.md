@@ -1,4 +1,4 @@
-# Network-AI Adopters
+﻿# Network-AI Adopters
 
 This file lists organizations and individuals using Network-AI in production or active evaluation.
 
@@ -10,7 +10,7 @@ This file lists organizations and individuals using Network-AI in production or 
 
 | Organization | Use Case | Since | Public Reference |
 |---|---|---|---|
-| *(be the first — [open a PR](https://github.com/jovanSAPFIONEER/Network-AI/pulls))* | | | |
+| *(be the first — [open a PR](https://github.com/Jovancoding/Network-AI/pulls))* | | | |
 
 ---
 
@@ -18,7 +18,7 @@ This file lists organizations and individuals using Network-AI in production or 
 
 | Project | Use Case | Since | Link |
 |---|---|---|---|
-| *(be the first — [open a PR](https://github.com/jovanSAPFIONEER/Network-AI/pulls))* | | | |
+| *(be the first — [open a PR](https://github.com/Jovancoding/Network-AI/pulls))* | | | |
 
 ---
 

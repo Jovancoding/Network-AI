@@ -1,4 +1,4 @@
-# Network-AI Quick Start Guide
+﻿# Network-AI Quick Start Guide
 
 Get the Multi-Agent Swarm Orchestrator running in **under 5 minutes**.
 
@@ -8,7 +8,7 @@ Get the Multi-Agent Swarm Orchestrator running in **under 5 minutes**.
 
 ```bash
 # Clone the repo
-git clone https://github.com/jovanSAPFIONEER/Network-AI.git
+git clone https://github.com/Jovancoding/Network-AI.git
 cd Network-AI
 
 # Install dependencies (only TypeScript + ts-node needed)
@@ -347,7 +347,7 @@ Your App
 
 ---
 
-**Questions?** Open an issue at [github.com/jovanSAPFIONEER/Network-AI](https://github.com/jovanSAPFIONEER/Network-AI)
+**Questions?** Open an issue at [github.com/Jovancoding/Network-AI](https://github.com/Jovancoding/Network-AI)
 
 ---
 

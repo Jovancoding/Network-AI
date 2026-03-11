@@ -1,4 +1,4 @@
-# Awesome List PR Submissions
+﻿# Awesome List PR Submissions
 
 Ready-to-use PR titles, one-liners, and context for each list.
 Submit these as pull requests to the respective repositories.
@@ -13,7 +13,7 @@ Submit these as pull requests to the respective repositories.
 
 **One-liner to add to the list:**
 ```markdown
-- [network-ai](https://github.com/jovanSAPFIONEER/Network-AI) - Multi-agent orchestration MCP server. 20+ MCP tools: blackboard read/write, agent spawn/stop, FSM transitions, budget tracking, token management, audit log query. `npx network-ai-server --port 3001`. TypeScript/Node.js.
+- [network-ai](https://github.com/Jovancoding/Network-AI) - Multi-agent orchestration MCP server. 20+ MCP tools: blackboard read/write, agent spawn/stop, FSM transitions, budget tracking, token management, audit log query. `npx network-ai-server --port 3001`. TypeScript/Node.js.
 ```
 
 **Where to add it:** Under the orchestration or multi-agent section.
@@ -31,7 +31,7 @@ Submit these as pull requests to the respective repositories.
 
 **One-liner to add to the list:**
 ```markdown
-- [network-ai](https://github.com/jovanSAPFIONEER/Network-AI) - Plug-and-play multi-agent orchestration for TypeScript/Node.js. Connects 12 frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, MCP, and more) with atomic shared state, FSM governance, per-agent budget enforcement, and cryptographic audit trails. Solves race conditions and split-brain writes in concurrent agent systems.
+- [network-ai](https://github.com/Jovancoding/Network-AI) - Plug-and-play multi-agent orchestration for TypeScript/Node.js. Connects 12 frameworks (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, MCP, and more) with atomic shared state, FSM governance, per-agent budget enforcement, and cryptographic audit trails. Solves race conditions and split-brain writes in concurrent agent systems.
 ```
 
 **PR body:**
@@ -47,7 +47,7 @@ Submit these as pull requests to the respective repositories.
 
 **One-liner to add to the list:**
 ```markdown
-- [network-ai](https://github.com/jovanSAPFIONEER/Network-AI) - Multi-agent orchestration framework with a first-class LangChain adapter. Wraps LangChain Runnables, chains, and agents with atomic shared state, permission gating, budget enforcement, and FSM governance. Prevents race conditions when multiple LangChain agents write to shared resources concurrently.
+- [network-ai](https://github.com/Jovancoding/Network-AI) - Multi-agent orchestration framework with a first-class LangChain adapter. Wraps LangChain Runnables, chains, and agents with atomic shared state, permission gating, budget enforcement, and FSM governance. Prevents race conditions when multiple LangChain agents write to shared resources concurrently.
 ```
 
 **Where to add it:** Under Tools / Agent frameworks / Orchestration.
@@ -62,7 +62,7 @@ Submit these as pull requests to the respective repositories.
 
 **One-liner to add to the list:**
 ```markdown
-- [network-ai](https://github.com/jovanSAPFIONEER/Network-AI) - Orchestration framework with a LlamaIndex adapter supporting query engines, chat engines, and agent runners. Adds atomic shared state, FSM governance, and per-agent budget ceilings to LlamaIndex-based pipelines.
+- [network-ai](https://github.com/Jovancoding/Network-AI) - Orchestration framework with a LlamaIndex adapter supporting query engines, chat engines, and agent runners. Adds atomic shared state, FSM governance, and per-agent budget ceilings to LlamaIndex-based pipelines.
 ```
 
 ---
@@ -75,7 +75,7 @@ Submit these as pull requests to the respective repositories.
 
 **One-liner:**
 ```markdown
-- [network-ai](https://github.com/jovanSAPFIONEER/Network-AI) - MCP server (`network-ai-server`) and transport (`McpSseTransport`) for multi-agent orchestration. Exposes blackboard, FSM, budget, token, and audit tools over SSE/JSON-RPC 2.0. Also includes an MCP adapter so MCP tool handlers can be registered as governed agents.
+- [network-ai](https://github.com/Jovancoding/Network-AI) - MCP server (`network-ai-server`) and transport (`McpSseTransport`) for multi-agent orchestration. Exposes blackboard, FSM, budget, token, and audit tools over SSE/JSON-RPC 2.0. Also includes an MCP adapter so MCP tool handlers can be registered as governed agents.
 ```
 
 ---

@@ -1,14 +1,14 @@
----
+﻿---
 name: Security Vulnerability
 about: Report a security issue (use Security Advisories for private reports)
 title: "[SECURITY] "
 labels: security
-assignees: jovanSAPFIONEER
+assignees: Jovancoding
 ---
 
 **STOP -- Is this a sensitive security vulnerability?**
 
-If yes, do NOT open this issue. Instead, report privately via [Security Advisories](https://github.com/jovanSAPFIONEER/Network-AI/security/advisories).
+If yes, do NOT open this issue. Instead, report privately via [Security Advisories](https://github.com/Jovancoding/Network-AI/security/advisories).
 
 ---
 
