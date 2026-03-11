@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/jovanSAPFIONEER/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.3.7-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.5.0-blue.svg)](https://github.com/jovanSAPFIONEER/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![Tests](https://img.shields.io/badge/tests-1399%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-14%20supported-blueviolet.svg)](#adapter-system)
@@ -21,6 +21,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 - **Shared blackboard with locking** — atomic `propose → validate → commit` prevents race conditions and split-brain failures across parallel agents
 - **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC audit trails, and permission gating
 - **14 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, and Codex — no glue code, no lock-in
+- **Persistent project memory (Layer 3)** — `context_manager.py` injects decisions, goals, stack, milestones, and banned patterns into every system prompt so agents always have full project context
 
 > **The silent failure mode in multi-agent systems:** parallel agents writing to the same key
 > use last-write-wins by default — one agent's result silently overwrites another's mid-flight.
@@ -56,6 +57,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 | No visibility into what agents did | HMAC-signed audit log on every write, permission grant, and FSM transition |
 | Locked into one AI framework | 14 adapters — mix LangChain + AutoGen + CrewAI + Codex + custom in one swarm |
 | Agents escalating beyond their scope | `AuthGuardian` — scoped permission tokens required before sensitive operations |
+| Agents lack project context between runs | `ProjectContextManager` (Layer 3) — inject decisions, goals, stack, and milestones into every system prompt |
 
 ---
 
@@ -71,9 +73,13 @@ flowchart TD
     classDef blackboard fill:#0c4a6e,stroke:#0284c7,color:#bae6fd
     classDef adapters   fill:#064e3b,stroke:#059669,color:#a7f3d0
     classDef audit      fill:#1e293b,stroke:#475569,color:#94a3b8
+    classDef context    fill:#3b1f00,stroke:#b45309,color:#fef3c7
 
     App["Your Application"]:::app
     App -->|"createSwarmOrchestrator()"| SO
+
+    PC["ProjectContextManager\n(Layer 3 — persistent memory)\ngoals · stack · decisions\nmilestones · banned"]:::context
+    PC -->|"injected into system prompt"| SO
 
     subgraph SO["SwarmOrchestrator"]
         AG["AuthGuardian\n(permission gating)"]:::security
