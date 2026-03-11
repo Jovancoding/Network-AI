@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.2] - 2026-03-11
+
+### Fixed
+- `SKILL.md` and `requirements.txt` script count corrected from 5 → 6: `context_manager.py` (added in v4.5.0) was not reflected in the "All 5 scripts" claim, causing ClawHub Security to flag the skill as suspicious due to the documentation/packaging inconsistency
+- `requirements.txt` import list updated to include `cast` (used in `context_manager.py`)
+
+## [4.5.2] - 2026-03-11
+
+### Fixed
+- `SKILL.md` and `requirements.txt` script count corrected 5 → 6: `context_manager.py` (added in v4.5.0) was missing from the "All 5 scripts" claim, causing ClawHub Security to flag the skill as a documentation/packaging inconsistency
+- `requirements.txt` import list updated to include `cast` (used by `context_manager.py`)
+
 ## [4.5.1] - 2026-03-11
 
 ### Fixed
