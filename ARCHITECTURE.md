@@ -43,9 +43,13 @@ flowchart TD
     classDef blackboard fill:#0c4a6e,stroke:#0284c7,color:#bae6fd
     classDef adapters   fill:#064e3b,stroke:#059669,color:#a7f3d0
     classDef audit      fill:#1e293b,stroke:#475569,color:#94a3b8
+    classDef context    fill:#3b1f00,stroke:#b45309,color:#fef3c7
 
     App["Your Application"]:::app
     App -->|"createSwarmOrchestrator()"| SO
+
+    PC["ProjectContextManager\n(Layer 3 — persistent memory)\ngoals · stack · decisions\nmilestones · banned"]:::context
+    PC -->|"injected into system prompt"| SO
 
     subgraph SO["SwarmOrchestrator"]
         AG["AuthGuardian\n(permission gating)"]:::security
@@ -198,6 +202,37 @@ Two-layer validation before blackboard writes:
 
 ---
 
+## The 3-Layer Memory Model
+
+Every agent in a Network-AI swarm operates with three memory layers:
+
+| Layer | Name | Lifetime | Managed by |
+|-------|------|----------|------------|
+| **1** | Agent context | Ephemeral — current session only | Platform / LLM host |
+| **2** | Blackboard | TTL-scoped — shared across agents | `LockedBlackboard` / `scripts/blackboard.py` |
+| **3** | Project context | Persistent — survives all sessions | `scripts/context_manager.py` |
+
+### Layer 2 — LockedBlackboard
+Shared markdown file for real-time task coordination: results, grant tokens, status flags, TTL-scoped cache. Atomic `propose → validate → commit` cycle prevents race conditions.
+
+### Layer 3 — ProjectContextManager
+A JSON file (`data/project-context.json`) that holds information every agent should know regardless of which session or task is running: goals, tech stack, architecture decisions, milestones, and banned approaches.
+
+```bash
+# Inject context into an agent system prompt
+python scripts/context_manager.py inject
+
+# Record a decision
+python scripts/context_manager.py update \
+  --section decisions \
+  --add '{"decision": "Atomic blackboard commits", "rationale": "Prevent race conditions"}'
+
+# Mark milestone complete
+python scripts/context_manager.py update --section milestones --complete "Ship v1.0"
+```
+
+---
+
 ## Agent Trust Levels
 
 | Agent | Trust | Role |
@@ -254,7 +289,8 @@ Network-AI/
 │   ├── swarm_guard.py            # Handoff tax prevention, budget tracking
 │   ├── check_permission.py       # AuthGuardian permission checker + active grants
 │   ├── validate_token.py         # Token validation
-│   └── revoke_token.py           # Token revocation + TTL cleanup
+│   ├── revoke_token.py           # Token revocation + TTL cleanup
+│   └── context_manager.py        # Layer-3 persistent project context
 ├── types/
 │   ├── agent-adapter.d.ts        # Universal adapter interfaces
 │   └── openclaw-core.d.ts        # OpenClaw type stubs

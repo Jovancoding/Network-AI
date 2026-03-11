@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.4.3",
+  "version": "4.5.0",
   "description": "Python orchestration skill: local multi-agent workflows via blackboard file, permission gating, and token budget scripts. All execution is local — no network calls, no Node.js required. NOTE: The README describes the full project including the companion Node.js/TypeScript npm package (network-ai on npm). Features documented there — HMAC-signed tokens, AES-256 encryption, networked MCP server, 14 adapters, full CLI — are NOT implemented in these Python scripts and are NOT part of this ClawHub skill bundle. Install 'npm install -g network-ai' separately for those features.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/jovanSAPFIONEER/Network-AI",
@@ -15,7 +15,7 @@
       "requirements": "requirements.txt",
       "requirements_note": "requirements.txt contains ZERO required packages — all scripts use Python stdlib only. No pip install needed.",
       "install_command": "# No install needed. Optionally: pip install -r requirements.txt (installs nothing required)",
-      "scripts": ["scripts/blackboard.py", "scripts/swarm_guard.py", "scripts/check_permission.py", "scripts/validate_token.py", "scripts/revoke_token.py"],
+      "scripts": ["scripts/blackboard.py", "scripts/swarm_guard.py", "scripts/check_permission.py", "scripts/validate_token.py", "scripts/revoke_token.py", "scripts/context_manager.py"],
       "note": "All scripts run locally only. No external network calls. No third-party dependencies."
     },
     "optional_node_server": {
@@ -183,6 +183,47 @@
         "properties": {
           "success": { "type": "boolean" },
           "previousValue": { "type": "any" }
+        }
+      }
+    },
+    "inject_context": {
+      "description": "Read the persistent project context file and return a formatted markdown block for injection into an agent system prompt. This is Layer 3 (long-lived) memory — architecture decisions, goals, tech stack, milestones, and banned approaches that every agent in the swarm should know.",
+      "parameters": {},
+      "returns": {
+        "type": "object",
+        "properties": {
+          "contextMarkdown": { "type": "string", "description": "Formatted markdown block ready to prepend to an agent system prompt" },
+          "updatedAt": { "type": "string", "description": "ISO timestamp of last context update" }
+        }
+      }
+    },
+    "update_context": {
+      "description": "Persist a decision, milestone update, stack entry, goal, or banned approach to the project context file (Layer 3 memory). Changes are appended and survive across sessions.",
+      "parameters": {
+        "section": {
+          "type": "string",
+          "required": true,
+          "enum": ["decisions", "milestones", "stack", "goals", "banned", "project"],
+          "description": "The context section to update"
+        },
+        "add": {
+          "type": "any",
+          "description": "Item to append (JSON object or plain string, depending on section)"
+        },
+        "set": {
+          "type": "object",
+          "description": "Key-value pairs to merge into the section (use for stack and project)"
+        },
+        "complete": {
+          "type": "string",
+          "description": "Milestone name to mark completed (milestones section only)"
+        }
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "section": { "type": "string" }
         }
       }
     }

@@ -56,6 +56,14 @@ Every log entry uses the same outer structure:
 | `handoff_allowed` | `swarm_guard.py` | Agent-to-agent handoff passes all checks |
 | `handoff_blocked` | `swarm_guard.py` | Agent-to-agent handoff blocked by guard |
 | `safety_shutdown` | `swarm_guard.py` | Swarm halted due to budget ceiling breach |
+| `init` | `context_manager.py` | Project context file created |
+| `update_decisions` | `context_manager.py` | Architecture decision recorded |
+| `milestone_complete` | `context_manager.py` | Milestone marked as completed |
+| `milestone_add` | `context_manager.py` | Milestone added to a bucket |
+| `update_stack` | `context_manager.py` | Tech stack entry updated |
+| `update_goals` | `context_manager.py` | Project goal added |
+| `update_banned` | `context_manager.py` | Banned approach recorded |
+| `update_project` | `context_manager.py` | Project metadata updated |
 
 ---
 

@@ -445,6 +445,67 @@ python scripts/revoke_token.py --cleanup
 python scripts/validate_token.py --token "grant_85364b44..."
 ```
 
+### Project Context (Layer 3 — Persistent Memory)
+
+Long-lived project state that every agent inherits, regardless of session:
+
+```bash
+# Initialise once
+python scripts/context_manager.py init \
+  --name "MyProject" \
+  --description "Multi-agent workflow" \
+  --version "1.0.0"
+
+# Print formatted block to inject into agent system prompts
+python scripts/context_manager.py inject
+
+# Record an architecture decision
+python scripts/context_manager.py update \
+  --section decisions \
+  --add '{"decision": "Use atomic blackboard commits", "rationale": "Prevent race conditions"}'
+
+# Update milestones
+python scripts/context_manager.py update --section milestones --complete "Ship v1.0"
+python scripts/context_manager.py update --section milestones --add '{"planned": "Vector memory integration"}'
+
+# Set tech stack
+python scripts/context_manager.py update --section stack --set '{"language": "TypeScript", "runtime": "Node.js 18"}'
+
+# Add a goal or ban an approach
+python scripts/context_manager.py update --section goals --add "Ship v2.0 before Q3"
+python scripts/context_manager.py update --section banned --add "Direct DB writes from agents"
+
+# Print full context as JSON
+python scripts/context_manager.py show
+```
+
+Context is stored in `data/project-context.json`. The `inject` command outputs a markdown block ready to prepend to any agent's system prompt.
+
+---
+
+## Use with Claude, ChatGPT & Codex
+
+Three integration files are included in the repo root:
+
+| File | Use |
+|---|---|
+| [`claude-tools.json`](claude-tools.json) | Claude API tool use & OpenAI Codex — drop into the `tools` array |
+| [`openapi.yaml`](openapi.yaml) | Custom GPT Actions — import directly in the GPT editor |
+| [`claude-project-prompt.md`](claude-project-prompt.md) | Claude Projects — paste into Custom Instructions |
+
+**Claude API / Codex:**
+```js
+import tools from './claude-tools.json' assert { type: 'json' };
+// Pass tools array to anthropic.messages.create({ tools }) or OpenAI chat completions
+```
+
+**Custom GPT Actions:**
+In the GPT editor → Actions → Import from URL, or paste `openapi.yaml` directly.
+Set the server URL to your running `npx network-ai-server --port 3001` instance.
+
+**Claude Projects:**
+Copy the contents of `claude-project-prompt.md` into a Claude Project's Custom Instructions field. No server required for instruction-only mode.
+
 ---
 
 ## Fan-Out / Fan-In Pattern

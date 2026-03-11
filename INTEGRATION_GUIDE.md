@@ -115,6 +115,7 @@ Match your problem to the Network-AI primitive:
 | Race conditions in parallel agent writes | `LockedBlackboard` with `priority-wins` | Higher-priority agents preempt lower-priority writes on conflict |
 | Need to expose all tools to an AI via MCP | `McpSseServer` + `network-ai-server` | HTTP/SSE server at `GET /sse`, `POST /mcp`, `GET /tools` |
 | Runtime AI control of the orchestrator | `ControlMcpTools` | AI can read/set config, spawn/stop agents, drive FSM transitions |
+| Agents lose project context between sessions | `ProjectContextManager` (`context_manager.py`) | Persistent Layer-3 JSON file injected into every agent's system prompt |
 
 ---
 

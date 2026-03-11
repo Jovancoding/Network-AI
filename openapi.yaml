@@ -6,7 +6,7 @@ info:
     blackboard coordination, parallel agent spawning, and permission gating
     via AuthGuardian. Requires the companion MCP server:
     `npm install -g network-ai && npx network-ai-server --port 3001`
-  version: 4.3.7
+  version: 4.5.0
   license:
     name: MIT
     url: https://github.com/jovanSAPFIONEER/Network-AI/blob/main/LICENSE
@@ -115,8 +115,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/PermissionResponse'
 
-  /blackboard/{key}:
+  /context/inject:
     get:
+      operationId: injectContext
+      summary: Get project context for agent injection
+      description: >
+        Returns the persistent project context (Layer 3 memory) as a formatted
+        markdown block. Prepend this to any agent's system prompt so all agents
+        share the same long-term project awareness: goals, tech stack,
+        architecture decisions, milestones, and banned approaches.
+      responses:
+        '200':
+          description: Formatted project context block
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contextMarkdown:
+                    type: string
+                    description: Markdown block ready to inject into system prompt
+                  updatedAt:
+                    type: string
+                    description: ISO timestamp of last context update
+
+  /context/update:
+    post:
+      operationId: updateContext
+      summary: Update persistent project context
+      description: >
+        Persist a decision, milestone, stack entry, goal, or banned approach
+        to the project context file (Layer 3 memory). Changes survive across
+        all agent sessions — every future agent that calls injectContext will
+        see them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateContextRequest'
+      responses:
+        '200':
+          description: Context section updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  section:
+                    type: string
+
+  /blackboard/{key}:
       operationId: readBlackboard
       summary: Read a blackboard entry
       parameters:
@@ -292,3 +343,20 @@ components:
         ttl:
           type: number
           description: Time-to-live in seconds (optional)
+
+    UpdateContextRequest:
+      type: object
+      required: [section]
+      properties:
+        section:
+          type: string
+          enum: [decisions, milestones, stack, goals, banned, project]
+          description: The context section to update
+        add:
+          description: Item to append (JSON object or plain string depending on section)
+        set:
+          type: object
+          description: Key-value pairs to merge (used for stack and project sections)
+        complete:
+          type: string
+          description: Milestone name to mark completed (milestones section only)

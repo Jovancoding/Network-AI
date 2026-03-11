@@ -42,12 +42,14 @@ Your agents
 │  JourneyFSM        ──── FSM state governance        │
 │  ComplianceMonitor ──── real-time violation policy  │
 │  BlackboardValidator─── content quality gate        │
+│  ProjectContextManager─ Layer-3 persistent memory   │
 └─────────────────────────────────────────────────────┘
     │
     ▼
 data/ (local filesystem — you own it)
   ├── audit_log.jsonl
   ├── active_grants.json
+  ├── project-context.json
   └── blackboard state files
 ```
 
@@ -96,7 +98,7 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 
 ### Stability Signals
 
-- 1,216 passing assertions across 13 suites
+- 1,399 passing assertions across 17 suites
 - Deterministic scoring — no random outcomes in permission evaluation or budget enforcement
 - CI runs on every push and every PR
 - All examples ship with the repo and run without mocking
@@ -112,6 +114,10 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 | Add budget enforcement | `FederatedBudget` in [QUICKSTART.md](QUICKSTART.md) |
 | Add FSM workflow governance | `JourneyFSM` in [ARCHITECTURE.md](ARCHITECTURE.md) |
 | MCP server (model context protocol) | `npx network-ai-mcp` — see [QUICKSTART.md](QUICKSTART.md) |
+| Inject long-term project context into agents | `context_manager.py inject` — see [QUICKSTART.md § Project Context](QUICKSTART.md) |
+| Use with Claude API / Codex (tool-use schema) | [`claude-tools.json`](claude-tools.json) — drop into `tools` array |
+| Use as a Custom GPT Action | [`openapi.yaml`](openapi.yaml) — import in GPT editor |
+| Use as a Claude Project | [`claude-project-prompt.md`](claude-project-prompt.md) — paste into Custom Instructions |
 | Inspect / manage state from terminal | `network-ai bb` CLI — see [QUICKSTART.md § CLI](QUICKSTART.md) |
 | Full working example (no API key) | `npx ts-node examples/08-control-plane-stress-demo.ts` |
 | Full working example (with API key) | `npx ts-node examples/07-full-showcase.ts` |

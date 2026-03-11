@@ -5,6 +5,24 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.0] - 2026-03-11
+
+### Added
+- **Project Context Layer (Layer 3 memory)** — New `scripts/context_manager.py` implements the third and final memory layer in the swarm architecture: persistent project context that survives across all sessions. Stores goals, tech stack, architecture decisions, milestones, and banned approaches in `data/project-context.json`. Formatted output (`inject` command) is ready to prepend to any agent system prompt so every agent in the swarm shares the same long-term project awareness.
+  - Commands: `init`, `show`, `inject`, `update --section {decisions|milestones|stack|goals|banned|project}`
+  - Appends to `data/audit_log.jsonl` for full traceability
+  - Zero third-party dependencies — stdlib only (`argparse`, `json`, `sys`, `datetime`, `pathlib`, `typing`)
+- **`data/project-context.json`** — Template context file included in repo; agents can initialise it with `context_manager.py init`
+- **`inject_context` capability** in `skill.json`, `claude-tools.json`, and `openapi.yaml` — returns formatted Layer 3 context block for system-prompt injection
+- **`update_context` capability** in `skill.json`, `claude-tools.json`, and `openapi.yaml` — persists decisions/milestones/stack/goals/banned to Layer 3 context
+- **`## The 3-Layer Memory Model`** section in `SKILL.md` — documents all three layers with full CLI examples for `context_manager.py`
+- `/context/inject` and `/context/update` endpoints in `openapi.yaml`
+
+### Changed
+- `skill.json` version → `4.5.0`; `context_manager.py` added to `install.python.scripts` list
+- `openapi.yaml` version → `4.5.0`
+- No changes to existing logic — 1,399 passing assertions across 17 suites
+
 ## [4.4.3] - 2026-03-10
 
 ### Security

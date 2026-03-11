@@ -165,6 +165,85 @@ python {baseDir}/scripts/blackboard.py write "task:001:final" \
 
 ---
 
+## The 3-Layer Memory Model
+
+Every agent in the swarm operates with three memory layers, each with a different scope and lifetime:
+
+| Layer | Name | Lifetime | Managed by |
+|-------|------|----------|------------|
+| **1** | Agent context | Ephemeral — current task only | Platform (per-session) |
+| **2** | Blackboard | TTL-scoped — shared across agents | `scripts/blackboard.py` |
+| **3** | Project context | Persistent — survives all sessions | `scripts/context_manager.py` |
+
+### Layer 1 — Agent Context
+Each agent's own context window: the current task instructions, conversation history, and immediate working memory. Managed automatically by the OpenClaw/LLM platform. Nothing to configure.
+
+### Layer 2 — Blackboard (Shared Coordination State)
+A shared markdown file (`swarm-blackboard.md`) for real-time cross-agent coordination: task results, grant tokens, status flags, and TTL-scoped cache entries. Agents read and write via `scripts/blackboard.py`. Entries expire automatically.
+
+### Layer 3 — Project Context (Persistent Long-Term Memory)
+A JSON file (`data/project-context.json`) that holds information every agent should know, regardless of what session or task is running:
+- **Goals** — long-term objectives of the project
+- **Tech stack** — languages, frameworks, infrastructure
+- **Milestones** — completed, in-progress, and planned work
+- **Architecture decisions** — design choices and their rationales
+- **Banned approaches** — approaches that have been ruled out
+
+#### Initialising Project Context
+
+```bash
+python {baseDir}/scripts/context_manager.py init \
+  --name "MyProject" \
+  --description "Multi-agent workflow automation" \
+  --version "1.0.0"
+```
+
+#### Injecting Context into an Agent System Prompt
+
+```bash
+python {baseDir}/scripts/context_manager.py inject
+```
+
+Copy the output block to the top of your agent's system prompt. Every agent that receives this block shares the same long-term project awareness.
+
+#### Recording a Decision
+
+```bash
+python {baseDir}/scripts/context_manager.py update \
+  --section decisions \
+  --add '{"decision": "Use atomic blackboard commits", "rationale": "Prevent race conditions in parallel agents"}'
+```
+
+#### Updating Milestones
+
+```bash
+# Mark a milestone complete
+python {baseDir}/scripts/context_manager.py update \
+  --section milestones --complete "Ship v2.0"
+
+# Add a planned milestone
+python {baseDir}/scripts/context_manager.py update \
+  --section milestones --add '{"planned": "Integrate vector memory"}'
+```
+
+#### Setting the Tech Stack
+
+```bash
+python {baseDir}/scripts/context_manager.py update \
+  --section stack \
+  --set '{"language": "TypeScript", "runtime": "Node.js 18", "framework": "Network-AI v4.5"}'
+```
+
+#### Banning an Approach
+
+```bash
+python {baseDir}/scripts/context_manager.py update \
+  --section banned \
+  --add "Direct database writes from agent scripts (use permission gating)"
+```
+
+---
+
 ## When to Use This Skill
 
 - **Task Delegation**: Route work to specialized agents (data_analyst, strategy_advisor, risk_assessor)

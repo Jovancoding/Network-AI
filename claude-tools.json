@@ -123,5 +123,39 @@
       },
       "required": ["key", "value"]
     }
+  },
+  {
+    "name": "inject_context",
+    "description": "Read the persistent project context (Layer 3 memory) and return a formatted markdown block for injection into an agent system prompt. Contains goals, tech stack, architecture decisions, milestones, and banned approaches that persist across all sessions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "update_context",
+    "description": "Persist a decision, milestone, stack entry, goal, or banned approach to the project context file (Layer 3 memory). Use this to record information that every agent in every future session should know.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "section": {
+          "type": "string",
+          "enum": ["decisions", "milestones", "stack", "goals", "banned", "project"],
+          "description": "The context section to update"
+        },
+        "add": {
+          "description": "Item to append — JSON object for decisions/milestones, plain string for goals/banned"
+        },
+        "set": {
+          "type": "object",
+          "description": "Key-value pairs to merge (use for stack and project sections)"
+        },
+        "complete": {
+          "type": "string",
+          "description": "Milestone name to mark as completed (milestones section only)"
+        }
+      },
+      "required": ["section"]
+    }
   }
 ]
