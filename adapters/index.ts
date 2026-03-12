@@ -98,6 +98,10 @@ export type {
   CodexCLIExecutor,
 } from './codex-adapter';
 
+// MiniMax adapter (MiniMax LLM API — MiniMax-M2.5 / MiniMax-M2.5-highspeed)
+export { MiniMaxAdapter } from './minimax-adapter';
+export type { MiniMaxAgentConfig, MiniMaxChatClient } from './minimax-adapter';
+
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from '../types/streaming-adapter';
 
