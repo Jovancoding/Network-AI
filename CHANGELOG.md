@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.1] - 2026-03-12
+
+### Fixed
+- **ClawHub security flag resolved** — Clarified `requirements.txt` is documentation only (zero required deps); added explicit note in SKILL.md Setup section
+- **Socket.dev supply chain risk resolved** — Added `socket.json` exceptions for Codex and MiniMax adapters' intentional network access (`fetch()` to OpenAI/MiniMax APIs) and URL strings
+- Updated adapter count from 12/14 to 15 across all docs: SKILL.md, package.json, skill.json, ARCHITECTURE.md, QUICKSTART.md, INTEGRATION_GUIDE.md, setup.ts, test-adapters.ts
+- Security policy updated: 4.6.x now current, 4.5.x moved to security-fixes-only
+
 ## [4.6.0] - 2026-03-12
 
 ### Added
@@ -95,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [4.3.7] - 2026-03-09
 
 ### Security
-- **OpenClaw Suspicious flag resolved** — Updated `skill.json` description and `SKILL.md` frontmatter to explicitly state that README documents the full project (including the companion npm package); HMAC tokens, AES-256, MCP server, 14 adapters, and CLI are NOT part of the Python ClawHub bundle. Eliminates the "overclaiming" mismatch that triggered medium-confidence Suspicious rating.
+- **OpenClaw Suspicious flag resolved** — Updated `skill.json` description and `SKILL.md` frontmatter to explicitly state that README documents the full project (including the companion npm package); HMAC tokens, AES-256, MCP server, 15 adapters, and CLI are NOT part of the Python ClawHub bundle. Eliminates the "overclaiming" mismatch that triggered medium-confidence Suspicious rating.
 
 ### Changed
 - No code changes — 1,399 passing assertions across 17 suites

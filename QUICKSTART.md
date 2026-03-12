@@ -18,7 +18,7 @@ npm install
 npx ts-node setup.ts --check
 ```
 
-**Zero external AI dependencies.** All 12 adapters are self-contained — add framework SDKs only when you need them.
+**Zero external AI dependencies.** All 15 adapters are self-contained — add framework SDKs only when you need them.
 
 ---
 
@@ -225,7 +225,7 @@ npx ts-node test-cli.ts           # 65 CLI tests
 
 ```bash
 npx ts-node setup.ts --check      # Verify installation
-npx ts-node setup.ts --list       # List all 12 adapters
+npx ts-node setup.ts --list       # List all 15 adapters
 npx ts-node setup.ts --example    # Generate example.ts
 ```
 
@@ -563,7 +563,7 @@ import SwarmOrchestrator, {
 // Factory
 import { createSwarmOrchestrator } from 'network-ai';
 
-// All 12 adapters
+// All 15 adapters
 import {
   AdapterRegistry, BaseAdapter,
   OpenClawAdapter, LangChainAdapter, AutoGenAdapter,

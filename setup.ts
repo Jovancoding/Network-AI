@@ -298,7 +298,7 @@ ${COLORS.cyan}${COLORS.bold}+===================================================
 }
 
 function printAdapterList(): void {
-  console.log(`${COLORS.bold}Supported Frameworks (12 adapters):${COLORS.reset}\n`);
+  console.log(`${COLORS.bold}Supported Frameworks (15 adapters):${COLORS.reset}\n`);
   const entries = Object.entries(ADAPTERS);
   for (let i = 0; i < entries.length; i++) {
     const [_key, info] = entries[i];

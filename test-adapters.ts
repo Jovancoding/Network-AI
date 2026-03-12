@@ -1152,11 +1152,11 @@ async function testAgnoAdapter(): Promise<void> {
 }
 
 // ============================================================================
-// TEST 15: All 12 Adapters in Registry Together
+// TEST 15: All 15 Adapters in Registry Together
 // ============================================================================
 
 async function testAllAdaptersInRegistry(): Promise<void> {
-  section('Full Registry -- All 12 Adapters Working Together');
+  section('Full Registry -- All 15 Adapters Working Together');
 
   const registry = new AdapterRegistry();
 

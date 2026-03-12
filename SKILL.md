@@ -1,11 +1,11 @@
 ﻿---
 name: Network-AI
-description: "Python orchestration skill: local multi-agent workflows via blackboard file, permission gating, and token budget scripts. All execution is local — no network calls, no Node.js required. TypeScript/Node.js features (HMAC tokens, AES-256, MCP server, 14 adapters, CLI) are in the SEPARATE companion npm package (npm install -g network-ai) and are NOT part of this skill bundle."
+description: "Python orchestration skill: local multi-agent workflows via blackboard file, permission gating, and token budget scripts. All execution is local — no network calls, no Node.js required. TypeScript/Node.js features (HMAC tokens, AES-256, MCP server, 15 adapters, CLI) are in the SEPARATE companion npm package (npm install -g network-ai) and are NOT part of this skill bundle."
 metadata:
   openclaw:
     emoji: "\U0001F41D"
     homepage: https://github.com/Jovancoding/Network-AI
-    bundle_scope: "Python scripts only (scripts/*.py). The README.md in this repo describes the FULL project including the companion Node.js npm package — features documented there (HMAC tokens, AES-256 encryption, MCP server, 14 adapters, CLI) are NOT implemented in these Python scripts and are NOT part of this ClawHub skill. Install the npm package separately for those features."
+    bundle_scope: "Python scripts only (scripts/*.py). The README.md in this repo describes the FULL project including the companion Node.js npm package — features documented there (HMAC tokens, AES-256 encryption, MCP server, 15 adapters, CLI) are NOT implemented in these Python scripts and are NOT part of this ClawHub skill. Install the npm package separately for those features."
     network_calls: none
     sessions_ops: "platform-provided — sessions_send, sessions_list, and sessions_history are OpenClaw host platform built-ins, not implemented or invoked by this skill's Python scripts"
     requires:
@@ -36,6 +36,8 @@ metadata:
 ## Setup
 
 **No pip install required.** All 6 scripts use Python standard library only — zero third-party packages.
+
+> **Note on `requirements.txt`:** The file exists for documentation purposes only — it lists the stdlib modules used and has **no required packages**. All listed deps are commented out as optional. You do not need to run `pip install -r requirements.txt`.
 
 ```bash
 # Prerequisite: python3 (any version ≥ 3.8)

@@ -35,6 +35,22 @@
       {
         "path": "dist/bin/mcp-server.js",
         "reason": "Intentional — network-ai-server is an opt-in CLI binary that starts an HTTP/SSE server to expose the Network-AI tool suite over MCP. Users invoke it explicitly; it is not a background side-effect."
+      },
+      {
+        "path": "adapters/codex-adapter.ts",
+        "reason": "Intentional — CodexAdapter calls OpenAI's chat/completions API (or user-provided baseUrl) via fetch(). Network access is the purpose of this adapter for connecting to OpenAI/Codex endpoints."
+      },
+      {
+        "path": "dist/adapters/codex-adapter.js",
+        "reason": "Intentional — CodexAdapter calls OpenAI's chat/completions API (or user-provided baseUrl) via fetch(). Network access is the purpose of this adapter for connecting to OpenAI/Codex endpoints."
+      },
+      {
+        "path": "adapters/minimax-adapter.ts",
+        "reason": "Intentional — MiniMaxAdapter calls MiniMax's OpenAI-compatible chat/completions API via fetch(). Network access is the purpose of this adapter for connecting to MiniMax LLM endpoints."
+      },
+      {
+        "path": "dist/adapters/minimax-adapter.js",
+        "reason": "Intentional — MiniMaxAdapter calls MiniMax's OpenAI-compatible chat/completions API via fetch(). Network access is the purpose of this adapter for connecting to MiniMax LLM endpoints."
       }
     ],
     "urlStrings": [
@@ -49,6 +65,22 @@
       {
         "path": "dist/bin/mcp-server.js",
         "reason": "Intentional — mcp-server.js is the MCP server binary; localhost URLs are for the server it starts (e.g. http://localhost:3001/sse) and are documented in help text and comments."
+      },
+      {
+        "path": "adapters/codex-adapter.ts",
+        "reason": "Intentional — CodexAdapter uses https://api.openai.com as default baseUrl for OpenAI API calls. Users can override via config.baseUrl."
+      },
+      {
+        "path": "dist/adapters/codex-adapter.js",
+        "reason": "Intentional — CodexAdapter uses https://api.openai.com as default baseUrl for OpenAI API calls. Users can override via config.baseUrl."
+      },
+      {
+        "path": "adapters/minimax-adapter.ts",
+        "reason": "Intentional — MiniMaxAdapter uses https://api.minimax.io/v1 as default baseUrl for MiniMax API calls. Users can override via config.baseUrl."
+      },
+      {
+        "path": "dist/adapters/minimax-adapter.js",
+        "reason": "Intentional — MiniMaxAdapter uses https://api.minimax.io/v1 as default baseUrl for MiniMax API calls. Users can override via config.baseUrl."
       }
     ],
     "envVars": [
