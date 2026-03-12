@@ -26,6 +26,7 @@ const SUITES = [
   'test-streaming.ts',
   'test-a2a.ts',
   'test-codex.ts',
+  'test-minimax.ts',
   'test-cli.ts',
 ];
 

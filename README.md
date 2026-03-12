@@ -4,9 +4,9 @@
 
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.5.3-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.6.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-1399%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1449%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-15%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -328,7 +328,7 @@ npm run test:priority     # Priority & preemption
 npm run test:cli          # CLI layer
 ```
 
-**1,399 passing assertions across 17 test suites** (`npm run test:all`):
+**1,449 passing assertions across 18 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -342,6 +342,7 @@ npm run test:cli          # CLI layer
 | `test-phase5e.ts` | 87 | Federated budget tracking |
 | `test-phase5c.ts` | 73 | Named multi-blackboard, isolation, backend options |
 | `test-codex.ts` | 51 | Codex adapter: chat, completion, CLI, BYOC client, error paths |
+| `test-minimax.ts` | 50 | MiniMax adapter: lifecycle, registration, chat mode, temperature clamping |
 | `test-priority.ts` | 64 | Priority preemption, conflict resolution, backward compat |
 | `test-a2a.ts` | 35 | A2A protocol: register, execute, mock fetch, error paths |
 | `test-streaming.ts` | 32 | Streaming adapters, chunk shapes, fallback, collectStream |

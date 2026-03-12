@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.0] - 2026-03-12
+
+### Added
+- **MiniMax adapter** — New `MiniMaxAdapter` integrating MiniMax's OpenAI-compatible chat completions API with MiniMax-M2.5 (204K context) and MiniMax-M2.5-highspeed models. Adapter count now 15. (PR #71, contributed by @octo-patch)
+- 50 new tests for MiniMax adapter (total test count: 1,449)
+
 ## [4.5.3] - 2026-03-11
 
 ### Changed
