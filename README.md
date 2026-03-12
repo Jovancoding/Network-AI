@@ -15,10 +15,6 @@
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Integration Guide](https://img.shields.io/badge/docs-integration%20guide-informational.svg)](INTEGRATION_GUIDE.md)
 
-<a href="https://glama.ai/mcp/servers/Jovancoding/network-ai">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/Jovancoding/network-ai/badge" />
-</a>
-
 Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordination, guardrails, and governance to any AI agent stack.
 
 - **Shared blackboard with locking** — atomic `propose → validate → commit` prevents race conditions and split-brain failures across parallel agents
