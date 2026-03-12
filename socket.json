@@ -4,7 +4,7 @@
     "evalDynamicCodeExecution": [
       {
         "path": "lib/blackboard-validator.ts",
-        "reason": "False positive — new RegExp('eval' + '\\\\s*\\\\(') is a security detection pattern that scans for eval() usage in untrusted agent code submitted to the blackboard. It is not dynamic code execution."
+        "reason": "False positive — /\\beval\\s*\\(/ is a security detection regex that scans for eval() usage in untrusted agent code submitted to the blackboard. It is not dynamic code execution."
       },
       {
         "path": "dist/lib/blackboard-validator.js",
@@ -85,8 +85,46 @@
     ],
     "envVars": [
       {
+        "path": "security.ts",
+        "reason": "Intentional — reads SWARM_TOKEN_SECRET and SWARM_ENCRYPTION_KEY env vars as an opt-in mechanism for users to supply secrets without hard-coding them."
+      },
+      {
         "path": "dist/security.js",
-        "reason": "Intentional — security.ts reads NETWORK_AI_ENCRYPTION_KEY and similar env vars as an opt-in mechanism for users to supply secrets without hard-coding them. This is the recommended pattern."
+        "reason": "Intentional — compiled output of security.ts. Reads SWARM_TOKEN_SECRET and SWARM_ENCRYPTION_KEY env vars."
+      },
+      {
+        "path": "adapters/codex-adapter.ts",
+        "reason": "Intentional — CodexAdapter reads OPENAI_API_KEY env var as a fallback when no API key is provided via config. Declared in skill.json env section."
+      },
+      {
+        "path": "dist/adapters/codex-adapter.js",
+        "reason": "Intentional — compiled output of codex-adapter.ts. Reads OPENAI_API_KEY env var."
+      },
+      {
+        "path": "adapters/minimax-adapter.ts",
+        "reason": "Intentional — MiniMaxAdapter reads MINIMAX_API_KEY env var as a fallback when no API key is provided via config. Declared in skill.json env section."
+      },
+      {
+        "path": "dist/adapters/minimax-adapter.js",
+        "reason": "Intentional — compiled output of minimax-adapter.ts. Reads MINIMAX_API_KEY env var."
+      },
+      {
+        "path": "setup.ts",
+        "reason": "Intentional — setup module checks for OPENAI_API_KEY env var to provide helpful configuration guidance. Declared in skill.json env section."
+      },
+      {
+        "path": "dist/setup.js",
+        "reason": "Intentional — compiled output of setup.ts. Checks for OPENAI_API_KEY env var."
+      }
+    ],
+    "shellExec": [
+      {
+        "path": "examples/05-code-review-swarm.ts",
+        "reason": "Intentional — example script uses execSync('npx tsc --noEmit') to demonstrate automated TypeScript type-checking in a code review pipeline. Not part of the core library."
+      },
+      {
+        "path": "examples/demo-runner.ts",
+        "reason": "Intentional — demo runner uses spawn('npx', ['ts-node', file]) to execute example scripts. This is a developer convenience script, not part of the core library."
       }
     ],
     "filesystemAccess": [

@@ -22,6 +22,9 @@ metadata:
       OPENAI_API_KEY:
         required: false
         description: "Not used by these Python scripts. Only used by the optional Node.js demo examples when running the companion npm package."
+      MINIMAX_API_KEY:
+        required: false
+        description: "Not used by these Python scripts. Only used by the optional Node.js MiniMaxAdapter when running the companion npm package."
     privacy:
       audit_log:
         path: data/audit_log.jsonl

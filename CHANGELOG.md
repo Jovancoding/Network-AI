@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.2] - 2026-03-12
+
+### Fixed
+- **ClawHub security flag #3 resolved** — Undeclared `MINIMAX_API_KEY` env var added to `skill.json` and `SKILL.md` frontmatter (was missing since MiniMax adapter merge in v4.6.0)
+- **`socket.json` env var coverage expanded** — Added ignore entries for all source files reading env vars: `security.ts`, `codex-adapter.ts`, `minimax-adapter.ts`, `setup.ts` (and their compiled `dist/` counterparts)
+- **`socket.json` shell exec coverage added** — Added ignore entries for `examples/05-code-review-swarm.ts` (`execSync`) and `examples/demo-runner.ts` (`spawn`)
+- **`String.fromCharCode` obfuscation removed** — Replaced char-code construction of `eval` regex in `blackboard-validator.ts` with direct `/\beval\s*\(/` pattern to eliminate false positive obfuscation detection
+
 ## [4.6.1] - 2026-03-12
 
 ### Fixed
