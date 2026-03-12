@@ -14,6 +14,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Integration Guide](https://img.shields.io/badge/docs-integration%20guide-informational.svg)](INTEGRATION_GUIDE.md)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/Cab5vAxc86)
 
 Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordination, guardrails, and governance to any AI agent stack.
 
@@ -392,6 +393,14 @@ Set the server URL to your running `npx network-ai-server --port 3001` instance.
 
 **Claude Projects:**
 Copy the contents of `claude-project-prompt.md` (below the horizontal rule) into a Claude Project's Custom Instructions field. No server required for instruction-only mode.
+
+---
+
+## Community
+
+Join our Discord server to discuss multi-agent AI coordination, get help, and share what you're building:
+
+[![Discord](https://img.shields.io/badge/Join%20Discord-5865F2?logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/Cab5vAxc86)
 
 ---
 
