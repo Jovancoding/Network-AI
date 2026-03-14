@@ -4,12 +4,12 @@
 
 | Version | Supported |
 |---------|-----------|
-| 4.6.x   | ✅ Yes — full support (current) |
+| 4.7.x   | ✅ Yes — full support (current) |
+| 4.6.x   | ✅ Security fixes only |
 | 4.5.x   | ✅ Security fixes only |
 | 4.4.x   | ✅ Security fixes only |
 | 4.3.x   | ✅ Security fixes only |
-| 4.2.x   | ✅ Security fixes only |
-| 4.0.x – 4.1.x | ⚠️ Security fixes only |
+| 4.0.x – 4.2.x | ⚠️ Security fixes only |
 | < 4.0   | ❌ No support |
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
@@ -30,7 +30,7 @@ Network-AI includes built-in security features:
 - **HMAC-SHA256 signed tokens** via AuthGuardian with trust levels and scope restrictions
 - **Rate limiting** to prevent abuse
 - **Path traversal protection** in the Python blackboard (regex + resolved-path boundary checks)
-- **Input validation** on all 20+ public API entry points
+- **Input validation** on all public API entry points
 - **Secure audit logging** with tamper-resistant event trails
 - **Justification hardening** (v3.2.1) -- prompt-injection detection (16 patterns), keyword-stuffing defense, repetition/padding detection, structural coherence validation
 - **FSM Behavioral Control Plane** (v3.3.0) -- state-scoped agent and tool authorization via `JourneyFSM` and `ToolAuthorizationMatrix`; unauthorized actions blocked with `ComplianceViolationError`
