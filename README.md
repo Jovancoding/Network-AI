@@ -15,10 +15,7 @@
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Integration Guide](https://img.shields.io/badge/docs-integration%20guide-informational.svg)](INTEGRATION_GUIDE.md)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/Cab5vAxc86)
-
-<a href="https://glama.ai/mcp/servers/Jovancoding/network-ai">
-  <img src="https://glama.ai/mcp/servers/Jovancoding/network-ai/badges/card.svg" alt="network-ai MCP server" />
-</a>
+[![Glama](https://glama.ai/mcp/servers/Jovancoding/network-ai/badges/score.svg)](https://glama.ai/mcp/servers/Jovancoding/network-ai)
 
 Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordination, guardrails, and governance to any AI agent stack.
 
