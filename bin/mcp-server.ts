@@ -45,6 +45,7 @@ import {
   McpCombinedBridge,
   McpBlackboardBridgeAdapter,
 } from '../lib/mcp-transport-sse';
+import type { McpJsonRpcRequest } from '../lib/mcp-bridge';
 import { ExtendedMcpTools } from '../lib/mcp-tools-extended';
 import { ControlMcpTools } from '../lib/mcp-tools-control';
 
@@ -64,6 +65,7 @@ interface ServerArgs {
   noAudit: boolean;
   auditLog: string;
   heartbeat: number;
+  stdio: boolean;
   help: boolean;
 }
 
@@ -80,6 +82,7 @@ function parseArgs(argv: string[]): ServerArgs {
     noAudit: false,
     auditLog: './data/audit_log.jsonl',
     heartbeat: 15000,
+    stdio: false,
     help: false,
   };
 
@@ -98,6 +101,7 @@ function parseArgs(argv: string[]): ServerArgs {
       case '--no-extended':  args.noExtended = true; break;
       case '--no-control':   args.noControl = true; break;
       case '--no-audit':     args.noAudit = true; break;
+      case '--stdio':          args.stdio = true; break;
       case '--help': case '-h': args.help = true; break;
     }
   }
@@ -111,6 +115,7 @@ network-ai-server — Network-AI MCP Server v4.0.13
 Usage: npx ts-node bin/mcp-server.ts [options]
 
 Options:
+  --stdio              Run in stdio mode (JSON-RPC over stdin/stdout)
   --port <n>           TCP port (default: 3001)
   --host <h>           Bind host (default: 0.0.0.0)
   --board <name>       Named blackboard to expose (default: main)
@@ -124,12 +129,54 @@ Options:
   --no-control         Disable control-plane tools
   --help               Show this help
 
-Connect to:
+Stdio mode (for MCP clients like Claude Desktop, Cursor, Glama):
+  npx network-ai-server --stdio
+
+SSE/HTTP mode (for network clients):
   GET  http://localhost:3001/sse     SSE stream
   POST http://localhost:3001/mcp     JSON-RPC 2.0 tool calls
   GET  http://localhost:3001/health  Health check
   GET  http://localhost:3001/tools   All available tools
 `);
+}
+
+// ============================================================================
+// STDIO TRANSPORT
+// ============================================================================
+
+/**
+ * Run the MCP server in stdio mode: read newline-delimited JSON-RPC from
+ * stdin, dispatch through `McpCombinedBridge.handleRPC()`, write responses
+ * to stdout.  This is the transport that Glama, Claude Desktop, Cursor, and
+ * other MCP-compatible inspectors/clients use by default.
+ */
+async function runStdio(combined: McpCombinedBridge): Promise<void> {
+  const { createInterface } = await import('readline');
+
+  const rl = createInterface({ input: process.stdin, terminal: false });
+
+  rl.on('line', async (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    let request: McpJsonRpcRequest;
+    try {
+      request = JSON.parse(trimmed);
+    } catch {
+      const err = {
+        jsonrpc: '2.0' as const,
+        id: null,
+        error: { code: -32700, message: 'Parse error' },
+      };
+      process.stdout.write(JSON.stringify(err) + '\n');
+      return;
+    }
+
+    const response = await combined.handleRPC(request);
+    process.stdout.write(JSON.stringify(response) + '\n');
+  });
+
+  rl.on('close', () => process.exit(0));
 }
 
 // ============================================================================
@@ -144,8 +191,14 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // In stdio mode, redirect console.log to stderr immediately so stdout
+  // is reserved exclusively for JSON-RPC protocol messages.
+  if (args.stdio) {
+    console.log = (...a: unknown[]) => process.stderr.write(a.join(' ') + '\n');
+  }
+
   console.log(`\n[network-ai-server] Starting MCP Server v4.0.13`);
-  console.log(`[network-ai-server] Board: ${args.board} | Port: ${args.port}`);
+  console.log(`[network-ai-server] Board: ${args.board} | Mode: ${args.stdio ? 'stdio' : `SSE (port ${args.port})`}`);
 
   // --------------------------------------------------------------------------
   // 1. Create orchestrator + blackboard
@@ -231,8 +284,15 @@ async function main(): Promise<void> {
   console.log(`[network-ai-server] Total tools exposed: ${totalTools}`);
 
   // --------------------------------------------------------------------------
-  // 6. Start SSE server
+  // 6. Start server (stdio or SSE)
   // --------------------------------------------------------------------------
+  if (args.stdio) {
+    console.log(`[network-ai-server] Stdio mode active — ${totalTools} tools ready`);
+    await runStdio(combined);
+    return;
+  }
+
+  // SSE/HTTP mode
   const server = new McpSseServer(combined, {
     port: args.port,
     host: args.host,

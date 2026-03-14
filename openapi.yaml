@@ -6,7 +6,7 @@ info:
     blackboard coordination, parallel agent spawning, and permission gating
     via AuthGuardian. Requires the companion MCP server:
     `npm install -g network-ai && npx network-ai-server --port 3001`
-  version: 4.6.2
+  version: 4.7.0
   license:
     name: MIT
     url: https://github.com/Jovancoding/Network-AI/blob/main/LICENSE

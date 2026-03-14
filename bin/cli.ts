@@ -18,7 +18,11 @@ import { AuthGuardian } from '../index';
 import { FederatedBudget } from '../lib/federated-budget';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const pkg = require('../package.json') as { version: string; name: string };
+const pkg = (() => {
+  try { return require('../package.json'); } catch {
+    return require('../../package.json');
+  }
+})() as { version: string; name: string };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -300,4 +304,17 @@ auditCmd.command('clear')
 
 // ── parse ─────────────────────────────────────────────────────────────────────
 
-program.parse(process.argv);
+// Auto-detect MCP stdio mode: when stdin is piped (not a TTY) and no
+// subcommand was given, start the MCP server in stdio transport mode.
+// This is the convention used by Glama, Claude Desktop, Cursor, etc.
+const userArgs = process.argv.slice(2);
+if (!process.stdin.isTTY && userArgs.length === 0) {
+  // Set --stdio before importing so the server module picks it up
+  process.argv.push('--stdio');
+  import('./mcp-server').catch(err => {
+    process.stderr.write(`[network-ai] Failed to start MCP stdio mode: ${err}\n`);
+    process.exit(1);
+  });
+} else {
+  program.parse(process.argv);
+}

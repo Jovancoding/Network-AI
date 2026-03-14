@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.0] - 2026-03-14
+
+### Added
+- **Stdio MCP transport** — `npx network-ai-server --stdio` starts the MCP server in stdio mode (JSON-RPC over stdin/stdout), enabling inspection by Glama, Claude Desktop, Cursor, and other MCP-compatible clients
+- **Auto-detect stdio mode in CLI** — `npx network-ai` with piped stdin (no arguments) automatically starts the MCP server in stdio mode, following the standard MCP convention
+
+### Changed
+- MCP server help text updated with stdio usage instructions
+
 ## [4.6.2] - 2026-03-12
 
 ### Fixed
