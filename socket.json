@@ -25,7 +25,7 @@
         "reason": "Intentional — CustomAdapter is a user-configured HTTP adapter that calls a user-supplied URL (config.url) to connect to external AI endpoints. Network access is the explicit purpose of this adapter."
       },
       {
-        "path": "dist/lib/mcp-transport-sse.ts",
+        "path": "lib/mcp-transport-sse.ts",
         "reason": "Intentional — McpSseTransport is an HTTP/SSE transport layer for the MCP protocol. Both the server (createServer) and client (http.request) directions are the explicit purpose of this module."
       },
       {

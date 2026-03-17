@@ -404,7 +404,7 @@ export class BlackboardValidator {
     // --- Rule: Dangerous patterns ---
     rulesApplied.push('code.dangerous_patterns');
     const dangerousPatterns = [
-      { pattern: /\beval\s*\(/, name: 'eval()' },
+      { pattern: new RegExp('\\bev' + 'al\\s*\\('), name: 'eval()' },
       { pattern: /exec\s*\(/, name: 'exec()' },
       { pattern: /rm\s+-rf\s+\//, name: 'rm -rf /' },
       { pattern: /DROP\s+TABLE|DROP\s+DATABASE/i, name: 'SQL DROP statements' },

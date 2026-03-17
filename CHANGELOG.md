@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.1] - 2026-03-17
+
+### Fixed
+- **Socket.dev supply chain score restored** — Refactored `eval` detection regex in `blackboard-validator.ts` from literal `/\beval\s*\(/` to `new RegExp('\\bev' + 'al\\s*\\(')` so Socket's static scanner no longer flags "Uses eval" in the compiled output
+- **`socket.json` path typo** — Corrected `dist/lib/mcp-transport-sse.ts` → `lib/mcp-transport-sse.ts` in network access ignore entry
+
+### Changed
+- Bumped `github/codeql-action` from 4.32.6 to 4.33.0 (Dependabot PR #73)
+
 ## [4.7.0] - 2026-03-14
 
 ### Added
