@@ -4,10 +4,10 @@
 
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.7.1-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.8.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-1449%20passing-brightgreen.svg)](#testing)
-[![Adapters](https://img.shields.io/badge/frameworks-15%20supported-blueviolet.svg)](#adapter-system)
+[![Tests](https://img.shields.io/badge/tests-1543%20passing-brightgreen.svg)](#testing)
+[![Adapters](https://img.shields.io/badge/frameworks-16%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -21,7 +21,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 
 - **Shared blackboard with locking** — atomic `propose → validate → commit` prevents race conditions and split-brain failures across parallel agents
 - **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC audit trails, and permission gating
-- **15 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, and MiniMax — no glue code, no lock-in
+- **16 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, MiniMax, and NemoClaw — no glue code, no lock-in
 - **Persistent project memory (Layer 3)** — `context_manager.py` injects decisions, goals, stack, milestones, and banned patterns into every system prompt so agents always have full project context
 
 > **The silent failure mode in multi-agent systems:** parallel agents writing to the same key
@@ -56,7 +56,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 | Race conditions in parallel agents | Atomic blackboard: `propose → validate → commit` with file-system mutex |
 | Agent overspend / runaway costs | `FederatedBudget` — hard per-agent token ceilings with live spend tracking |
 | No visibility into what agents did | HMAC-signed audit log on every write, permission grant, and FSM transition |
-| Locked into one AI framework | 15 adapters — mix LangChain + AutoGen + CrewAI + Codex + MiniMax + custom in one swarm |
+| Locked into one AI framework | 16 adapters — mix LangChain + AutoGen + CrewAI + Codex + MiniMax + NemoClaw + custom in one swarm |
 | Agents escalating beyond their scope | `AuthGuardian` — scoped permission tokens required before sensitive operations |
 | Agents lack project context between runs | `ProjectContextManager` (Layer 3) — inject decisions, goals, stack, and milestones into every system prompt |
 
@@ -268,7 +268,7 @@ npm run demo -- --07
 
 ## Adapter System
 
-15 adapters, zero adapter dependencies. You bring your own SDK objects.
+16 adapters, zero adapter dependencies. You bring your own SDK objects.
 
 | Adapter | Framework / Protocol | Register method |
 |---|---|---|
@@ -287,6 +287,7 @@ npm run demo -- --07
 | `A2AAdapter` | Google A2A Protocol | `registerRemoteAgent(name, url)` |
 | `CodexAdapter` | OpenAI Codex / gpt-4o / Codex CLI | `registerCodexAgent(name, config)` |
 | `MiniMaxAdapter` | MiniMax LLM API (M2.5 / M2.5-highspeed) | `registerAgent(name, config)` |
+| `NemoClawAdapter` | NVIDIA NemoClaw (sandboxed agents via OpenShell) | `registerSandboxAgent(name, config)` |
 
 **Streaming variants** (drop-in replacements with `.stream()` support):
 
@@ -321,7 +322,7 @@ Extend `BaseAdapter` (or `StreamingBaseAdapter` for streaming) to add your own i
 npm run test:all          # All suites in sequence
 npm test                  # Core orchestrator
 npm run test:security     # Security module
-npm run test:adapters     # All 15 adapters
+npm run test:adapters     # All 16 adapters
 npm run test:streaming    # Streaming adapters
 npm run test:a2a          # A2A protocol adapter
 npm run test:codex        # Codex adapter
@@ -329,7 +330,7 @@ npm run test:priority     # Priority & preemption
 npm run test:cli          # CLI layer
 ```
 
-**1,449 passing assertions across 18 test suites** (`npm run test:all`):
+**1,543 passing assertions across 19 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -337,13 +338,14 @@ npm run test:cli          # CLI layer
 | `test-phase5f.ts` | 127 | SSE transport, `McpCombinedBridge`, extended MCP tools |
 | `test-phase5g.ts` | 121 | CRDT backend, vector clocks, bidirectional sync |
 | `test-phase6.ts` | 121 | MCP server, control-plane tools, audit tools |
-| `test-adapters.ts` | 140 | All 15 adapters, registry routing, integration, edge cases |
+| `test-adapters.ts` | 141 | All 16 adapters, registry routing, integration, edge cases |
 | `test-phase5d.ts` | 117 | Pluggable backend (Redis, CRDT, Memory) |
 | `test-standalone.ts` | 88 | Blackboard, auth, integration, persistence, parallelisation, quality gate |
 | `test-phase5e.ts` | 87 | Federated budget tracking |
 | `test-phase5c.ts` | 73 | Named multi-blackboard, isolation, backend options |
 | `test-codex.ts` | 51 | Codex adapter: chat, completion, CLI, BYOC client, error paths |
 | `test-minimax.ts` | 50 | MiniMax adapter: lifecycle, registration, chat mode, temperature clamping |
+| `test-nemoclaw.ts` | 93 | NemoClaw adapter: sandbox lifecycle, policies, blueprint, handoff, env forwarding |
 | `test-priority.ts` | 64 | Priority preemption, conflict resolution, backward compat |
 | `test-a2a.ts` | 35 | A2A protocol: register, execute, mock fetch, error paths |
 | `test-streaming.ts` | 32 | Streaming adapters, chunk shapes, fallback, collectStream |

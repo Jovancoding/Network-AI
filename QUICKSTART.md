@@ -18,7 +18,7 @@ npm install
 npx ts-node setup.ts --check
 ```
 
-**Zero external AI dependencies.** All 15 adapters are self-contained — add framework SDKs only when you need them.
+**Zero external AI dependencies.** All 16 adapters are self-contained — add framework SDKs only when you need them.
 
 ---
 
@@ -38,6 +38,11 @@ npx ts-node setup.ts --check
 | `haystack` | Haystack | none | Production RAG pipelines |
 | `dspy` | DSPy | none | Programmatic prompt optimisation |
 | `agno` | Agno | none | Multi-agent teams |
+| `openclaw` | OpenClaw | `openclaw-core` | OpenClaw skill ecosystem |
+| `a2a` | A2A | none | Agent-to-Agent protocol |
+| `codex` | Codex | `openai` | OpenAI Codex CLI |
+| `minimax` | MiniMax | none | MiniMax chat completions |
+| `nemoclaw` | NemoClaw | none | NVIDIA sandboxed agent execution |
 
 ---
 
@@ -225,7 +230,7 @@ npx ts-node test-cli.ts           # 65 CLI tests
 
 ```bash
 npx ts-node setup.ts --check      # Verify installation
-npx ts-node setup.ts --list       # List all 15 adapters
+npx ts-node setup.ts --list       # List all 16 adapters
 npx ts-node setup.ts --example    # Generate example.ts
 ```
 
@@ -563,7 +568,7 @@ import SwarmOrchestrator, {
 // Factory
 import { createSwarmOrchestrator } from 'network-ai';
 
-// All 15 adapters
+// All 16 adapters
 import {
   AdapterRegistry, BaseAdapter,
   OpenClawAdapter, LangChainAdapter, AutoGenAdapter,

@@ -4,17 +4,17 @@ This file is read automatically by Claude Code when working in this repository.
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 4.7.1.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 4.8.0.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 1,449 tests across 18 suites
+npm run test:all              # Run all 1,543 tests across 19 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
-npm run test:adapters         # All 15 adapter tests
+npm run test:adapters         # All 16 adapter tests
 npm run test:priority         # Priority & preemption tests
 npm run test:cli              # CLI layer tests
 ```
@@ -28,7 +28,7 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/locked-blackboard.ts` — LockedBlackboard with atomic propose → validate → commit and file-system mutex
 - `lib/fsm-journey.ts` — JourneyFSM behavioral control plane
 - `lib/compliance-monitor.ts` — Real-time agent behavior surveillance
-- `adapters/` — 15 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, etc.)
+- `adapters/` — 16 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)
 - `scripts/` — Python helper scripts (blackboard, permissions, token management)

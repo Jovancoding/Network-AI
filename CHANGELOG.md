@@ -5,6 +5,16 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.0] - 2026-03-18
+
+### Added
+- **NemoClaw adapter** — New `NemoClawAdapter` integrating NVIDIA NemoClaw's sandboxed agent execution via OpenShell. Features: sandbox lifecycle management (create/status/destroy), deny-by-default YAML network policies, blueprint execution (plan/apply/status/rollback), command execution inside sandboxes, static policy presets (`mcpServerPolicy()`, `nvidiaPolicy()`), and handoff/blackboard forwarding via environment variables. Adapter count now 16.
+- 93 new tests for NemoClaw adapter across 21 test sections (total test count: 1,543 across 19 suites)
+- New example `examples/10-nemoclaw-sandbox-swarm.ts` — 3-agent sandbox coordination demo with per-agent network policies
+
+### Changed
+- Security policy updated: 4.8.x now current, 4.7.x moved to security-fixes-only
+
 ## [4.7.1] - 2026-03-17
 
 ### Fixed

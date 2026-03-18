@@ -119,6 +119,14 @@
     ],
     "shellExec": [
       {
+        "path": "adapters/nemoclaw-adapter.ts",
+        "reason": "Intentional — NemoClawAdapter's default executor uses child_process.execFile to invoke the openshell CLI for sandbox management. This is the fallback when no custom executor is provided. Users are expected to bring their own executor in production."
+      },
+      {
+        "path": "dist/adapters/nemoclaw-adapter.js",
+        "reason": "Intentional — compiled output of nemoclaw-adapter.ts. Uses child_process.execFile to invoke the openshell CLI."
+      },
+      {
         "path": "examples/05-code-review-swarm.ts",
         "reason": "Intentional — example script uses execSync('npx tsc --noEmit') to demonstrate automated TypeScript type-checking in a code review pipeline. Not part of the core library."
       },

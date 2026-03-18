@@ -2600,5 +2600,22 @@ export type {
   CodexCLIExecutor,
 } from './adapters/codex-adapter';
 
+// MiniMax adapter (MiniMax LLM API)
+export { MiniMaxAdapter } from './adapters/minimax-adapter';
+export type { MiniMaxAgentConfig, MiniMaxChatClient } from './adapters/minimax-adapter';
+
+// NemoClaw adapter (NVIDIA NemoClaw — sandboxed agent execution via OpenShell)
+export { NemoClawAdapter } from './adapters/nemoclaw-adapter';
+export type {
+  NemoClawAgentConfig,
+  OpenShellExecutor,
+  BlueprintAction,
+  BlueprintRunResult,
+  SandboxState,
+  SandboxStatus,
+  NetworkPolicy,
+  PolicyEndpoint,
+} from './adapters/nemoclaw-adapter';
+
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from './types/streaming-adapter';

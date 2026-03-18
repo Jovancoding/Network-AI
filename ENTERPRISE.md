@@ -12,7 +12,7 @@ This document exists so an engineer or architect can evaluate Network-AI in unde
 | Do I control all data? | **Yes.** All state lives in your `data/` directory on your own infrastructure. Nothing is transmitted. |
 | Is the source auditable? | **Yes.** MIT-licensed, fully open source, no obfuscated code, no telemetry. |
 | Does it have an audit trail? | **Yes.** Every permission request, grant, denial, and revocation is appended to `data/audit_log.jsonl` with a UTC timestamp. See [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md). |
-| Can I plug in my own LLM / provider? | **Yes.** The adapter registry supports LangChain, AutoGen, CrewAI, LlamaIndex, Semantic Kernel, OpenAI Assistants, Haystack, DSPy, Agno, and a `CustomAdapter` for anything else. |
+| Can I plug in my own LLM / provider? | **Yes.** The adapter registry supports LangChain, AutoGen, CrewAI, LlamaIndex, Semantic Kernel, OpenAI Assistants, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax, NemoClaw, and a `CustomAdapter` for anything else. |
 | Does it work with our existing agent framework? | **Yes.** It wraps around your framework — you keep what you have and add guardrails on top. |
 | Is there a security review? | **Yes.** CodeQL scanning on every push, Dependabot auto-merge, Socket.dev supply chain score A, OpenSSF Scorecard. See [SECURITY.md](SECURITY.md). |
 | What does it cost to operate? | **Zero licensing cost.** MIT license. Infrastructure cost = your own compute. |

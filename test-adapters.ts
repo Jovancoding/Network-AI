@@ -1152,11 +1152,11 @@ async function testAgnoAdapter(): Promise<void> {
 }
 
 // ============================================================================
-// TEST 15: All 15 Adapters in Registry Together
+// TEST 15: All 16 Adapters in Registry Together
 // ============================================================================
 
 async function testAllAdaptersInRegistry(): Promise<void> {
-  section('Full Registry -- All 15 Adapters Working Together');
+  section('Full Registry -- All 16 Adapters Working Together');
 
   const registry = new AdapterRegistry();
 
@@ -1167,6 +1167,7 @@ async function testAllAdaptersInRegistry(): Promise<void> {
   const { HaystackAdapter } = await import('./adapters/haystack-adapter');
   const { DSPyAdapter } = await import('./adapters/dspy-adapter');
   const { AgnoAdapter } = await import('./adapters/agno-adapter');
+  const { NemoClawAdapter } = await import('./adapters/nemoclaw-adapter');
 
   // Set up all new adapters with mock agents
   const llamaindex = new LlamaIndexAdapter();
@@ -1204,6 +1205,18 @@ async function testAllAdaptersInRegistry(): Promise<void> {
   const custom = new CustomAdapter();
   custom.registerHandler('echo', async (payload) => ({ echo: payload.params }));
 
+  // NemoClaw adapter with mock executor
+  const nemoclaw = new NemoClawAdapter();
+  const mockExec = async (subcommand: string, args: string[]) => {
+    if (subcommand === 'sandbox' && args[0] === 'get') return JSON.stringify({ state: 'running' });
+    if (subcommand === 'sandbox' && args[0] === 'create') return 'created';
+    if (subcommand === 'sandbox' && args[0] === 'connect') return JSON.stringify({ result: 'nemoclaw done' });
+    if (subcommand === 'policy') return 'ok';
+    return '';
+  };
+  await nemoclaw.initialize({ options: { executor: mockExec } });
+  nemoclaw.registerSandboxAgent('sandbox-worker', { sandboxName: 'test-sandbox' });
+
   // Register all
   await registry.addAdapter(llamaindex);
   await registry.addAdapter(sk);
@@ -1212,9 +1225,10 @@ async function testAllAdaptersInRegistry(): Promise<void> {
   await registry.addAdapter(dspy);
   await registry.addAdapter(agno);
   await registry.addAdapter(custom);
+  await registry.addAdapter(nemoclaw);
 
   const allAdapters = registry.listAdapters();
-  assert(allAdapters.length === 7, `7 adapters registered in registry (got ${allAdapters.length})`);
+  assert(allAdapters.length === 8, `8 adapters registered in registry (got ${allAdapters.length})`);
 
   const ctx: AgentContext = { agentId: 'test', taskId: 't1' };
 
@@ -1254,9 +1268,14 @@ async function testAllAdaptersInRegistry(): Promise<void> {
   }, ctx);
   assert(r7.success === true, 'Custom still works through registry');
 
+  const r8 = await registry.executeAgent('nemoclaw:sandbox-worker', {
+    action: 'run', params: { task: 'test' },
+  }, ctx);
+  assert(r8.success === true, 'NemoClaw works through registry');
+
   // Health check all
   const health = await registry.healthCheck();
-  assert(Object.keys(health).length === 7, 'Health check covers all 7 adapters');
+  assert(Object.keys(health).length === 8, 'Health check covers all 8 adapters');
   assert(Object.values(health).every((h: any) => h.healthy), 'All adapters report healthy');
 
   await registry.shutdownAll();

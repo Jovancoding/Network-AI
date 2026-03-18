@@ -64,7 +64,7 @@ Answers drive `AuthGuardian` configuration and audit log retention policy.
 
 ## 2. Framework Mapping
 
-Network-AI ships 15 adapters. Map your existing agents to the right one:
+Network-AI ships 16 adapters. Map your existing agents to the right one:
 
 | Your Stack | Network-AI Adapter | Notes |
 |-----------|-------------------|-------|
@@ -79,6 +79,10 @@ Network-AI ships 15 adapters. Map your existing agents to the right one:
 | Agno (ex-Phidata) | `AgnoAdapter` | Agents, teams, functions |
 | MCP tools | `McpAdapter` | Tool serving and discovery |
 | OpenClaw / Clawdbot / Moltbot | `OpenClawAdapter` | Native skill execution via `callSkill` |
+| A2A protocol | `A2AAdapter` | Agent-to-Agent protocol interop |
+| OpenAI Codex CLI | `CodexAdapter` | Codex CLI task execution |
+| MiniMax | `MiniMaxAdapter` | MiniMax chat completions (M2.5) |
+| NVIDIA NemoClaw | `NemoClawAdapter` | Sandboxed agent execution via OpenShell |
 | **Anything else** | `CustomAdapter` | Wrap any async function or HTTP endpoint |
 
 ### No matching framework?
@@ -459,7 +463,7 @@ Run these before declaring the integration production-ready:
 |----------|---------------|
 | [QUICKSTART.md](QUICKSTART.md) | Get running in 5 minutes |
 | [QUICKSTART.md § CLI](QUICKSTART.md) | CLI reference — bb, auth, budget, audit commands |
-| [references/adapter-system.md](references/adapter-system.md) | All 15 adapters with code examples |
+| [references/adapter-system.md](references/adapter-system.md) | All 16 adapters with code examples |
 | [references/trust-levels.md](references/trust-levels.md) | Trust scoring formula and agent roles |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission system, justification scoring, token lifecycle |
 | [references/blackboard-schema.md](references/blackboard-schema.md) | Blackboard key conventions and namespacing |

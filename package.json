@@ -1,7 +1,7 @@
 {
   "name": "network-ai",
-  "version": "4.7.1",
-  "description": "AI agent orchestration framework for TypeScript/Node.js - 15 adapters (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax + streaming variants). Built-in CLI, security, swarm intelligence, real-time streaming, and agentic workflow patterns.",
+  "version": "4.8.0",
+  "description": "AI agent orchestration framework for TypeScript/Node.js - 16 adapters (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax, NemoClaw + streaming variants). Built-in CLI, security, swarm intelligence, real-time streaming, and agentic workflow patterns.",
   "homepage": "https://github.com/Jovancoding/Network-AI#readme",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -30,6 +30,7 @@
     "test:streaming": "npx ts-node test-streaming.ts",
     "test:a2a": "npx ts-node test-a2a.ts",
     "test:codex": "npx ts-node test-codex.ts",
+    "test:nemoclaw": "npx ts-node test-nemoclaw.ts",
     "test:cli": "npx ts-node test-cli.ts",
     "test:all": "npx ts-node run-tests.ts",
     "setup": "npx ts-node setup.ts",

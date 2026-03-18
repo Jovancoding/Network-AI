@@ -264,7 +264,7 @@ Network-AI/
 ├── setup.ts                      # Developer setup & installation checker
 ├── bin/
 │   └── cli.ts                    # Full CLI — bb, auth, budget, audit commands (in-process)
-├── adapters/                     # 15 plug-and-play agent framework adapters
+├── adapters/                     # 16 plug-and-play agent framework adapters
 │   ├── adapter-registry.ts       # Multi-adapter routing & discovery
 │   ├── base-adapter.ts           # Abstract base class
 │   ├── custom-adapter.ts         # Custom function/HTTP agent adapter

@@ -102,6 +102,19 @@ export type {
 export { MiniMaxAdapter } from './minimax-adapter';
 export type { MiniMaxAgentConfig, MiniMaxChatClient } from './minimax-adapter';
 
+// NemoClaw adapter (NVIDIA NemoClaw — sandboxed agent execution via OpenShell)
+export { NemoClawAdapter } from './nemoclaw-adapter';
+export type {
+  NemoClawAgentConfig,
+  OpenShellExecutor,
+  BlueprintAction,
+  BlueprintRunResult,
+  SandboxState,
+  SandboxStatus,
+  NetworkPolicy,
+  PolicyEndpoint,
+} from './nemoclaw-adapter';
+
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from '../types/streaming-adapter';
 

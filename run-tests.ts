@@ -27,6 +27,7 @@ const SUITES = [
   'test-a2a.ts',
   'test-codex.ts',
   'test-minimax.ts',
+  'test-nemoclaw.ts',
   'test-cli.ts',
 ];
 
