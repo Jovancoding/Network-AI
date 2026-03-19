@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.1] - 2026-03-19
+
+### Changed
+- Simplified architecture diagrams — removed `ProjectContextManager` from mermaid charts (it is a standalone Python helper, not a runtime component); added note below each diagram linking to its full documentation
+- Added NemoClaw sandbox swarm demo video to README alongside existing demo entries
+
 ## [4.9.0] - 2026-03-19
 
 ### Added
