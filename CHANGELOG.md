@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.0] - 2026-03-19
+
+### Added
+- **Ed25519 asymmetric token signing** — AuthGuardian now supports `algorithm: 'ed25519'` as an alternative to HMAC-SHA256. Ed25519 enables third-party verification of grant tokens without sharing secrets — public key exportable via `exportPublicKey()`. HMAC remains the default for single-issuer deployments.
+- `verifyTokenSignature()` — Cryptographic signature verification for both HMAC and Ed25519 grant tokens
+- `getSigningAlgorithm()` — Query which signing algorithm an AuthGuardian instance uses
+- `exportPublicKey()` — Export Ed25519 public key in PEM/SPKI format for external verifiers
+- 12 new tests for Ed25519 signing, verification, tamper detection, cross-guardian isolation, and HMAC signature verification (total: 1,582 across 20 suites)
+
 ## [4.8.1] - 2026-03-19
 
 ### Fixed

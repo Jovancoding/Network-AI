@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.8.1",
+  "version": "4.9.0",
   "description": "Python orchestration skill: local multi-agent workflows via blackboard file, permission gating, and token budget scripts. All execution is local — no network calls, no Node.js required. NOTE: The README describes the full project including the companion Node.js/TypeScript npm package (network-ai on npm). Features documented there — HMAC-signed tokens, AES-256 encryption, networked MCP server, 16 adapters, full CLI — are NOT implemented in these Python scripts and are NOT part of this ClawHub skill bundle. Install 'npm install -g network-ai' separately for those features.",
   "author": "Network-AI Community",
   "homepage": "https://github.com/Jovancoding/Network-AI",

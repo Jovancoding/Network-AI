@@ -10,6 +10,7 @@ import { spawnSync } from 'child_process';
 import { resolve } from 'path';
 
 const SUITES = [
+  'test.ts',
   'test-standalone.ts',
   'test-security.ts',
   'test-adapters.ts',

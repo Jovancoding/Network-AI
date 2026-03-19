@@ -111,8 +111,8 @@ Match your problem to the Network-AI primitive:
 |---------|-----------|-----|
 | Two agents overwriting each other's data | `LockedBlackboard` | Atomic `propose → validate → commit` with file-system mutex |
 | Agent overspending token budget | `FederatedBudget` | Per-agent ceiling; hard cut-off on overspend |
-| Agent accessing a resource it shouldn't | `AuthGuardian` + `SecureTokenManager` | HMAC-signed scoped tokens required at every sensitive operation |
-| No audit trail for automated decisions | Audit log (`data/audit_log.jsonl`) | Cryptographic HMAC-signed chain, every write recorded |
+| Agent accessing a resource it shouldn't | `AuthGuardian` + `SecureTokenManager` | HMAC / Ed25519-signed scoped tokens required at every sensitive operation |
+| No audit trail for automated decisions | Audit log (`data/audit_log.jsonl`) | Cryptographic HMAC / Ed25519-signed chain, every write recorded |
 | Agent running out of turn / taking too many actions | `ComplianceMonitor` | TOOL_ABUSE, TURN_TAKING, RESPONSE_TIMEOUT, JOURNEY_TIMEOUT detected in real time |
 | Workflow needs defined states (e.g. INTAKE → REVIEW → APPROVE) | `JourneyFSM` | State machine gates which agents may act in which states |
 | Content safety / hallucination in agent outputs | `QualityGateAgent` + `BlackboardValidator` | Two-layer validation before output enters the blackboard |
@@ -304,11 +304,11 @@ Network-AI does **not** require or replace an external IAM system. `AuthGuardian
 AI Agent → AuthGuardian (justification scoring) → your IAM (final auth) → resource
 ```
 
-The HMAC secret (`HMAC_SECRET` env var) should be rotated on the same schedule as your other API keys and stored in your secret manager (AWS Secrets Manager, Azure Key Vault, HashiCorp Vault).
+The HMAC secret (`HMAC_SECRET` env var) should be rotated on the same schedule as your other API keys and stored in your secret manager (AWS Secrets Manager, Azure Key Vault, HashiCorp Vault). Alternatively, use `algorithm: 'ed25519'` for asymmetric signing — no shared secret required.
 
 ### Audit Log Retention
 
-The audit log at `data/audit_log.jsonl` is a HMAC-signed append-only chain. Each entry contains: timestamp, agentId, eventType, resource, outcome, and a chain signature.
+The audit log at `data/audit_log.jsonl` is a HMAC / Ed25519-signed append-only chain. Each entry contains: timestamp, agentId, eventType, resource, outcome, and a chain signature.
 
 - **GDPR / right to erasure:** Entries are immutable by design. If data subject erasure applies, store identifying data outside the log and reference only pseudonymized agent IDs inside it.
 - **Retention:** Rotate files using your standard log rotation tooling (logrotate, Fluentd, etc.). The chain continues across files — verification just needs the previous file's last hash.
@@ -327,7 +327,7 @@ Network-AI has **zero required external network calls**. All operations (blackbo
 Isolate tenants by:
 1. **Separate blackboard roots** — each tenant gets their own directory path passed to `LockedBlackboard(tenantPath)`
 2. **Separate budget pools** — prefix pool names with tenant ID: `tenant-abc:classifier`
-3. **Separate HMAC secrets** — one `SecureTokenManager` instance per tenant
+3. **Separate HMAC secrets / Ed25519 keypairs** — one `SecureTokenManager` instance per tenant
 4. **Namespace scoping** — use consistent key prefixes in the blackboard (e.g. `tenant-abc:invoice:42`)
 
 ### Scaling

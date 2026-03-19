@@ -4,14 +4,14 @@ This file is read automatically by Claude Code when working in this repository.
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 4.8.1.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 4.9.0.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 1,543 tests across 19 suites
+npm run test:all              # Run all 1,582 tests across 20 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 16 adapter tests
@@ -68,7 +68,7 @@ Tools: `blackboard_read`, `blackboard_write`, `blackboard_list`, `blackboard_del
 ## Security Requirements
 
 - AES-256-GCM encryption for data at rest
-- HMAC-SHA256 signed tokens with TTL
+- HMAC-SHA256 / Ed25519 signed tokens with TTL
 - No hardcoded secrets, keys, or credentials anywhere
 - Path traversal and injection protections on all file operations
 - Rate limiting on all public-facing endpoints

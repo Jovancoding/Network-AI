@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 4.8.x   | ✅ Yes — full support (current) |
+| 4.9.x   | ✅ Yes — full support (current) |
+| 4.8.x   | ✅ Security fixes only |
 | 4.7.x   | ✅ Security fixes only |
 | 4.6.x   | ✅ Security fixes only |
 | 4.5.x   | ✅ Security fixes only |
@@ -28,7 +29,7 @@ You will receive an acknowledgment within 48 hours and a detailed response withi
 Network-AI includes built-in security features:
 
 - **AES-256-GCM encryption** for blackboard data at rest
-- **HMAC-SHA256 signed tokens** via AuthGuardian with trust levels and scope restrictions
+- **HMAC-SHA256 / Ed25519 signed tokens** via AuthGuardian with trust levels and scope restrictions
 - **Rate limiting** to prevent abuse
 - **Path traversal protection** in the Python blackboard (regex + resolved-path boundary checks)
 - **Input validation** on all 20+ public API entry points
@@ -66,7 +67,7 @@ The security module (`security.ts`) provides defense-in-depth protections:
 
 | Component | Class | Purpose |
 |---|---|---|
-| Token Manager | `SecureTokenManager` | HMAC-signed tokens with expiration |
+| Token Manager | `SecureTokenManager` | HMAC / Ed25519-signed tokens with expiration |
 | Input Sanitizer | `InputSanitizer` | XSS, injection, path traversal prevention |
 | Rate Limiter | `RateLimiter` | Per-agent request throttling + lockout |
 | Encryptor | `DataEncryptor` | AES-256-GCM encryption for sensitive data |
@@ -116,7 +117,7 @@ python scripts/check_permission.py --audit-summary --last 50
 
 ## Audit Trail
 
-The `SecureAuditLogger` produces HMAC-signed entries in `data/audit_log.jsonl`.
+The `SecureAuditLogger` produces HMAC / Ed25519-signed entries in `data/audit_log.jsonl`.
 
 Logged events: `permission_granted`, `permission_denied`, `permission_revoked`, `ttl_cleanup`, `result_validated`, and all blackboard writes.
 

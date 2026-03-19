@@ -85,7 +85,7 @@ Permission gating before sensitive operations. Agents must request a token with 
 ```typescript
 const grant = auth.requestPermission('data_analyst', 'DATABASE', 'read',
   'Need customer order history for sales report');
-// grant.token is scoped HMAC-signed token with TTL
+// grant.token is scoped HMAC / Ed25519-signed token with TTL
 ```
 
 Resource types: `DATABASE` (risk 0.5), `PAYMENTS` (0.7), `EMAIL` (0.4), `FILE_EXPORT` (0.6)
@@ -307,6 +307,6 @@ Network-AI/
 │   ├── 04-live-swarm.ts
 │   └── 05-code-review-swarm.ts
 └── data/
-    ├── audit_log.jsonl           # HMAC-signed audit trail (local only)
+    ├── audit_log.jsonl           # HMAC / Ed25519-signed audit trail (local only)
     └── pending_changes/          # In-flight atomic change records
 ```

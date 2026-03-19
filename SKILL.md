@@ -743,7 +743,7 @@ npx network-ai-server --port 3001
 ```
 
 The companion npm package (`network-ai`) provides:
-- HMAC-signed audit tokens (vs UUID tokens in the Python layer)
+- HMAC / Ed25519-signed audit tokens (vs UUID tokens in the Python layer)
 - AES-256 blackboard encryption
 - A standalone MCP server for IDE integration (Claude, Cursor, VS Code)
 - 16 framework adapters (LangChain, AutoGen, CrewAI, DSPy, LlamaIndex, NemoClaw, etc.)

@@ -215,6 +215,133 @@ async function testAuthGuardian() {
   const activeGrants = authGuardian.getActiveGrants();
   log(`     Active grants: ${activeGrants.length}`, 'cyan');
   pass('Active grants retrieval');
+
+  // Test HMAC token signature verification
+  const hmacGuardian = new AuthGuardian();
+  const hmacGrant = await hmacGuardian.requestPermission(
+    'orchestrator', 'FILE_SYSTEM',
+    'Need to read configuration files for build pipeline task-101',
+    'read'
+  );
+  if (hmacGrant.granted && hmacGrant.grantToken) {
+    if (hmacGuardian.verifyTokenSignature(hmacGrant.grantToken)) {
+      pass('HMAC token signature verification');
+    } else {
+      fail('HMAC token signature verification');
+    }
+    if (hmacGuardian.getSigningAlgorithm() === 'hmac-sha256') {
+      pass('HMAC signing algorithm reported correctly');
+    } else {
+      fail('HMAC signing algorithm reported correctly');
+    }
+    if (hmacGuardian.exportPublicKey() === null) {
+      pass('HMAC guardian returns null public key');
+    } else {
+      fail('HMAC guardian returns null public key');
+    }
+  } else {
+    fail('HMAC grant for signature test');
+  }
+}
+
+// ============================================================================
+// TEST 2b: AuthGuardian Ed25519 Signing
+// ============================================================================
+
+async function testAuthGuardianEd25519() {
+  header('TEST 2b: AuthGuardian Ed25519 Signing');
+
+  const guardian = new AuthGuardian({ algorithm: 'ed25519' });
+
+  // Algorithm should be ed25519
+  if (guardian.getSigningAlgorithm() === 'ed25519') {
+    pass('Ed25519 signing algorithm configured');
+  } else {
+    fail('Ed25519 signing algorithm configured');
+  }
+
+  // Public key should be exportable
+  const pubKey = guardian.exportPublicKey();
+  if (pubKey && pubKey.includes('BEGIN PUBLIC KEY')) {
+    pass('Ed25519 public key exported in PEM format');
+    log(`     Public key: ${pubKey.split('\n')[1].substring(0, 30)}...`, 'cyan');
+  } else {
+    fail('Ed25519 public key exported in PEM format');
+  }
+
+  // Grant a permission and verify the token is signed
+  const grant = await guardian.requestPermission(
+    'orchestrator',
+    'FILE_SYSTEM',
+    'Need to read workspace files for code review analysis task-202',
+    'read'
+  );
+
+  if (grant.granted && grant.grantToken) {
+    pass('Ed25519 permission granted');
+    log(`     Token: ${grant.grantToken.substring(0, 40)}...`, 'cyan');
+
+    // Token should contain a dot separator (payload.signature)
+    if (grant.grantToken.includes('.')) {
+      pass('Ed25519 token contains signature');
+    } else {
+      fail('Ed25519 token contains signature');
+    }
+
+    // Signature should verify
+    if (guardian.verifyTokenSignature(grant.grantToken)) {
+      pass('Ed25519 token signature verifies');
+    } else {
+      fail('Ed25519 token signature verifies');
+    }
+
+    // Tampered token should not verify
+    const tampered = grant.grantToken.slice(0, -3) + 'xxx';
+    if (!guardian.verifyTokenSignature(tampered)) {
+      pass('Tampered Ed25519 token rejected');
+    } else {
+      fail('Tampered Ed25519 token rejected');
+    }
+
+    // Token should still validate (active, not expired)
+    if (guardian.validateToken(grant.grantToken)) {
+      pass('Ed25519 token validates as active');
+    } else {
+      fail('Ed25519 token validates as active');
+    }
+
+    // Revocation should work
+    guardian.revokeToken(grant.grantToken);
+    if (!guardian.validateToken(grant.grantToken)) {
+      pass('Ed25519 token revocation works');
+    } else {
+      fail('Ed25519 token revocation works');
+    }
+  } else {
+    fail('Ed25519 permission granted', grant.reason);
+  }
+
+  // A different Ed25519 guardian should not verify tokens from the first
+  const guardian2 = new AuthGuardian({ algorithm: 'ed25519' });
+  const grant2 = await guardian.requestPermission(
+    'orchestrator', 'GIT',
+    'Need to check git status for deployment verification task-303',
+    'read'
+  );
+  // Revoked guardian's token tested with guardian2 — but we need a non-revoked token
+  const grant3 = await guardian2.requestPermission(
+    'orchestrator', 'FILE_SYSTEM',
+    'Need to read build output files for quality check task-404',
+    'read'
+  );
+  if (grant3.granted && grant3.grantToken) {
+    // guardian (different keypair) should not verify guardian2's token
+    if (!guardian.verifyTokenSignature(grant3.grantToken)) {
+      pass('Cross-guardian Ed25519 verification correctly fails');
+    } else {
+      fail('Cross-guardian Ed25519 verification correctly fails');
+    }
+  }
 }
 
 // ============================================================================
@@ -426,6 +553,7 @@ async function runAllTests() {
   try {
     await testBlackboard();
     await testAuthGuardian();
+    await testAuthGuardianEd25519();
     await testSwarmOrchestrator();
     await testTaskDelegation();
     await testFilePersistence();
@@ -438,6 +566,7 @@ async function runAllTests() {
     log('  Core components verified:', 'cyan');
     log('    * SharedBlackboard: Read/Write/TTL/Persistence [PASS]', 'cyan');
     log('    * AuthGuardian: Permission Wall enforcement [PASS]', 'cyan');
+    log('    * AuthGuardian: Ed25519 signing & verification [PASS]', 'cyan');
     log('    * SwarmOrchestrator: All capabilities [PASS]', 'cyan');
     log('    * File persistence: Markdown blackboard [PASS]', 'cyan');
     log('', 'reset');

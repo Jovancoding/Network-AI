@@ -6,7 +6,7 @@
   <title>Network-AI | Multi-Agent Orchestration for Production Systems</title>
   <meta name="description" content="Network-AI is a TypeScript/Node.js multi-agent orchestration layer with shared-state locking, permission gating, audit trails, FSM governance, and 16 framework adapters.">
   <meta property="og:title" content="Network-AI | Multi-Agent Orchestration for Production Systems">
-  <meta property="og:description" content="Shared-state locking, HMAC permission tokens, audit trails, budgets, compliance monitoring, and 16 adapters for modern agent stacks.">
+  <meta property="og:description" content="Shared-state locking, HMAC / Ed25519 permission tokens, audit trails, budgets, compliance monitoring, and 16 adapters for modern agent stacks.">
   <meta property="og:url" content="https://jovancoding.github.io/Network-AI/">
   <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -958,8 +958,8 @@
             </div>
             <div class="hero-signals">
               <span class="signal">16 adapters supported</span>
-              <span class="signal">1,543 tests passing</span>
-              <span class="signal">19 suites</span>
+              <span class="signal">1,582 tests passing</span>
+              <span class="signal">20 suites</span>
               <span class="signal">MIT licensed</span>
             </div>
           </div>
@@ -970,7 +970,7 @@
                 <h2>Release snapshot</h2>
                 <p>What ships with the current public release.</p>
               </div>
-              <span class="badge">v4.8.1</span>
+              <span class="badge">v4.9.0</span>
             </div>
             <div class="metrics">
               <div class="metric">
@@ -982,7 +982,7 @@
                 <div class="metric-label">Adapter runtime deps</div>
               </div>
               <div class="metric">
-                <strong>HMAC</strong>
+                <strong>HMAC / Ed25519</strong>
                 <div class="metric-label">Permission tokens</div>
               </div>
               <div class="metric">
@@ -995,7 +995,7 @@
               <ul class="stack-list">
                 <li><strong>Agent frameworks</strong><span>LangChain, CrewAI, AutoGen, NemoClaw, MCP</span></li>
                 <li><strong>Control primitives</strong><span>Blackboard, AuthGuardian, JourneyFSM, budgets</span></li>
-                <li><strong>Auditability</strong><span>Append-only HMAC audit log and compliance monitor</span></li>
+                <li><strong>Auditability</strong><span>Append-only HMAC / Ed25519 audit log and compliance monitor</span></li>
               </ul>
             </div>
           </aside>
@@ -1057,7 +1057,7 @@
             </p>
             <ul class="split-points">
               <li>Atomic blackboard writes prevent split-brain state.</li>
-              <li>AuthGuardian issues HMAC-signed scoped tokens with TTL.</li>
+              <li>AuthGuardian issues HMAC / Ed25519-signed scoped tokens with TTL.</li>
               <li>JourneyFSM blocks agents from skipping authorized stages.</li>
               <li>ComplianceMonitor watches behavior continuously, not after the fact.</li>
             </ul>
@@ -1092,7 +1092,7 @@
             <p>Agents must justify access before touching protected resources. Grants are signed, scoped, and time-limited.</p>
             <ul>
               <li>40/30/30 weighted scoring</li>
-              <li>HMAC-signed grant tokens</li>
+              <li>HMAC / Ed25519-signed grant tokens</li>
               <li>Fine-grained resource protection</li>
             </ul>
           </article>

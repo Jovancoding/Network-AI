@@ -13,7 +13,7 @@
 
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
+import { randomUUID, generateKeyPairSync, sign as ed25519Sign, verify as ed25519Verify, createHmac, KeyObject } from 'crypto';
 import { AdapterRegistry } from './adapters/adapter-registry';
 import { InputSanitizer, SecureSwarmGateway } from './security';
 import type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions } from './lib/locked-blackboard';
@@ -662,15 +662,35 @@ class AuthGuardian {
   private auditLog: Array<{ timestamp: string; action: string; details: unknown }> = [];
   private auditLogPath: string;
   private trustConfigPath: string;
+  private readonly signingAlgorithm: 'hmac-sha256' | 'ed25519';
+  private readonly hmacSecret: string;
+  private readonly ed25519PrivateKey: KeyObject | null;
+  private readonly ed25519PublicKey: KeyObject | null;
 
   constructor(options?: {
     trustLevels?: AgentTrustConfig[];
     resourceProfiles?: Record<string, ResourceProfile>;
     auditLogPath?: string;
     trustConfigPath?: string;
+    /** Signing algorithm for grant tokens. Default: 'hmac-sha256'. */
+    algorithm?: 'hmac-sha256' | 'ed25519';
+    /** HMAC secret (only used when algorithm is 'hmac-sha256'). Auto-generated if omitted. */
+    hmacSecret?: string;
   }) {
     this.auditLogPath = options?.auditLogPath ?? CONFIG.auditLogPath;
     this.trustConfigPath = options?.trustConfigPath ?? CONFIG.trustConfigPath;
+    this.signingAlgorithm = options?.algorithm ?? 'hmac-sha256';
+
+    if (this.signingAlgorithm === 'ed25519') {
+      const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+      this.ed25519PrivateKey = privateKey;
+      this.ed25519PublicKey = publicKey;
+      this.hmacSecret = '';
+    } else {
+      this.ed25519PrivateKey = null;
+      this.ed25519PublicKey = null;
+      this.hmacSecret = options?.hmacSecret ?? randomUUID();
+    }
 
     // Load resource profiles (user-provided + defaults)
     const profiles = { ...DEFAULT_RESOURCE_PROFILES, ...(options?.resourceProfiles ?? {}) };
@@ -1071,7 +1091,61 @@ class AuthGuardian {
   }
 
   private generateGrantToken(): string {
-    return `grant_${randomUUID().replace(/-/g, '')}`;
+    const id = randomUUID().replace(/-/g, '');
+    const payload = `grant_${id}`;
+    if (this.signingAlgorithm === 'ed25519' && this.ed25519PrivateKey) {
+      const sig = ed25519Sign(null, Buffer.from(payload), this.ed25519PrivateKey).toString('base64url');
+      return `${payload}.${sig}`;
+    }
+    // HMAC: append signature so tokens are tamper-evident
+    const sig = createHmac('sha256', this.hmacSecret).update(payload).digest('base64url');
+    return `${payload}.${sig}`;
+  }
+
+  /**
+   * Verify a grant token's cryptographic signature.
+   * For Ed25519 tokens, this can be done by any party holding the public key.
+   * For HMAC tokens, only the issuing AuthGuardian can verify.
+   *
+   * @param token - The grant token to verify
+   * @returns `true` if the signature is valid
+   */
+  verifyTokenSignature(token: string): boolean {
+    const dotIndex = token.lastIndexOf('.');
+    if (dotIndex === -1) return false;
+    const payload = token.slice(0, dotIndex);
+    const sig = token.slice(dotIndex + 1);
+    if (this.signingAlgorithm === 'ed25519' && this.ed25519PublicKey) {
+      try {
+        return ed25519Verify(null, Buffer.from(payload), this.ed25519PublicKey, Buffer.from(sig, 'base64url'));
+      } catch {
+        return false;
+      }
+    }
+    const expected = createHmac('sha256', this.hmacSecret).update(payload).digest('base64url');
+    // Constant-time comparison
+    if (expected.length !== sig.length) return false;
+    let result = 0;
+    for (let i = 0; i < expected.length; i++) {
+      result |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
+    }
+    return result === 0;
+  }
+
+  /**
+   * Get the signing algorithm used by this AuthGuardian instance.
+   */
+  getSigningAlgorithm(): 'hmac-sha256' | 'ed25519' {
+    return this.signingAlgorithm;
+  }
+
+  /**
+   * Export the Ed25519 public key in PEM format for third-party verification.
+   * Returns `null` if the instance uses HMAC signing.
+   */
+  exportPublicKey(): string | null {
+    if (!this.ed25519PublicKey) return null;
+    return this.ed25519PublicKey.export({ type: 'spki', format: 'pem' }) as string;
   }
 
   private log(action: string, details: unknown): void {

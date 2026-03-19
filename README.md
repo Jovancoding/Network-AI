@@ -5,9 +5,9 @@
 [![Website](https://img.shields.io/badge/website-jovancoding.github.io/Network--AI-4b9df2?style=flat&logo=github-pages&logoColor=white)](https://jovancoding.github.io/Network-AI/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.8.1-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.9.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-1543%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1582%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-16%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -21,7 +21,7 @@
 Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordination, guardrails, and governance to any AI agent stack.
 
 - **Shared blackboard with locking** — atomic `propose → validate → commit` prevents race conditions and split-brain failures across parallel agents
-- **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC audit trails, and permission gating
+- **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC / Ed25519 audit trails, and permission gating
 - **16 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, MiniMax, and NemoClaw — no glue code, no lock-in
 - **Persistent project memory (Layer 3)** — `context_manager.py` injects decisions, goals, stack, milestones, and banned patterns into every system prompt so agents always have full project context
 
@@ -56,7 +56,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 |---|---|
 | Race conditions in parallel agents | Atomic blackboard: `propose → validate → commit` with file-system mutex |
 | Agent overspend / runaway costs | `FederatedBudget` — hard per-agent token ceilings with live spend tracking |
-| No visibility into what agents did | HMAC-signed audit log on every write, permission grant, and FSM transition |
+| No visibility into what agents did | HMAC / Ed25519-signed audit log on every write, permission grant, and FSM transition |
 | Locked into one AI framework | 16 adapters — mix LangChain + AutoGen + CrewAI + Codex + MiniMax + NemoClaw + custom in one swarm |
 | Agents escalating beyond their scope | `AuthGuardian` — scoped permission tokens required before sensitive operations |
 | Agents lack project context between runs | `ProjectContextManager` (Layer 3) — inject decisions, goals, stack, and milestones into every system prompt |
@@ -161,7 +161,7 @@ curl http://localhost:3001/tools    # full tool list
 **Tools exposed over MCP:**
 - `blackboard_read` / `blackboard_write` / `blackboard_list` / `blackboard_delete` / `blackboard_exists`
 - `budget_status` / `budget_spend` / `budget_reset` — federated token tracking
-- `token_create` / `token_validate` / `token_revoke` — HMAC-signed permission tokens
+- `token_create` / `token_validate` / `token_revoke` — HMAC / Ed25519-signed permission tokens
 - `audit_query` — query the append-only audit log
 - `config_get` / `config_set` — live orchestrator configuration
 - `agent_list` / `agent_spawn` / `agent_stop` — agent lifecycle
@@ -331,7 +331,7 @@ npm run test:priority     # Priority & preemption
 npm run test:cli          # CLI layer
 ```
 
-**1,543 passing assertions across 19 test suites** (`npm run test:all`):
+**1,582 passing assertions across 20 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
