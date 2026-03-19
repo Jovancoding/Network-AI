@@ -263,6 +263,14 @@ npm run demo -- --07
 
 [![Code Review Swarm Demo](https://img.youtube.com/vi/UyMsNhaw9lU/0.jpg)](https://youtu.be/UyMsNhaw9lU)
 
+**NemoClaw sandbox swarm** *(no API key)* — 3 agents in isolated NVIDIA NemoClaw sandboxes with deny-by-default network policies:
+
+```bash
+npx ts-node examples/10-nemoclaw-sandbox-swarm.ts
+```
+
+[![NemoClaw Sandbox Demo](https://img.youtube.com/vi/c-UWDrdP4ZE/0.jpg)](https://www.youtube.com/watch?v=c-UWDrdP4ZE)
+
 ---
 
 ## Adapter System
