@@ -145,6 +145,18 @@ npx ts-node examples/08-control-plane-stress-demo.ts
 
 ---
 
+## 10 · NemoClaw Sandbox Swarm
+
+No API key required. Three agents in isolated NVIDIA NemoClaw sandboxes with deny-by-default network policies.
+
+```bash
+npx ts-node examples/10-nemoclaw-sandbox-swarm.ts
+```
+
+[![NemoClaw Sandbox Demo](https://img.youtube.com/vi/c-UWDrdP4ZE/0.jpg)](https://www.youtube.com/watch?v=c-UWDrdP4ZE)
+
+---
+
 ## Next steps
 
 | Goal | Starting point |
