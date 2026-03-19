@@ -52,7 +52,7 @@ flowchart TD
     PC -->|"injected into system prompt"| SO
 
     subgraph SO["SwarmOrchestrator"]
-        AG["AuthGuardian\n(permission gating)"]:::security
+        AG["AuthGuardian\n(HMAC / Ed25519 permission tokens)"]:::security
         AR["AdapterRegistry\n(route tasks to frameworks)"]:::routing
         QG["QualityGateAgent\n(validate blackboard writes)"]:::quality
         BB["SharedBlackboard\n(shared agent state)\npropose → validate → commit\nfilesystem mutex"]:::blackboard
@@ -64,7 +64,7 @@ flowchart TD
         QG -->|"validates"| BB
     end
 
-    SO --> AUDIT["data/audit_log.jsonl"]:::audit
+    SO --> AUDIT["data/audit_log.jsonl\n(HMAC / Ed25519-signed)"]:::audit
 ```
 
 > `FederatedBudget` is a standalone export — instantiate it separately and optionally wire it to a blackboard backend for cross-node token budget enforcement.
