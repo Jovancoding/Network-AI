@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Network-AI — Multi-Agent Orchestrator</title>
+  <meta name="description" content="TypeScript/Node.js multi-agent orchestrator with shared state, guardrails, budgets, and 16 framework adapters. Zero lock-in.">
+  <meta property="og:title" content="Network-AI — Multi-Agent Orchestrator">
+  <meta property="og:description" content="Shared blackboard with locking, permission gating, FSM governance, and 16 framework adapters. Zero lock-in.">
+  <meta property="og:url" content="https://jovancoding.github.io/Network-AI/">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --purple: #bc8cff;
+      --orange: #f0883e;
+      --red: #f85149;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 80px 20px 60px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 1.25rem;
+      color: var(--text-dim);
+      max-width: 600px;
+      margin: 0 auto 32px;
+    }
+    .hero-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn:hover { text-decoration: none; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .btn-primary { background: var(--accent); color: var(--bg); }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
+    /* Install strip */
+    .install {
+      text-align: center;
+      padding: 20px;
+      margin-bottom: 40px;
+    }
+    .install code {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      color: var(--green);
+      user-select: all;
+    }
+
+    /* Stats */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      padding: 0 20px 60px;
+      flex-wrap: wrap;
+    }
+    .stat {
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+    }
+
+    /* Problem section */
+    .problem {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .problem h2 { font-size: 1.8rem; margin-bottom: 16px; }
+    .problem p { color: var(--text-dim); font-size: 1.05rem; }
+    .problem code {
+      background: var(--surface);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      color: var(--orange);
+    }
+
+    /* Features grid */
+    .features {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 40px 20px 60px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .feature {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .feature-icon { font-size: 1.5rem; margin-bottom: 8px; }
+    .feature h3 { font-size: 1.1rem; margin-bottom: 8px; }
+    .feature p { font-size: 0.9rem; color: var(--text-dim); }
+
+    /* Adapters */
+    .adapters {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .adapters h2 { font-size: 1.8rem; margin-bottom: 8px; }
+    .adapters .subtitle { color: var(--text-dim); margin-bottom: 24px; }
+    .adapter-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .adapter-tag {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    /* Demo section */
+    .demo {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .demo h2 { font-size: 1.8rem; margin-bottom: 24px; }
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .demo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: transform 0.15s;
+    }
+    .demo-card:hover { transform: translateY(-2px); text-decoration: none; }
+    .demo-card img {
+      width: 100%;
+      aspect-ratio: 16/9;
+      object-fit: cover;
+      display: block;
+    }
+    .demo-card .demo-label {
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* Code example */
+    .example {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 40px 20px 60px;
+    }
+    .example h2 { font-size: 1.8rem; margin-bottom: 24px; text-align: center; }
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.85rem;
+      line-height: 1.7;
+    }
+    .code-block .kw { color: var(--purple); }
+    .code-block .fn { color: #d2a8ff; }
+    .code-block .str { color: #a5d6ff; }
+    .code-block .cm { color: var(--text-dim); }
+    .code-block .type { color: #ff7b72; }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      border-top: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+    footer .links {
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 2rem; }
+      .stats { gap: 24px; }
+      .stat-num { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>Network-AI</h1>
+    <p>Multi-agent orchestrator for TypeScript/Node.js — shared state, guardrails, budgets, and cross-framework coordination.</p>
+    <div class="hero-buttons">
+      <a href="https://github.com/Jovancoding/Network-AI" class="btn btn-primary">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+      <a href="https://www.npmjs.com/package/network-ai" class="btn btn-secondary">
+        <svg width="18" height="18" viewBox="0 0 18 7" fill="currentColor"><path d="M0 0h18v6H9v1H5V6H0V0zm1 5h2V2h1v3h1V1H1v4zm5-4v5h2V5h2V1H6zm3 3H8V2h1v2zm1-3v4h2V2h1v2h1V2h1v3h1V1h-6z"/></svg>
+        npm
+      </a>
+      <a href="https://discord.gg/Cab5vAxc86" class="btn btn-secondary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
+        Discord
+      </a>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <div class="install">
+    <code>npm install network-ai</code>
+  </div>
+
+  <!-- Stats -->
+  <section class="stats">
+    <div class="stat">
+      <div class="stat-num">16</div>
+      <div class="stat-label">Framework Adapters</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">1,543</div>
+      <div class="stat-label">Tests Passing</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">19</div>
+      <div class="stat-label">Test Suites</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">0</div>
+      <div class="stat-label">Runtime Dependencies*</div>
+    </div>
+  </section>
+
+  <!-- Problem -->
+  <section class="problem">
+    <h2>The silent failure mode in multi-agent systems</h2>
+    <p>Parallel agents writing to the same key use last-write-wins by default — one agent's result silently overwrites another's mid-flight. The outcome is split-brain state: double-spends, contradictory decisions, corrupted context, no error thrown. Network-AI's <code>propose → validate → commit</code> mutex prevents this at the coordination layer.</p>
+  </section>
+
+  <!-- Features -->
+  <section class="features">
+    <div class="feature">
+      <div class="feature-icon">🔒</div>
+      <h3>Shared Blackboard with Locking</h3>
+      <p>Atomic <code>propose → validate → commit</code> with file-system mutex. Prevents race conditions and split-brain failures across parallel agents.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🛡️</div>
+      <h3>Permission Gating</h3>
+      <p>AuthGuardian scores justification quality (40%), trust level (30%), and resource risk (30%) before issuing HMAC-signed tokens.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📊</div>
+      <h3>Federated Budgets</h3>
+      <p>Per-agent token ceilings. Rogue agents get cut off mid-task. Budget tracking with real-time spend monitoring.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔄</div>
+      <h3>FSM Governance</h3>
+      <p>JourneyFSM enforces explicit state transitions. Agents can't skip stages or act outside their authorized workflow.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📝</div>
+      <h3>HMAC Audit Trail</h3>
+      <p>Every write, permission grant, and state transition logged to a tamper-evident, append-only audit log.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">👁️</div>
+      <h3>Compliance Monitor</h3>
+      <p>Real-time agent behavior surveillance with configurable violation policies and severity classification.</p>
+    </div>
+  </section>
+
+  <!-- Adapters -->
+  <section class="adapters">
+    <h2>16 Framework Adapters</h2>
+    <p class="subtitle">Zero runtime dependencies for adapters — bring your own client.</p>
+    <div class="adapter-grid">
+      <span class="adapter-tag">LangChain</span>
+      <span class="adapter-tag">AutoGen</span>
+      <span class="adapter-tag">CrewAI</span>
+      <span class="adapter-tag">OpenAI Assistants</span>
+      <span class="adapter-tag">LlamaIndex</span>
+      <span class="adapter-tag">Semantic Kernel</span>
+      <span class="adapter-tag">Haystack</span>
+      <span class="adapter-tag">DSPy</span>
+      <span class="adapter-tag">Agno</span>
+      <span class="adapter-tag">MCP</span>
+      <span class="adapter-tag">OpenClaw</span>
+      <span class="adapter-tag">A2A</span>
+      <span class="adapter-tag">Codex</span>
+      <span class="adapter-tag">MiniMax</span>
+      <span class="adapter-tag">NemoClaw</span>
+      <span class="adapter-tag">Custom</span>
+    </div>
+  </section>
+
+  <!-- Demos -->
+  <section class="demo">
+    <h2>Demos</h2>
+    <div class="demo-grid">
+      <a href="https://www.youtube.com/watch?v=UyMsNhaw9lU" class="demo-card" target="_blank" rel="noopener">
+        <img src="https://img.youtube.com/vi/UyMsNhaw9lU/mqdefault.jpg" alt="Code Review Swarm Demo" loading="lazy">
+        <div class="demo-label">05 · Code Review Swarm</div>
+      </a>
+      <a href="https://www.youtube.com/watch?v=niVRZJu1MEo" class="demo-card" target="_blank" rel="noopener">
+        <img src="https://img.youtube.com/vi/niVRZJu1MEo/mqdefault.jpg" alt="Control Plane Stress Demo" loading="lazy">
+        <div class="demo-label">08 · Control Plane Stress</div>
+      </a>
+      <a href="https://www.youtube.com/watch?v=c-UWDrdP4ZE" class="demo-card" target="_blank" rel="noopener">
+        <img src="https://img.youtube.com/vi/c-UWDrdP4ZE/mqdefault.jpg" alt="NemoClaw Sandbox Demo" loading="lazy">
+        <div class="demo-label">10 · NemoClaw Sandbox Swarm</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Quick Example -->
+  <section class="example">
+    <h2>Quick Start</h2>
+    <div class="code-block">
+<span class="kw">import</span> { createSwarmOrchestrator } <span class="kw">from</span> <span class="str">'network-ai'</span>;
+<span class="kw">import</span> { AdapterRegistry, CustomAdapter } <span class="kw">from</span> <span class="str">'network-ai/adapters'</span>;
+
+<span class="kw">const</span> orchestrator = <span class="fn">createSwarmOrchestrator</span>({
+  agentId: <span class="str">'my-app'</span>,
+  swarmName: <span class="str">'My Swarm'</span>,
+});
+
+<span class="kw">const</span> adapter = <span class="kw">new</span> <span class="type">CustomAdapter</span>();
+adapter.<span class="fn">registerHandler</span>(<span class="str">'greeter'</span>, <span class="kw">async</span> (payload) =&gt; {
+  <span class="kw">return</span> { greeting: <span class="str">`Hello, ${payload.handoff?.instruction}!`</span> };
+});
+
+<span class="kw">const</span> registry = <span class="kw">new</span> <span class="type">AdapterRegistry</span>();
+<span class="kw">await</span> registry.<span class="fn">addAdapter</span>(adapter);
+<span class="kw">await</span> registry.<span class="fn">executeAgent</span>(<span class="str">'custom:greeter'</span>, {
+  action: <span class="str">'greet'</span>,
+  handoff: { instruction: <span class="str">'World'</span> },
+});
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="links">
+      <a href="https://github.com/Jovancoding/Network-AI">GitHub</a>
+      <a href="https://www.npmjs.com/package/network-ai">npm</a>
+      <a href="https://clawhub.ai/skills/network-ai">ClawHub</a>
+      <a href="https://glama.ai/mcp/servers/Jovancoding/network-ai">Glama</a>
+      <a href="https://discord.gg/Cab5vAxc86">Discord</a>
+      <a href="https://github.com/Jovancoding/Network-AI/blob/main/QUICKSTART.md">Quick Start</a>
+      <a href="https://github.com/Jovancoding/Network-AI/blob/main/INTEGRATION_GUIDE.md">Integration Guide</a>
+    </div>
+    <p>MIT License · Built by <a href="https://github.com/Jovancoding">Jovancoding</a></p>
+    <p style="margin-top: 8px; font-size: 0.8rem;">*Adapters have zero runtime deps — BYOC (bring your own client)</p>
+  </footer>
+
+</body>
+</html>
