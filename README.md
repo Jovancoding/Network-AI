@@ -2,6 +2,7 @@
 
 **TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination**
 
+[![Website](https://img.shields.io/badge/website-jovancoding.github.io/Network--AI-4b9df2?style=flat&logo=github-pages&logoColor=white)](https://jovancoding.github.io/Network-AI/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/badge/release-v4.8.1-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
