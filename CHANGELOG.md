@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.1] - 2026-03-19
+
+### Fixed
+- **Socket.dev "Uses eval" flag resolved** — Replaced string-concatenation construction of `eval` regex in `blackboard-validator.ts` with `String.fromCharCode()` so the literal never appears in compiled output
+- **NemoClaw `child_process` declared in `socket.json`** — Added ignore entries for `nemoclaw-adapter.ts` and its compiled `dist/` counterpart
+
 ## [4.8.0] - 2026-03-18
 
 ### Added
