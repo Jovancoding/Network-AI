@@ -75,13 +75,9 @@ flowchart TD
     classDef blackboard fill:#0c4a6e,stroke:#0284c7,color:#bae6fd
     classDef adapters   fill:#064e3b,stroke:#059669,color:#a7f3d0
     classDef audit      fill:#1e293b,stroke:#475569,color:#94a3b8
-    classDef context    fill:#3b1f00,stroke:#b45309,color:#fef3c7
 
     App["Your Application"]:::app
     App -->|"createSwarmOrchestrator()"| SO
-
-    PC["ProjectContextManager\n(Layer 3 — persistent memory)\ngoals · stack · decisions\nmilestones · banned"]:::context
-    PC -->|"injected into system prompt"| SO
 
     subgraph SO["SwarmOrchestrator"]
         AG["AuthGuardian\n(HMAC / Ed25519 permission tokens)"]:::security
@@ -100,6 +96,8 @@ flowchart TD
 ```
 
 > `FederatedBudget` is a standalone export — instantiate it separately and optionally wire it to a blackboard backend for cross-node token budget enforcement.
+>
+> `ProjectContextManager` is a Layer-3 Python helper (`scripts/context_manager.py`) that injects persistent project goals, decisions, and milestones into agent system prompts — see [ARCHITECTURE.md § Layer 3](ARCHITECTURE.md#layer-3--projectcontextmanager).
 
 → [Full architecture, FSM journey, and handoff protocol](ARCHITECTURE.md)
 
