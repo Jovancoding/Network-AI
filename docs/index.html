@@ -3,426 +3,1268 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Network-AI — Multi-Agent Orchestrator</title>
-  <meta name="description" content="TypeScript/Node.js multi-agent orchestrator with shared state, guardrails, budgets, and 16 framework adapters. Zero lock-in.">
-  <meta property="og:title" content="Network-AI — Multi-Agent Orchestrator">
-  <meta property="og:description" content="Shared blackboard with locking, permission gating, FSM governance, and 16 framework adapters. Zero lock-in.">
+  <title>Network-AI | Multi-Agent Orchestration for Production Systems</title>
+  <meta name="description" content="Network-AI is a TypeScript/Node.js multi-agent orchestration layer with shared-state locking, permission gating, audit trails, FSM governance, and 16 framework adapters.">
+  <meta property="og:title" content="Network-AI | Multi-Agent Orchestration for Production Systems">
+  <meta property="og:description" content="Shared-state locking, HMAC permission tokens, audit trails, budgets, compliance monitoring, and 16 adapters for modern agent stacks.">
   <meta property="og:url" content="https://jovancoding.github.io/Network-AI/">
   <meta property="og:type" content="website">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230f2340'/><path d='M18 22h10l4 6-4 6H18l-4-6 4-6zm18 0h10l4 6-4 6H36l-4-6 4-6zm-9 16h10l4 6-4 6H27l-4-6 4-6z' fill='%2387c9ff'/></svg>">
   <style>
     :root {
-      --bg: #0d1117;
-      --surface: #161b22;
-      --border: #30363d;
-      --text: #e6edf3;
-      --text-dim: #8b949e;
-      --accent: #58a6ff;
-      --green: #3fb950;
-      --purple: #bc8cff;
-      --orange: #f0883e;
-      --red: #f85149;
+      --ink: #10233c;
+      --ink-soft: #4c6481;
+      --paper: #eef6ff;
+      --paper-strong: #fbfdff;
+      --panel: rgba(251, 253, 255, 0.8);
+      --line: rgba(16, 35, 60, 0.1);
+      --brand: #4b9df2;
+      --brand-deep: #2a6fc3;
+      --accent: #173b66;
+      --accent-soft: #dfeeff;
+      --success: #2d8f70;
+      --shadow: 0 18px 50px rgba(23, 59, 102, 0.08);
+      --radius-lg: 28px;
+      --radius-md: 18px;
+      --max-width: 1180px;
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-    }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
 
-    /* Hero */
-    .hero {
-      text-align: center;
-      padding: 80px 20px 60px;
-      max-width: 800px;
-      margin: 0 auto;
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
-    .hero h1 {
-      font-size: 3rem;
-      font-weight: 800;
-      margin-bottom: 16px;
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+
+    html {
+      scroll-behavior: smooth;
     }
-    .hero p {
-      font-size: 1.25rem;
-      color: var(--text-dim);
-      max-width: 600px;
-      margin: 0 auto 32px;
+
+    body {
+      font-family: "Manrope", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(135, 201, 255, 0.26), transparent 30%),
+        radial-gradient(circle at 85% 18%, rgba(75, 157, 242, 0.14), transparent 24%),
+        linear-gradient(180deg, #f3f9ff 0%, #e8f2fc 100%);
+      line-height: 1.55;
+      min-height: 100vh;
     }
-    .hero-buttons {
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    code,
+    pre,
+    .eyebrow,
+    .metric-label,
+    .terminal-meta,
+    .signal,
+    .tag,
+    .badge {
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .shell {
+      width: min(var(--max-width), calc(100% - 32px));
+      margin: 20px auto 32px;
+    }
+
+    .page-frame {
+      border: 1px solid rgba(20, 32, 51, 0.08);
+      border-radius: 32px;
+      background: rgba(248, 252, 255, 0.78);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .page-frame::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(130deg, rgba(255, 255, 255, 0.35), transparent 30%),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.18), transparent 25%);
+    }
+
+    .topbar {
       display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 22px 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(246, 251, 255, 0.86);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(16px);
     }
-    .btn {
+
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #14345a, #5caef7);
+      display: grid;
+      place-items: center;
+    }
+
+    .brand-mark svg {
+      width: 24px;
+      height: 24px;
+      color: #e9f7ff;
+    }
+
+    .brand-copy strong {
+      display: block;
+      font-size: 1rem;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-copy span {
+      display: block;
+      color: var(--ink-soft);
+      font-size: 0.87rem;
+    }
+
+    .topnav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .nav-link,
+    .cta,
+    .subtle-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 999px;
+      transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+
+    .nav-link {
+      padding: 10px 14px;
+      color: var(--ink-soft);
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+
+    .nav-link:hover,
+    .subtle-cta:hover,
+    .cta:hover,
+    .video-card:hover,
+    .feature-card:hover,
+    .proof-card:hover,
+    .stack-card:hover,
+    .architecture-panel:hover {
+      transform: translateY(-2px);
+    }
+
+    .cta,
+    .subtle-cta {
+      padding: 12px 18px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .cta {
+      background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+      color: #f7fbff;
+      box-shadow: 0 12px 24px rgba(42, 111, 195, 0.2);
+    }
+
+    .subtle-cta {
+      background: rgba(75, 157, 242, 0.08);
+      color: var(--accent);
+      border: 1px solid rgba(75, 157, 242, 0.18);
+    }
+
+    section {
+      padding: 0 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero {
+      padding-top: 44px;
+      padding-bottom: 34px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      gap: 28px;
+      align-items: stretch;
+    }
+
+    .hero-copy,
+    .hero-panel,
+    .proof-card,
+    .feature-card,
+    .video-card,
+    .stack-card,
+    .architecture-panel,
+    .terminal {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .hero-copy {
+      padding: 34px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-copy::after {
+      content: "";
+      position: absolute;
+      width: 220px;
+      height: 220px;
+      right: -70px;
+      top: -70px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(135, 201, 255, 0.34), transparent 68%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
-      transition: transform 0.15s, box-shadow 0.15s;
-    }
-    .btn:hover { text-decoration: none; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-    .btn-primary { background: var(--accent); color: var(--bg); }
-    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
-
-    /* Install strip */
-    .install {
-      text-align: center;
-      padding: 20px;
-      margin-bottom: 40px;
-    }
-    .install code {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-size: 1.1rem;
-      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      color: var(--green);
-      user-select: all;
+      font-size: 0.79rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--brand-deep);
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: rgba(75, 157, 242, 0.12);
+      margin-bottom: 18px;
     }
 
-    /* Stats */
-    .stats {
+    .eyebrow::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--brand);
+    }
+
+    h1,
+    h2,
+    h3 {
+      letter-spacing: -0.045em;
+    }
+
+    h1 {
+      font-size: clamp(2.7rem, 5vw, 5.4rem);
+      line-height: 0.95;
+      max-width: 12ch;
+      margin-bottom: 20px;
+    }
+
+    .hero-copy p {
+      font-size: 1.08rem;
+      color: var(--ink-soft);
+      max-width: 60ch;
+    }
+
+    .hero-actions {
       display: flex;
-      justify-content: center;
-      gap: 40px;
-      padding: 0 20px 60px;
+      gap: 12px;
+      margin-top: 26px;
       flex-wrap: wrap;
     }
-    .stat {
-      text-align: center;
-    }
-    .stat-num {
-      font-size: 2.5rem;
-      font-weight: 800;
-      color: var(--accent);
-    }
-    .stat-label {
-      font-size: 0.9rem;
-      color: var(--text-dim);
-    }
 
-    /* Problem section */
-    .problem {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      text-align: center;
-    }
-    .problem h2 { font-size: 1.8rem; margin-bottom: 16px; }
-    .problem p { color: var(--text-dim); font-size: 1.05rem; }
-    .problem code {
-      background: var(--surface);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.95rem;
-      color: var(--orange);
-    }
-
-    /* Features grid */
-    .features {
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 40px 20px 60px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 20px;
-    }
-    .feature {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-    }
-    .feature-icon { font-size: 1.5rem; margin-bottom: 8px; }
-    .feature h3 { font-size: 1.1rem; margin-bottom: 8px; }
-    .feature p { font-size: 0.9rem; color: var(--text-dim); }
-
-    /* Adapters */
-    .adapters {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      text-align: center;
-    }
-    .adapters h2 { font-size: 1.8rem; margin-bottom: 8px; }
-    .adapters .subtitle { color: var(--text-dim); margin-bottom: 24px; }
-    .adapter-grid {
+    .hero-signals {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      justify-content: center;
-    }
-    .adapter-tag {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 0.9rem;
-      font-weight: 500;
+      margin-top: 24px;
     }
 
-    /* Demo section */
-    .demo {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      text-align: center;
+    .signal {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      font-size: 0.83rem;
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.6);
     }
-    .demo h2 { font-size: 1.8rem; margin-bottom: 24px; }
-    .demo-grid {
+
+    .signal::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    .hero-panel {
+      padding: 24px;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-rows: auto auto 1fr;
+      gap: 18px;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .panel-head h2 {
+      font-size: 1.2rem;
+      margin-bottom: 4px;
+    }
+
+    .panel-head p {
+      color: var(--ink-soft);
+      font-size: 0.94rem;
+    }
+
+    .badge {
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(75, 157, 242, 0.1);
+      color: var(--accent);
+      font-size: 0.76rem;
+      white-space: nowrap;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      padding: 16px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.68);
+      border: 1px solid rgba(20, 32, 51, 0.08);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 2rem;
+      line-height: 1;
+      margin-bottom: 6px;
+      color: var(--accent);
+    }
+
+    .metric-label {
+      color: var(--ink-soft);
+      font-size: 0.76rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .stack-card {
+      padding: 18px;
+    }
+
+    .stack-card h3 {
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+
+    .stack-list {
+      list-style: none;
+      display: grid;
+      gap: 10px;
+    }
+
+    .stack-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 11px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(20, 32, 51, 0.08);
+      font-size: 0.92rem;
+    }
+
+    .stack-list span {
+      color: var(--ink-soft);
+    }
+
+    .trust-band {
+      padding-top: 10px;
+      padding-bottom: 12px;
+    }
+
+    .trust-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .proof-card {
+      padding: 18px;
+    }
+
+    .proof-card strong {
+      display: block;
+      font-size: 1.15rem;
+      margin-bottom: 8px;
+    }
+
+    .proof-card p {
+      color: var(--ink-soft);
+      font-size: 0.92rem;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .section-header h2 {
+      font-size: clamp(2rem, 4vw, 3.1rem);
+      line-height: 0.98;
+      max-width: 12ch;
+    }
+
+    .section-header p {
+      max-width: 50ch;
+      color: var(--ink-soft);
+      font-size: 1rem;
+    }
+
+    .story {
+      padding-top: 36px;
+      padding-bottom: 18px;
+    }
+
+    .story-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: 18px;
+    }
+
+    .problem-panel,
+    .solution-panel {
+      padding: 26px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.54);
+      box-shadow: var(--shadow);
+    }
+
+    .problem-panel {
+      background: linear-gradient(180deg, rgba(240, 248, 255, 0.96), rgba(251, 253, 255, 0.95));
+    }
+
+    .solution-panel {
+      background: linear-gradient(180deg, rgba(233, 244, 255, 0.96), rgba(250, 253, 255, 0.96));
+    }
+
+    .panel-kicker {
+      color: var(--brand-deep);
+      font-size: 0.79rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      display: inline-block;
+    }
+
+    .problem-panel h3,
+    .solution-panel h3 {
+      font-size: 1.55rem;
+      margin-bottom: 12px;
+    }
+
+    .problem-panel p,
+    .solution-panel p {
+      color: var(--ink-soft);
+      font-size: 0.98rem;
+    }
+
+    .split-points {
+      list-style: none;
+      margin-top: 18px;
+      display: grid;
+      gap: 11px;
+    }
+
+    .split-points li {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 10px;
+      align-items: start;
+      color: var(--ink-soft);
+    }
+
+    .split-points li::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-top: 0.35rem;
+      background: var(--brand);
+    }
+
+    .features {
+      padding-top: 34px;
+      padding-bottom: 18px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 16px;
     }
-    .demo-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      transition: transform 0.15s;
-    }
-    .demo-card:hover { transform: translateY(-2px); text-decoration: none; }
-    .demo-card img {
-      width: 100%;
-      aspect-ratio: 16/9;
-      object-fit: cover;
-      display: block;
-    }
-    .demo-card .demo-label {
-      padding: 12px 16px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text);
-    }
 
-    /* Code example */
-    .example {
-      max-width: 700px;
-      margin: 0 auto;
-      padding: 40px 20px 60px;
-    }
-    .example h2 { font-size: 1.8rem; margin-bottom: 24px; text-align: center; }
-    .code-block {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+    .feature-card {
       padding: 24px;
-      overflow-x: auto;
-      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      font-size: 0.85rem;
-      line-height: 1.7;
     }
-    .code-block .kw { color: var(--purple); }
-    .code-block .fn { color: #d2a8ff; }
-    .code-block .str { color: #a5d6ff; }
-    .code-block .cm { color: var(--text-dim); }
-    .code-block .type { color: #ff7b72; }
 
-    /* Footer */
-    footer {
-      text-align: center;
-      padding: 40px 20px;
-      border-top: 1px solid var(--border);
-      color: var(--text-dim);
+    .feature-card .tag {
+      display: inline-block;
+      font-size: 0.76rem;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 7px 10px;
+      border-radius: 999px;
+      margin-bottom: 14px;
+    }
+
+    .feature-card h3 {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      color: var(--ink-soft);
+      font-size: 0.95rem;
+    }
+
+    .feature-card ul {
+      list-style: none;
+      margin-top: 16px;
+      display: grid;
+      gap: 8px;
+      color: var(--ink-soft);
       font-size: 0.9rem;
     }
-    footer .links {
-      display: flex;
-      gap: 24px;
-      justify-content: center;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
+
+    .feature-card li::before {
+      content: "+ ";
+      color: var(--brand-deep);
+      font-weight: 700;
     }
 
-    @media (max-width: 600px) {
-      .hero h1 { font-size: 2rem; }
-      .stats { gap: 24px; }
-      .stat-num { font-size: 2rem; }
+    .architecture {
+      padding-top: 34px;
+      padding-bottom: 18px;
+    }
+
+    .architecture-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .architecture-panel {
+      padding: 24px;
+    }
+
+    .blueprint {
+      display: grid;
+      gap: 14px;
+    }
+
+    .blueprint-row {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .blueprint-label {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(23, 59, 102, 0.07);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .blueprint-detail {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(20, 32, 51, 0.08);
+      color: var(--ink-soft);
+    }
+
+    .adapter-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .adapter-pill {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(20, 32, 51, 0.08);
+      font-size: 0.9rem;
+      color: var(--ink-soft);
+      font-weight: 700;
+    }
+
+    .video-section {
+      padding-top: 34px;
+      padding-bottom: 18px;
+    }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .video-card {
+      overflow: hidden;
+    }
+
+    .video-card img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+    }
+
+    .video-body {
+      padding: 16px 18px 18px;
+    }
+
+    .video-body strong {
+      display: block;
+      font-size: 1.05rem;
+      margin-bottom: 6px;
+    }
+
+    .video-body span {
+      color: var(--ink-soft);
+      font-size: 0.92rem;
+    }
+
+    .terminal-section {
+      padding-top: 34px;
+      padding-bottom: 36px;
+    }
+
+    .terminal {
+      overflow: hidden;
+    }
+
+    .terminal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(75, 157, 242, 0.07);
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .terminal-dots span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(20, 32, 51, 0.18);
+    }
+
+    .terminal-dots span:nth-child(1) { background: #dd6c4f; }
+    .terminal-dots span:nth-child(2) { background: #d8a336; }
+    .terminal-dots span:nth-child(3) { background: #5f9d75; }
+
+    .terminal-meta {
+      color: var(--ink-soft);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    pre {
+      overflow-x: auto;
+      padding: 22px 24px 24px;
+      background: linear-gradient(180deg, #132338, #101b2a);
+      color: #deebf8;
+      font-size: 0.93rem;
+      line-height: 1.75;
+    }
+
+    .line-comment { color: #89a7c6; }
+    .line-keyword { color: #ffd479; }
+    .line-func { color: #9ed0ff; }
+    .line-string { color: #d6f7c6; }
+
+    .cta-band {
+      margin: 8px 28px 28px;
+      border-radius: 28px;
+      padding: 26px;
+      background: linear-gradient(135deg, rgba(18, 52, 90, 0.98), rgba(53, 118, 198, 0.94));
+      color: #f8f7f2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-band::after {
+      content: "";
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      right: -110px;
+      top: -130px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(162, 220, 255, 0.3), transparent 68%);
+      pointer-events: none;
+    }
+
+    .cta-band h2 {
+      font-size: clamp(1.7rem, 3vw, 2.6rem);
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta-band p {
+      color: rgba(248, 247, 242, 0.78);
+      max-width: 58ch;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta-band .subtle-cta {
+      color: #f8f7f2;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    footer {
+      padding: 0 28px 28px;
+      color: var(--ink-soft);
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      padding-top: 8px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 0.94rem;
+    }
+
+    .footer-note {
+      font-size: 0.88rem;
+    }
+
+    @media (max-width: 1080px) {
+      .hero-grid,
+      .architecture-grid,
+      .story-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .trust-grid,
+      .feature-grid,
+      .video-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .section-header {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .section-header h2 {
+        max-width: none;
+      }
+
+      .cta-band {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        width: min(100% - 16px, var(--max-width));
+        margin-top: 8px;
+      }
+
+      .page-frame {
+        border-radius: 24px;
+      }
+
+      .topbar,
+      section,
+      footer {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+
+      .hero-copy,
+      .hero-panel,
+      .feature-card,
+      .proof-card,
+      .architecture-panel,
+      .stack-card,
+      .video-body,
+      .problem-panel,
+      .solution-panel,
+      .cta-band {
+        padding: 20px;
+      }
+
+      .trust-grid,
+      .feature-grid,
+      .video-grid,
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .blueprint-row {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        position: static;
+      }
+
+      h1 {
+        max-width: none;
+      }
+
+      .hero-actions,
+      .cta-actions,
+      .topnav {
+        width: 100%;
+      }
+
+      .hero-actions > *,
+      .cta-actions > * {
+        flex: 1 1 220px;
+      }
+
+      .footer-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
     }
   </style>
 </head>
 <body>
+  <div class="shell">
+    <div class="page-frame">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 7h4l2 3-2 3H6L4 10l2-3Z"></path>
+              <path d="M14 7h4l2 3-2 3h-4l-2-3 2-3Z"></path>
+              <path d="M10 14h4l2 3-2 3h-4l-2-3 2-3Z"></path>
+            </svg>
+          </div>
+          <div class="brand-copy">
+            <strong>Network-AI</strong>
+            <span>Coordination infrastructure for serious agent systems</span>
+          </div>
+        </div>
+        <nav class="topnav">
+          <a class="nav-link" href="#architecture">Architecture</a>
+          <a class="nav-link" href="#demos">Demos</a>
+          <a class="nav-link" href="https://github.com/Jovancoding/Network-AI/blob/main/INTEGRATION_GUIDE.md">Docs</a>
+          <a class="subtle-cta" href="https://www.npmjs.com/package/network-ai">npm</a>
+          <a class="cta" href="https://github.com/Jovancoding/Network-AI">View Repository</a>
+        </nav>
+      </header>
 
-  <!-- Hero -->
-  <section class="hero">
-    <h1>Network-AI</h1>
-    <p>Multi-agent orchestrator for TypeScript/Node.js — shared state, guardrails, budgets, and cross-framework coordination.</p>
-    <div class="hero-buttons">
-      <a href="https://github.com/Jovancoding/Network-AI" class="btn btn-primary">
-        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-        GitHub
-      </a>
-      <a href="https://www.npmjs.com/package/network-ai" class="btn btn-secondary">
-        <svg width="18" height="18" viewBox="0 0 18 7" fill="currentColor"><path d="M0 0h18v6H9v1H5V6H0V0zm1 5h2V2h1v3h1V1H1v4zm5-4v5h2V5h2V1H6zm3 3H8V2h1v2zm1-3v4h2V2h1v2h1V2h1v3h1V1h-6z"/></svg>
-        npm
-      </a>
-      <a href="https://discord.gg/Cab5vAxc86" class="btn btn-secondary">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
-        Discord
-      </a>
+      <section class="hero">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <div class="eyebrow">Production-grade multi-agent control plane</div>
+            <h1>Orchestrate agents without trusting them blindly.</h1>
+            <p>
+              Network-AI sits between your agents and your shared state. It adds locking, permission gating,
+              budgets, audit trails, and workflow governance so parallel agent systems behave like production
+              software instead of best-effort demos.
+            </p>
+            <div class="hero-actions">
+              <a class="cta" href="https://github.com/Jovancoding/Network-AI">Read the code</a>
+              <a class="subtle-cta" href="#demos">Watch demos</a>
+            </div>
+            <div class="hero-signals">
+              <span class="signal">16 adapters supported</span>
+              <span class="signal">1,543 tests passing</span>
+              <span class="signal">19 suites</span>
+              <span class="signal">MIT licensed</span>
+            </div>
+          </div>
+
+          <aside class="hero-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Release snapshot</h2>
+                <p>What ships with the current public release.</p>
+              </div>
+              <span class="badge">v4.8.1</span>
+            </div>
+            <div class="metrics">
+              <div class="metric">
+                <strong>16</strong>
+                <div class="metric-label">Adapters</div>
+              </div>
+              <div class="metric">
+                <strong>0</strong>
+                <div class="metric-label">Adapter runtime deps</div>
+              </div>
+              <div class="metric">
+                <strong>HMAC</strong>
+                <div class="metric-label">Permission tokens</div>
+              </div>
+              <div class="metric">
+                <strong>FSM</strong>
+                <div class="metric-label">Workflow governance</div>
+              </div>
+            </div>
+            <div class="stack-card">
+              <h3>What teams plug in</h3>
+              <ul class="stack-list">
+                <li><strong>Agent frameworks</strong><span>LangChain, CrewAI, AutoGen, NemoClaw, MCP</span></li>
+                <li><strong>Control primitives</strong><span>Blackboard, AuthGuardian, JourneyFSM, budgets</span></li>
+                <li><strong>Auditability</strong><span>Append-only HMAC audit log and compliance monitor</span></li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="trust-band">
+        <div class="trust-grid">
+          <article class="proof-card">
+            <strong>Atomic shared state</strong>
+            <p>Use propose -&gt; validate -&gt; commit with a file-system mutex instead of last-write-wins race conditions.</p>
+          </article>
+          <article class="proof-card">
+            <strong>Permission-first execution</strong>
+            <p>Score justification quality, trust level, and resource risk before any sensitive operation is allowed.</p>
+          </article>
+          <article class="proof-card">
+            <strong>Traceable operations</strong>
+            <p>Record grants, denials, writes, transitions, and token actions in a tamper-evident audit log.</p>
+          </article>
+          <article class="proof-card">
+            <strong>Cross-framework by design</strong>
+            <p>Wrap existing agents instead of replacing them. Keep your stack and add governance on top.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="story">
+        <div class="section-header">
+          <div>
+            <h2>The failure mode most agent demos skip.</h2>
+          </div>
+          <p>
+            Parallel agents do not usually fail loudly. They fail by silently overwriting state,
+            bypassing policy, drifting across workflow stages, and leaving you with no reliable audit trail.
+          </p>
+        </div>
+        <div class="story-grid">
+          <article class="problem-panel">
+            <span class="panel-kicker">Default multi-agent behavior</span>
+            <h3>Best-effort coordination breaks under pressure.</h3>
+            <p>
+              When multiple agents operate on the same system, most frameworks assume cooperation instead of
+              enforcing it. That works in a toy run. It breaks in production.
+            </p>
+            <ul class="split-points">
+              <li>Shared keys get overwritten with no conflict detection.</li>
+              <li>Tool calls happen without pre-authorization or scoped credentials.</li>
+              <li>Agents carry stale state across tasks and workflow phases.</li>
+              <li>Postmortems lack a trustworthy sequence of who did what and why.</li>
+            </ul>
+          </article>
+          <article class="solution-panel">
+            <span class="panel-kicker">Network-AI approach</span>
+            <h3>Turn agent activity into governed system behavior.</h3>
+            <p>
+              Network-AI adds a thin control plane around your existing agents: lock shared writes, gate tool
+              access, enforce state transitions, and log every sensitive action with enough integrity to audit later.
+            </p>
+            <ul class="split-points">
+              <li>Atomic blackboard writes prevent split-brain state.</li>
+              <li>AuthGuardian issues HMAC-signed scoped tokens with TTL.</li>
+              <li>JourneyFSM blocks agents from skipping authorized stages.</li>
+              <li>ComplianceMonitor watches behavior continuously, not after the fact.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="features">
+        <div class="section-header">
+          <div>
+            <h2>Built for teams shipping real agent workflows.</h2>
+          </div>
+          <p>
+            The project is opinionated about coordination quality: explicit permissions, constrained state,
+            deterministic workflow control, and integration paths that do not lock you into one ecosystem.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <span class="tag">State integrity</span>
+            <h3>Locked blackboard coordination</h3>
+            <p>Shared state is protected by atomic propose -&gt; validate -&gt; commit semantics with a file-backed mutex.</p>
+            <ul>
+              <li>Conflict-safe writes</li>
+              <li>Validation before commit</li>
+              <li>Persistent local-first storage</li>
+            </ul>
+          </article>
+          <article class="feature-card">
+            <span class="tag">Security model</span>
+            <h3>Permission gating with scoped tokens</h3>
+            <p>Agents must justify access before touching protected resources. Grants are signed, scoped, and time-limited.</p>
+            <ul>
+              <li>40/30/30 weighted scoring</li>
+              <li>HMAC-signed grant tokens</li>
+              <li>Fine-grained resource protection</li>
+            </ul>
+          </article>
+          <article class="feature-card">
+            <span class="tag">Behavior control</span>
+            <h3>Workflow governance and compliance</h3>
+            <p>Finite-state workflow enforcement and runtime surveillance keep agents aligned with the path you define.</p>
+            <ul>
+              <li>JourneyFSM state enforcement</li>
+              <li>ComplianceMonitor policies</li>
+              <li>Real-time violation handling</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="architecture" id="architecture">
+        <div class="section-header">
+          <div>
+            <h2>One orchestration layer, many agent stacks.</h2>
+          </div>
+          <p>
+            Network-AI is additive. You keep CrewAI, LangChain, AutoGen, MCP, or NemoClaw, and add a control plane above them.
+          </p>
+        </div>
+        <div class="architecture-grid">
+          <article class="architecture-panel">
+            <div class="blueprint">
+              <div class="blueprint-row">
+                <div class="blueprint-label">Agent frameworks</div>
+                <div class="blueprint-detail">CrewAI, LangChain, AutoGen, OpenAI Assistants, NemoClaw, MCP, and more route through adapters.</div>
+              </div>
+              <div class="blueprint-row">
+                <div class="blueprint-label">Control plane</div>
+                <div class="blueprint-detail">LockedBlackboard, AuthGuardian, FederatedBudget, JourneyFSM, ComplianceMonitor, and validation layers.</div>
+              </div>
+              <div class="blueprint-row">
+                <div class="blueprint-label">Outputs</div>
+                <div class="blueprint-detail">Governed execution, auditability, scoped access, deterministic transitions, and cleaner failure boundaries.</div>
+              </div>
+            </div>
+          </article>
+          <aside class="architecture-panel">
+            <h3 style="font-size:1.18rem; margin-bottom: 14px;">Adapter surface</h3>
+            <p style="color: var(--ink-soft); margin-bottom: 12px;">Sixteen frameworks supported today, including streaming variants and sandboxed execution.</p>
+            <div class="adapter-cloud">
+              <span class="adapter-pill">LangChain</span>
+              <span class="adapter-pill">AutoGen</span>
+              <span class="adapter-pill">CrewAI</span>
+              <span class="adapter-pill">OpenAI Assistants</span>
+              <span class="adapter-pill">LlamaIndex</span>
+              <span class="adapter-pill">Semantic Kernel</span>
+              <span class="adapter-pill">Haystack</span>
+              <span class="adapter-pill">DSPy</span>
+              <span class="adapter-pill">Agno</span>
+              <span class="adapter-pill">MCP</span>
+              <span class="adapter-pill">OpenClaw</span>
+              <span class="adapter-pill">A2A</span>
+              <span class="adapter-pill">Codex</span>
+              <span class="adapter-pill">MiniMax</span>
+              <span class="adapter-pill">NemoClaw</span>
+              <span class="adapter-pill">Custom</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="video-section" id="demos">
+        <div class="section-header">
+          <div>
+            <h2>Watch the system under load.</h2>
+          </div>
+          <p>
+            The fastest way to understand the product is to watch the orchestration layer mediate real workflows,
+            guardrails, and sandboxed execution paths.
+          </p>
+        </div>
+        <div class="video-grid">
+          <a class="video-card" href="https://www.youtube.com/watch?v=UyMsNhaw9lU" target="_blank" rel="noopener">
+            <img src="https://img.youtube.com/vi/UyMsNhaw9lU/mqdefault.jpg" alt="Code Review Swarm demo">
+            <div class="video-body">
+              <strong>05 | Code Review Swarm</strong>
+              <span>See a multi-agent review pipeline coordinate analysis, remediation, and output generation.</span>
+            </div>
+          </a>
+          <a class="video-card" href="https://www.youtube.com/watch?v=niVRZJu1MEo" target="_blank" rel="noopener">
+            <img src="https://img.youtube.com/vi/niVRZJu1MEo/mqdefault.jpg" alt="Control Plane Stress demo">
+            <div class="video-body">
+              <strong>08 | Control Plane Stress</strong>
+              <span>Watch locks, FSM rules, compliance monitoring, and orchestration constraints hold under pressure.</span>
+            </div>
+          </a>
+          <a class="video-card" href="https://www.youtube.com/watch?v=c-UWDrdP4ZE" target="_blank" rel="noopener">
+            <img src="https://img.youtube.com/vi/c-UWDrdP4ZE/mqdefault.jpg" alt="NemoClaw Sandbox Swarm demo">
+            <div class="video-body">
+              <strong>10 | NemoClaw Sandbox Swarm</strong>
+              <span>Three isolated sandboxes, deny-by-default networking, and blackboard coordination across agents.</span>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <section class="terminal-section">
+        <div class="section-header">
+          <div>
+            <h2>Start small. Keep the same control model as you scale.</h2>
+          </div>
+          <p>
+            The quick-start path stays direct: install, register an adapter, execute an agent, and let the orchestration layer manage the dangerous parts.
+          </p>
+        </div>
+        <div class="terminal">
+          <div class="terminal-head">
+            <div class="terminal-dots" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="terminal-meta">Quick start</div>
+          </div>
+          <pre><span class="line-comment"># install</span>
+npm install network-ai
+
+<span class="line-keyword">import</span> { createSwarmOrchestrator } <span class="line-keyword">from</span> <span class="line-string">"network-ai"</span>;
+<span class="line-keyword">import</span> { AdapterRegistry, CustomAdapter } <span class="line-keyword">from</span> <span class="line-string">"network-ai/adapters"</span>;
+
+<span class="line-keyword">const</span> orchestrator = <span class="line-func">createSwarmOrchestrator</span>({
+  agentId: <span class="line-string">"my-app"</span>,
+  swarmName: <span class="line-string">"Production Swarm"</span>,
+});
+
+<span class="line-keyword">const</span> adapter = <span class="line-keyword">new</span> CustomAdapter();
+adapter.<span class="line-func">registerHandler</span>(<span class="line-string">"greeter"</span>, <span class="line-keyword">async</span> (payload) =&gt; ({
+  greeting: <span class="line-string">`Hello, ${payload.handoff?.instruction ?? "World"}!`</span>,
+}));
+
+<span class="line-keyword">const</span> registry = <span class="line-keyword">new</span> AdapterRegistry();
+<span class="line-keyword">await</span> registry.<span class="line-func">addAdapter</span>(adapter);
+<span class="line-keyword">await</span> registry.<span class="line-func">executeAgent</span>(<span class="line-string">"custom:greeter"</span>, {
+  action: <span class="line-string">"greet"</span>,
+  handoff: { instruction: <span class="line-string">"World"</span> },
+});</pre>
+        </div>
+      </section>
+
+      <div class="cta-band">
+        <div>
+          <h2>Use your existing agent framework. Add discipline where it matters.</h2>
+          <p>
+            If your team already has agent workflows in motion, Network-AI lets you add concurrency control,
+            permission boundaries, and auditability without rewriting the stack from scratch.
+          </p>
+        </div>
+        <div class="cta-actions">
+          <a class="cta" href="https://github.com/Jovancoding/Network-AI/blob/main/QUICKSTART.md">Read quick start</a>
+          <a class="subtle-cta" href="https://github.com/Jovancoding/Network-AI/blob/main/INTEGRATION_GUIDE.md">Integration guide</a>
+        </div>
+      </div>
+
+      <footer>
+        <div class="footer-inner">
+          <div class="footer-links">
+            <a href="https://github.com/Jovancoding/Network-AI">GitHub</a>
+            <a href="https://www.npmjs.com/package/network-ai">npm</a>
+            <a href="https://clawhub.ai/skills/network-ai">ClawHub</a>
+            <a href="https://glama.ai/mcp/servers/Jovancoding/network-ai">Glama</a>
+            <a href="https://discord.gg/Cab5vAxc86">Discord</a>
+          </div>
+          <div class="footer-note">MIT License | Built by Jovancoding | Adapters follow BYOC: bring your own client.</div>
+        </div>
+      </footer>
     </div>
-  </section>
-
-  <!-- Install -->
-  <div class="install">
-    <code>npm install network-ai</code>
   </div>
-
-  <!-- Stats -->
-  <section class="stats">
-    <div class="stat">
-      <div class="stat-num">16</div>
-      <div class="stat-label">Framework Adapters</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num">1,543</div>
-      <div class="stat-label">Tests Passing</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num">19</div>
-      <div class="stat-label">Test Suites</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num">0</div>
-      <div class="stat-label">Runtime Dependencies*</div>
-    </div>
-  </section>
-
-  <!-- Problem -->
-  <section class="problem">
-    <h2>The silent failure mode in multi-agent systems</h2>
-    <p>Parallel agents writing to the same key use last-write-wins by default — one agent's result silently overwrites another's mid-flight. The outcome is split-brain state: double-spends, contradictory decisions, corrupted context, no error thrown. Network-AI's <code>propose → validate → commit</code> mutex prevents this at the coordination layer.</p>
-  </section>
-
-  <!-- Features -->
-  <section class="features">
-    <div class="feature">
-      <div class="feature-icon">🔒</div>
-      <h3>Shared Blackboard with Locking</h3>
-      <p>Atomic <code>propose → validate → commit</code> with file-system mutex. Prevents race conditions and split-brain failures across parallel agents.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🛡️</div>
-      <h3>Permission Gating</h3>
-      <p>AuthGuardian scores justification quality (40%), trust level (30%), and resource risk (30%) before issuing HMAC-signed tokens.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">📊</div>
-      <h3>Federated Budgets</h3>
-      <p>Per-agent token ceilings. Rogue agents get cut off mid-task. Budget tracking with real-time spend monitoring.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🔄</div>
-      <h3>FSM Governance</h3>
-      <p>JourneyFSM enforces explicit state transitions. Agents can't skip stages or act outside their authorized workflow.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">📝</div>
-      <h3>HMAC Audit Trail</h3>
-      <p>Every write, permission grant, and state transition logged to a tamper-evident, append-only audit log.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">👁️</div>
-      <h3>Compliance Monitor</h3>
-      <p>Real-time agent behavior surveillance with configurable violation policies and severity classification.</p>
-    </div>
-  </section>
-
-  <!-- Adapters -->
-  <section class="adapters">
-    <h2>16 Framework Adapters</h2>
-    <p class="subtitle">Zero runtime dependencies for adapters — bring your own client.</p>
-    <div class="adapter-grid">
-      <span class="adapter-tag">LangChain</span>
-      <span class="adapter-tag">AutoGen</span>
-      <span class="adapter-tag">CrewAI</span>
-      <span class="adapter-tag">OpenAI Assistants</span>
-      <span class="adapter-tag">LlamaIndex</span>
-      <span class="adapter-tag">Semantic Kernel</span>
-      <span class="adapter-tag">Haystack</span>
-      <span class="adapter-tag">DSPy</span>
-      <span class="adapter-tag">Agno</span>
-      <span class="adapter-tag">MCP</span>
-      <span class="adapter-tag">OpenClaw</span>
-      <span class="adapter-tag">A2A</span>
-      <span class="adapter-tag">Codex</span>
-      <span class="adapter-tag">MiniMax</span>
-      <span class="adapter-tag">NemoClaw</span>
-      <span class="adapter-tag">Custom</span>
-    </div>
-  </section>
-
-  <!-- Demos -->
-  <section class="demo">
-    <h2>Demos</h2>
-    <div class="demo-grid">
-      <a href="https://www.youtube.com/watch?v=UyMsNhaw9lU" class="demo-card" target="_blank" rel="noopener">
-        <img src="https://img.youtube.com/vi/UyMsNhaw9lU/mqdefault.jpg" alt="Code Review Swarm Demo" loading="lazy">
-        <div class="demo-label">05 · Code Review Swarm</div>
-      </a>
-      <a href="https://www.youtube.com/watch?v=niVRZJu1MEo" class="demo-card" target="_blank" rel="noopener">
-        <img src="https://img.youtube.com/vi/niVRZJu1MEo/mqdefault.jpg" alt="Control Plane Stress Demo" loading="lazy">
-        <div class="demo-label">08 · Control Plane Stress</div>
-      </a>
-      <a href="https://www.youtube.com/watch?v=c-UWDrdP4ZE" class="demo-card" target="_blank" rel="noopener">
-        <img src="https://img.youtube.com/vi/c-UWDrdP4ZE/mqdefault.jpg" alt="NemoClaw Sandbox Demo" loading="lazy">
-        <div class="demo-label">10 · NemoClaw Sandbox Swarm</div>
-      </a>
-    </div>
-  </section>
-
-  <!-- Quick Example -->
-  <section class="example">
-    <h2>Quick Start</h2>
-    <div class="code-block">
-<span class="kw">import</span> { createSwarmOrchestrator } <span class="kw">from</span> <span class="str">'network-ai'</span>;
-<span class="kw">import</span> { AdapterRegistry, CustomAdapter } <span class="kw">from</span> <span class="str">'network-ai/adapters'</span>;
-
-<span class="kw">const</span> orchestrator = <span class="fn">createSwarmOrchestrator</span>({
-  agentId: <span class="str">'my-app'</span>,
-  swarmName: <span class="str">'My Swarm'</span>,
-});
-
-<span class="kw">const</span> adapter = <span class="kw">new</span> <span class="type">CustomAdapter</span>();
-adapter.<span class="fn">registerHandler</span>(<span class="str">'greeter'</span>, <span class="kw">async</span> (payload) =&gt; {
-  <span class="kw">return</span> { greeting: <span class="str">`Hello, ${payload.handoff?.instruction}!`</span> };
-});
-
-<span class="kw">const</span> registry = <span class="kw">new</span> <span class="type">AdapterRegistry</span>();
-<span class="kw">await</span> registry.<span class="fn">addAdapter</span>(adapter);
-<span class="kw">await</span> registry.<span class="fn">executeAgent</span>(<span class="str">'custom:greeter'</span>, {
-  action: <span class="str">'greet'</span>,
-  handoff: { instruction: <span class="str">'World'</span> },
-});
-    </div>
-  </section>
-
-  <!-- Footer -->
-  <footer>
-    <div class="links">
-      <a href="https://github.com/Jovancoding/Network-AI">GitHub</a>
-      <a href="https://www.npmjs.com/package/network-ai">npm</a>
-      <a href="https://clawhub.ai/skills/network-ai">ClawHub</a>
-      <a href="https://glama.ai/mcp/servers/Jovancoding/network-ai">Glama</a>
-      <a href="https://discord.gg/Cab5vAxc86">Discord</a>
-      <a href="https://github.com/Jovancoding/Network-AI/blob/main/QUICKSTART.md">Quick Start</a>
-      <a href="https://github.com/Jovancoding/Network-AI/blob/main/INTEGRATION_GUIDE.md">Integration Guide</a>
-    </div>
-    <p>MIT License · Built by <a href="https://github.com/Jovancoding">Jovancoding</a></p>
-    <p style="margin-top: 8px; font-size: 0.8rem;">*Adapters have zero runtime deps — BYOC (bring your own client)</p>
-  </footer>
-
 </body>
 </html>
