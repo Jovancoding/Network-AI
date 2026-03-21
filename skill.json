@@ -1,7 +1,7 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.10.3",
-  "description": "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. All execution is local with zero network calls and zero third-party dependencies.",
+  "version": "4.10.4",
+  "description": "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. The bundled Python scripts make no network calls and have zero third-party dependencies. Workflow delegations via the host platform's sessions_send may invoke external model APIs.",
   "author": "Network-AI Community",
   "homepage": "https://network-ai.org",
   "repository": "https://github.com/Jovancoding/Network-AI",  "source": "https://github.com/Jovancoding/Network-AI",  "license": "MIT",

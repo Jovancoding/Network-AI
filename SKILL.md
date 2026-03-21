@@ -1,12 +1,12 @@
 ﻿---
 name: Network-AI
-description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. All execution is local with zero network calls and zero third-party dependencies."
+description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. The bundled Python scripts make no network calls and have zero third-party dependencies. Workflow delegations via the host platform's sessions_send may invoke external model APIs."
 metadata:
   openclaw:
     emoji: "\U0001F41D"
     homepage: https://network-ai.org
     bundle_scope: "Python scripts only (scripts/*.py). All execution is local."
-    network_calls: none
+    network_calls: "none from bundled scripts; platform sessions_send delegations may invoke external models"
     sessions_ops: "platform-provided"
     requires:
       bins:
@@ -25,7 +25,7 @@ metadata:
 
 # Swarm Orchestrator Skill
 
-> **Scope:** All instructions below run local Python scripts (`scripts/*.py`). No network calls are made. Tokens are UUID-based (`grant_{uuid4().hex}`) stored in `data/active_grants.json`. Audit logging is plain JSONL (`data/audit_log.jsonl`).
+> **Scope:** The bundled Python scripts (`scripts/*.py`) make no network calls, use only the Python standard library, and have zero third-party dependencies. Tokens are UUID-based (`grant_{uuid4().hex}`) stored in `data/active_grants.json`. Audit logging is plain JSONL (`data/audit_log.jsonl`). Workflow delegations that use the host platform's `sessions_send` may invoke external model APIs outside this skill's control.
 
 ## Setup
 
@@ -719,25 +719,3 @@ python {baseDir}/scripts/swarm_guard.py supervisor-review --task-id "task_001"
 - [Blackboard Schema](references/blackboard-schema.md) - Data structure specifications
 - [Agent Trust Levels](references/trust-levels.md) - How trust is calculated
 - [CLI Reference](QUICKSTART.md) - Full `network-ai` CLI command reference (§ 10. CLI)
-
----
-
-## Appendix: Optional Node.js Companion (npm)
-
-> **This section describes a SEPARATE project — not part of this ClawHub skill bundle.**
-> The Python scripts above work completely without any of this.
-> Install only if you want MCP server integration with Claude/Cursor/VS Code.
-
-```bash
-npm install -g network-ai
-npx network-ai-server --port 3001
-```
-
-The companion npm package (`network-ai`) provides:
-- HMAC / Ed25519-signed audit tokens (vs UUID tokens in the Python layer)
-- AES-256 blackboard encryption
-- A standalone MCP server for IDE integration (Claude, Cursor, VS Code)
-- 17 framework adapters (LangChain, AutoGen, CrewAI, DSPy, LlamaIndex, NemoClaw, APS, etc.)
-- A full CLI (`network-ai bb`, `network-ai auth`, `network-ai budget`, `network-ai audit`)
-
-None of the above are provided by this skill's Python scripts. No network calls are made by this skill.

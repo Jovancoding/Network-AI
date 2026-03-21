@@ -5,6 +5,13 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.4] - 2026-03-22
+
+### Fixed
+- Reworded skill description and scope to accurately state that bundled Python scripts make no network calls while platform `sessions_send` delegations may invoke external model APIs (fixes ClawHub scanner "scope mismatch" finding)
+- Removed Node.js companion appendix from `SKILL.md` to eliminate all networked-component references from the skill bundle
+- Updated `network_calls` metadata from `none` to accurately describe platform delegation behavior
+
 ## [4.10.3] - 2026-03-22
 
 ### Changed
