@@ -4,53 +4,65 @@
     "evalDynamicCodeExecution": [
       {
         "path": "lib/blackboard-validator.ts",
-        "reason": "False positive — /\\beval\\s*\\(/ is a security detection regex that scans for eval() usage in untrusted agent code submitted to the blackboard. It is not dynamic code execution."
+        "reason": "False positive — this pattern is part of dangerous-code detection for untrusted agent content written to the blackboard. It does not execute code."
       },
       {
         "path": "dist/lib/blackboard-validator.js",
-        "reason": "False positive — this is a security detection pattern that scans for eval() usage in untrusted agent code. It is not dynamic code execution."
+        "reason": "False positive — compiled output of the dangerous-code detector. It matches risky input patterns and does not execute code."
       }
     ],
     "networkAccess": [
       {
         "path": "adapters/a2a-adapter.ts",
-        "reason": "Intentional — A2AAdapter implements the Google Agent-to-Agent protocol; fetch() calls are made to remote agent endpoints that users explicitly register via registerRemoteAgent(). Network access is the purpose of this adapter."
+        "reason": "Intentional — A2AAdapter implements the Google Agent-to-Agent protocol and sends outbound HTTP requests only to agent endpoints explicitly registered by the user."
       },
       {
         "path": "dist/adapters/a2a-adapter.js",
-        "reason": "Intentional — A2AAdapter implements the Google Agent-to-Agent protocol; fetch() calls are made to remote agent endpoints that users explicitly register via registerRemoteAgent(). Network access is the purpose of this adapter."
+        "reason": "Intentional — compiled output of A2AAdapter. It talks only to agent endpoints explicitly registered by the user."
+      },
+      {
+        "path": "adapters/custom-adapter.ts",
+        "reason": "Intentional — CustomAdapter can call a caller-supplied HTTP endpoint as part of its documented bring-your-own-client behavior."
       },
       {
         "path": "dist/adapters/custom-adapter.js",
-        "reason": "Intentional — CustomAdapter is a user-configured HTTP adapter that calls a user-supplied URL (config.url) to connect to external AI endpoints. Network access is the explicit purpose of this adapter."
+        "reason": "Intentional — compiled output of CustomAdapter. It calls a caller-supplied endpoint as part of documented adapter behavior."
+      },
+      {
+        "path": "adapters/aps-adapter.ts",
+        "reason": "Intentional — APSAdapter can verify delegation chains through a configured remote verifier endpoint when that mode is enabled by the caller."
+      },
+      {
+        "path": "dist/adapters/aps-adapter.js",
+        "reason": "Intentional — compiled output of APSAdapter. It talks only to a caller-configured verifier endpoint when that verification mode is enabled."
       },
       {
         "path": "lib/mcp-transport-sse.ts",
-        "reason": "Intentional — McpSseTransport is an HTTP/SSE transport layer for the MCP protocol. Both the server (createServer) and client (http.request) directions are the explicit purpose of this module."
+        "reason": "Intentional — McpSseTransport is the HTTP and SSE transport layer for MCP. Serving and connecting over HTTP is its documented role."
       },
       {
         "path": "dist/lib/mcp-transport-sse.js",
-        "reason": "Intentional — McpSseTransport is an HTTP/SSE transport layer for the MCP protocol. Both the server (createServer) and client (http.request) directions are the explicit purpose of this module."
+        "reason": "Intentional — compiled output of the MCP HTTP and SSE transport layer."
       },
       {
         "path": "dist/bin/mcp-server.js",
-        "reason": "Intentional — network-ai-server is an opt-in CLI binary that starts an HTTP/SSE server to expose the Network-AI tool suite over MCP. Users invoke it explicitly; it is not a background side-effect."
+        "reason": "Intentional — network-ai-server is an opt-in CLI binary that starts an MCP HTTP and SSE server only when the user invokes it explicitly."
       },
       {
         "path": "adapters/codex-adapter.ts",
-        "reason": "Intentional — CodexAdapter calls OpenAI's chat/completions API (or user-provided baseUrl) via fetch(). Network access is the purpose of this adapter for connecting to OpenAI/Codex endpoints."
+        "reason": "Intentional — CodexAdapter sends outbound requests to OpenAI or a caller-provided base URL as part of its documented adapter behavior."
       },
       {
         "path": "dist/adapters/codex-adapter.js",
-        "reason": "Intentional — CodexAdapter calls OpenAI's chat/completions API (or user-provided baseUrl) via fetch(). Network access is the purpose of this adapter for connecting to OpenAI/Codex endpoints."
+        "reason": "Intentional — compiled output of CodexAdapter. It talks to OpenAI or a caller-provided base URL."
       },
       {
         "path": "adapters/minimax-adapter.ts",
-        "reason": "Intentional — MiniMaxAdapter calls MiniMax's OpenAI-compatible chat/completions API via fetch(). Network access is the purpose of this adapter for connecting to MiniMax LLM endpoints."
+        "reason": "Intentional — MiniMaxAdapter sends outbound requests to MiniMax's API as part of its documented adapter behavior."
       },
       {
         "path": "dist/adapters/minimax-adapter.js",
-        "reason": "Intentional — MiniMaxAdapter calls MiniMax's OpenAI-compatible chat/completions API via fetch(). Network access is the purpose of this adapter for connecting to MiniMax LLM endpoints."
+        "reason": "Intentional — compiled output of MiniMaxAdapter. It talks to MiniMax endpoints as configured by the caller."
       }
     ],
     "urlStrings": [

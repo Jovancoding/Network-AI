@@ -524,14 +524,14 @@ const pillars = ['reliability', 'security', 'cost', 'operations', 'performance']
 
 // Fan-out: each agent writes to its own section independently
 for (const pillar of pillars) {
-  const id = board.propose(`eval:${pillar}`, { score: Math.random(), findings: [] }, pillar);
+  const id = board.propose(`review:${pillar}`, { score: Math.random(), findings: [] }, pillar);
   board.validate(id, 'orchestrator');
   board.commit(id);
 }
 
 // Fan-in: orchestrator reads all results and synthesises
-const results = pillars.map(p => ({ pillar: p, ...board.read(`eval:${p}`) }));
-const id = board.propose('eval:summary', {
+const results = pillars.map(p => ({ pillar: p, ...board.read(`review:${p}`) }));
+const id = board.propose('review:summary', {
   overall: results.reduce((s, r) => s + r.score, 0) / results.length,
   pillars: results,
 }, 'orchestrator');

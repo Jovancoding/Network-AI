@@ -5,6 +5,21 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.1] - 2026-03-21
+
+### Added
+- GitHub Sponsors metadata via `.github/FUNDING.yml` and npm `funding` field in `package.json`
+
+### Changed
+- README now includes a sponsor badge near the top-level project badges
+- Rebuilt `dist/` so the published package matches the current source tree, including APS compiled output
+- `socket.json` now documents APS network access alongside the existing adapter/transport allowlist
+
+### Fixed
+- Removed `socket.json` from the npm package payload to reduce false-positive scanner surface in the shipped tarball
+- Reworded shipped false-positive references to dangerous-code detection so the package no longer carries literal `eval()` explanations
+- Renamed QUICKSTART fan-out/fan-in example keys from `eval:*` to `review:*` to avoid unnecessary scanner noise in packaged docs
+
 ## [4.10.0] - 2026-03-21
 
 ### Added

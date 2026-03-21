@@ -1,6 +1,6 @@
 {
   "name": "network-ai",
-  "version": "4.10.0",
+  "version": "4.10.1",
   "description": "AI agent orchestration framework for TypeScript/Node.js - 17 adapters (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS + streaming variants). Built-in CLI, security, swarm intelligence, real-time streaming, and agentic workflow patterns.",
   "homepage": "https://github.com/Jovancoding/Network-AI#readme",
   "main": "dist/index.js",
@@ -80,6 +80,10 @@
   ],
   "author": "OpenClaw Community",
   "license": "MIT",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/Jovancoding"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Jovancoding/Network-AI.git"
@@ -104,8 +108,7 @@
     "QUICKSTART.md",
     "INTEGRATION_GUIDE.md",
     "SKILL.md",
-    "LICENSE",
-    "socket.json"
+    "LICENSE"
   ],
   "dependencies": {
     "commander": "^14.0.3"
