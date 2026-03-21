@@ -232,3 +232,32 @@ network-ai --json auth token data_analyst --resource DATABASE --action read \
 ```
 
 Trust level is a numeric value (`0`–`4`) mapped internally to the 0.5–0.9 scoring range — configure agent trust in `scripts/check_permission.py`.
+
+---
+
+## APS Integration (v4.10.0)
+
+The `APSAdapter` bridges **APS (Agent Permission Service) delegation chains** into AuthGuardian trust levels. When an agent presents an APS delegation token, the adapter:
+
+1. Verifies the delegation signature (locally, via MCP, or BYOC verifier)
+2. Computes a depth-decayed trust level: `baseTrust × (1 - (currentDepth / maxDepth × depthDecay))`
+3. Maps APS scopes to AuthGuardian resource types (`file:read` → `FILE_SYSTEM`, `shell:exec` → `SHELL_EXEC`, etc.)
+4. Returns an `AgentTrustConfig` ready for `registerAgentTrust()`
+
+```typescript
+import { APSAdapter } from 'network-ai';
+
+const aps = new APSAdapter();
+await aps.initialize({ baseTrust: 0.8, depthDecay: 0.4 });
+
+const trust = await aps.apsDelegationToTrust({
+  delegator: 'root', delegatee: 'agent-1',
+  scope: ['file:read', 'git:read'],
+  currentDepth: 0, maxDepth: 3,
+  signature: 'valid-sig',
+});
+// trust.trustLevel === 0.8 (root = full base trust)
+// trust.allowedResources === ['FILE_SYSTEM', 'GIT']
+```
+
+See [references/adapter-system.md § APS Adapter](adapter-system.md#aps-adapter--delegation-chain-trust-bridge) for full usage.

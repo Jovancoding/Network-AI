@@ -308,6 +308,43 @@ orchestrator.adapters.on('adapter:error', (event) => {
 });
 ```
 
+## APS Adapter — Delegation-Chain Trust Bridge
+
+The `APSAdapter` maps APS (Agent Permission Service) delegation chains to AuthGuardian trust levels. This is the interop PoC for cross-framework permission delegation proposed in [crewAIInc/crewAI#4560](https://github.com/crewAIInc/crewAI/issues/4560).
+
+```typescript
+import { APSAdapter } from 'network-ai';
+
+const aps = new APSAdapter();
+await aps.initialize({});
+
+const trust = await aps.apsDelegationToTrust({
+  delegator:    'root-orchestrator',
+  delegatee:    'sub-agent-7',
+  scope:        ['file:read', 'net:fetch'],
+  currentDepth: 1,
+  maxDepth:     3,
+  signature:    '<base64-token>',
+});
+
+// trust.agentId       → 'sub-agent-7'
+// trust.trustLevel    → 0.693 (depth-decayed from 0.8 base)
+// trust.allowedResources → ['FILE_SYSTEM', 'NETWORK']
+// trust.allowedNamespaces → ['file:', 'net:']
+```
+
+**Trust formula:** `baseTrust × (1 - (currentDepth / maxDepth × depthDecay))`
+
+Defaults: `baseTrust = 0.8`, `depthDecay = 0.4`. Configurable via `initialize({ baseTrust, depthDecay })`.
+
+**Verification modes:**
+
+| Mode | Description |
+|------|-------------|
+| `local` (default) | Verifies signature is non-empty |
+| `mcp` | Verifies via an external MCP server (`mcpServerUrl` required) |
+| BYOC | Pass a custom `verifySignature` function at initialize |
+
 ## All Existing Features Still Work
 
 The adapter system is additive — everything from v1/v2 is preserved:

@@ -102,6 +102,14 @@ export type {
 export { MiniMaxAdapter } from './minimax-adapter';
 export type { MiniMaxAgentConfig, MiniMaxChatClient } from './minimax-adapter';
 
+// APS adapter (Agent Permission Service — delegation chain → trust mapping)
+export { APSAdapter } from './aps-adapter';
+export type {
+  APSDelegation,
+  APSTrustMapping,
+  APSAdapterConfig,
+} from './aps-adapter';
+
 // NemoClaw adapter (NVIDIA NemoClaw — sandboxed agent execution via OpenShell)
 export { NemoClawAdapter } from './nemoclaw-adapter';
 export type {

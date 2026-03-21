@@ -323,12 +323,6 @@ async function testAuthGuardianEd25519() {
 
   // A different Ed25519 guardian should not verify tokens from the first
   const guardian2 = new AuthGuardian({ algorithm: 'ed25519' });
-  const grant2 = await guardian.requestPermission(
-    'orchestrator', 'GIT',
-    'Need to check git status for deployment verification task-303',
-    'read'
-  );
-  // Revoked guardian's token tested with guardian2 — but we need a non-revoked token
   const grant3 = await guardian2.requestPermission(
     'orchestrator', 'FILE_SYSTEM',
     'Need to read build output files for quality check task-404',

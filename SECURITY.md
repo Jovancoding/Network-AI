@@ -3,8 +3,9 @@
 ## Supported Versions
 
 | Version | Supported |
-|---------|-----------|
-| 4.9.x   | ✅ Yes — full support (current) |
+|---------|-----------||
+| 4.10.x  | ✅ Yes — full support (current) |
+| 4.9.x   | ✅ Security fixes only |
 | 4.8.x   | ✅ Security fixes only |
 | 4.7.x   | ✅ Security fixes only |
 | 4.6.x   | ✅ Security fixes only |

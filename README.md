@@ -5,10 +5,10 @@
 [![Website](https://img.shields.io/badge/website-jovancoding.github.io/Network--AI-4b9df2?style=flat&logo=github-pages&logoColor=white)](https://jovancoding.github.io/Network-AI/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.9.1-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.10.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-1582%20passing-brightgreen.svg)](#testing)
-[![Adapters](https://img.shields.io/badge/frameworks-16%20supported-blueviolet.svg)](#adapter-system)
+[![Tests](https://img.shields.io/badge/tests-1617%20passing-brightgreen.svg)](#testing)
+[![Adapters](https://img.shields.io/badge/frameworks-17%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -18,11 +18,15 @@
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/Cab5vAxc86)
 [![Glama](https://glama.ai/mcp/servers/Jovancoding/network-ai/badges/score.svg)](https://glama.ai/mcp/servers/Jovancoding/network-ai)
 
+<p align="center">
+  <img src="assets/demo.svg" alt="Network-AI control-plane demo — atomic blackboard, priority preemption, AuthGuardian, FSM governance" width="720">
+</p>
+
 Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordination, guardrails, and governance to any AI agent stack.
 
 - **Shared blackboard with locking** — atomic `propose → validate → commit` prevents race conditions and split-brain failures across parallel agents
 - **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC / Ed25519 audit trails, and permission gating
-- **16 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, MiniMax, and NemoClaw — no glue code, no lock-in
+- **17 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, MiniMax, NemoClaw, and APS — no glue code, no lock-in
 - **Persistent project memory (Layer 3)** — `context_manager.py` injects decisions, goals, stack, milestones, and banned patterns into every system prompt so agents always have full project context
 
 > **The silent failure mode in multi-agent systems:** parallel agents writing to the same key
@@ -39,14 +43,51 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 
 [**5-minute quickstart →**](QUICKSTART.md) &nbsp;|&nbsp; [**Architecture →**](ARCHITECTURE.md) &nbsp;|&nbsp; [**All adapters →**](#adapter-system) &nbsp;|&nbsp; [**Benchmarks →**](BENCHMARKS.md)
 
-> **Try the control-plane stress test — no API key, ~3 seconds:**
-> ```bash
-> npx ts-node examples/08-control-plane-stress-demo.ts
-> ```
-> Runs priority preemption, AuthGuardian permission gating, FSM governance, and compliance
-> monitoring against a live swarm. No external services required.
->
+---
+
+## ⚡ Try in 60 Seconds
+
+```bash
+npm install network-ai
+```
+
+```typescript
+import { LockedBlackboard } from 'network-ai';
+
+const board = new LockedBlackboard('.');
+const id    = board.propose('status', { ready: true }, 'agent-1');
+board.validate(id, 'agent-1');
+board.commit(id);
+
+console.log(board.read('status'));  // { ready: true }
+```
+
+Two agents, atomic writes, no race conditions. That's it.
+
+Want the full stress test? **No API key, ~3 seconds:**
+
+```bash
+npx ts-node examples/08-control-plane-stress-demo.ts
+```
+
+Runs priority preemption, AuthGuardian permission gating, FSM governance, and compliance monitoring — all without a single LLM call.
+
 > If it saves you from a race condition, a ⭐ helps others find it.
+
+---
+
+## What's Included
+
+| | |
+|---|---|
+| ✅ Atomic shared state | `propose → validate → commit` with filesystem mutex — no split-brain |
+| ✅ Token budgets | Hard per-agent ceilings with live spend tracking |
+| ✅ Permission gating | HMAC / Ed25519-signed tokens, scoped per agent and resource |
+| ✅ Append-only audit log | Every write, grant, and transition signed and logged |
+| ✅ 17 framework adapters | LangChain, CrewAI, AutoGen, MCP, Codex, APS, and 11 more — zero lock-in |
+| ✅ FSM governance | Hard-stop agents at state boundaries, timeout enforcement |
+| ✅ Compliance monitoring | Real-time violation detection (tool abuse, turn-taking, timeouts) |
+| ✅ TypeScript native | ES2022 strict mode, zero native dependencies |
 
 ---
 
@@ -57,7 +98,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 | Race conditions in parallel agents | Atomic blackboard: `propose → validate → commit` with file-system mutex |
 | Agent overspend / runaway costs | `FederatedBudget` — hard per-agent token ceilings with live spend tracking |
 | No visibility into what agents did | HMAC / Ed25519-signed audit log on every write, permission grant, and FSM transition |
-| Locked into one AI framework | 16 adapters — mix LangChain + AutoGen + CrewAI + Codex + MiniMax + NemoClaw + custom in one swarm |
+| Locked into one AI framework | 17 adapters — mix LangChain + AutoGen + CrewAI + Codex + MiniMax + NemoClaw + APS + custom in one swarm |
 | Agents escalating beyond their scope | `AuthGuardian` — scoped permission tokens required before sensitive operations |
 | Agents lack project context between runs | `ProjectContextManager` (Layer 3) — inject decisions, goals, stack, and milestones into every system prompt |
 
@@ -275,7 +316,7 @@ npx ts-node examples/10-nemoclaw-sandbox-swarm.ts
 
 ## Adapter System
 
-16 adapters, zero adapter dependencies. You bring your own SDK objects.
+17 adapters, zero adapter dependencies. You bring your own SDK objects.
 
 | Adapter | Framework / Protocol | Register method |
 |---|---|---|
@@ -295,6 +336,7 @@ npx ts-node examples/10-nemoclaw-sandbox-swarm.ts
 | `CodexAdapter` | OpenAI Codex / gpt-4o / Codex CLI | `registerCodexAgent(name, config)` |
 | `MiniMaxAdapter` | MiniMax LLM API (M2.5 / M2.5-highspeed) | `registerAgent(name, config)` |
 | `NemoClawAdapter` | NVIDIA NemoClaw (sandboxed agents via OpenShell) | `registerSandboxAgent(name, config)` |
+| `APSAdapter` | Agent Permission Service (delegation-chain trust) | `apsDelegationToTrust(delegation)` |
 
 **Streaming variants** (drop-in replacements with `.stream()` support):
 
@@ -313,7 +355,7 @@ Extend `BaseAdapter` (or `StreamingBaseAdapter` for streaming) to add your own i
 
 | Capability | Network-AI | LangGraph | CrewAI | AutoGen |
 |---|---|---|---|---|
-| Cross-framework agents in one swarm | ✅ 15 built-in adapters | ⚠️ Nodes can call any code; no adapter abstraction | ⚠️ Extensible via tools; CrewAI-native agents only | ⚠️ Extensible via plugins; AutoGen-native agents only |
+| Cross-framework agents in one swarm | ✅ 17 built-in adapters | ⚠️ Nodes can call any code; no adapter abstraction | ⚠️ Extensible via tools; CrewAI-native agents only | ⚠️ Extensible via plugins; AutoGen-native agents only |
 | Atomic shared state (conflict-safe) | ✅ `propose → validate → commit` mutex | ⚠️ State passed between nodes; last-write-wins | ⚠️ Shared memory available; no conflict resolution | ⚠️ Shared context available; no conflict resolution |
 | Hard token ceiling per agent | ✅ `FederatedBudget` (first-class API) | ⚠️ Via callbacks / custom middleware | ⚠️ Via callbacks / custom middleware | ⚠️ Built-in token tracking in v0.4+; no swarm-level ceiling |
 | Permission gating before sensitive ops | ✅ `AuthGuardian` (built-in) | ⚠️ Possible via custom node logic | ⚠️ Possible via custom tools | ⚠️ Possible via custom middleware |
@@ -329,7 +371,7 @@ Extend `BaseAdapter` (or `StreamingBaseAdapter` for streaming) to add your own i
 npm run test:all          # All suites in sequence
 npm test                  # Core orchestrator
 npm run test:security     # Security module
-npm run test:adapters     # All 16 adapters
+npm run test:adapters     # All 17 adapters
 npm run test:streaming    # Streaming adapters
 npm run test:a2a          # A2A protocol adapter
 npm run test:codex        # Codex adapter
@@ -337,7 +379,7 @@ npm run test:priority     # Priority & preemption
 npm run test:cli          # CLI layer
 ```
 
-**1,582 passing assertions across 20 test suites** (`npm run test:all`):
+**1,617 passing assertions across 20 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -345,7 +387,7 @@ npm run test:cli          # CLI layer
 | `test-phase5f.ts` | 127 | SSE transport, `McpCombinedBridge`, extended MCP tools |
 | `test-phase5g.ts` | 121 | CRDT backend, vector clocks, bidirectional sync |
 | `test-phase6.ts` | 121 | MCP server, control-plane tools, audit tools |
-| `test-adapters.ts` | 141 | All 16 adapters, registry routing, integration, edge cases |
+| `test-adapters.ts` | 176 | All 17 adapters, registry routing, integration, edge cases |
 | `test-phase5d.ts` | 117 | Pluggable backend (Redis, CRDT, Memory) |
 | `test-standalone.ts` | 88 | Blackboard, auth, integration, persistence, parallelisation, quality gate |
 | `test-phase5e.ts` | 87 | Federated budget tracking |

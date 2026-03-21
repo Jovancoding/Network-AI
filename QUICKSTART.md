@@ -18,7 +18,7 @@ npm install
 npx ts-node setup.ts --check
 ```
 
-**Zero external AI dependencies.** All 16 adapters are self-contained — add framework SDKs only when you need them.
+**Zero external AI dependencies.** All 17 adapters are self-contained — add framework SDKs only when you need them.
 
 ---
 
@@ -42,7 +42,7 @@ npx ts-node setup.ts --check
 | `a2a` | A2A | none | Agent-to-Agent protocol |
 | `codex` | Codex | `openai` | OpenAI Codex CLI |
 | `minimax` | MiniMax | none | MiniMax chat completions |
-| `nemoclaw` | NemoClaw | none | NVIDIA sandboxed agent execution |
+| `nemoclaw` | NemoClaw | none | NVIDIA sandboxed agent execution |\n| `aps` | APS | none | Delegation-chain trust mapping |
 
 ---
 
@@ -218,9 +218,9 @@ export class MyFrameworkAdapter extends BaseAdapter {
 ## 8. Run Tests
 
 ```bash
-npx ts-node test-standalone.ts    # 79 core tests
-npx ts-node test-security.ts      # 33 security tests
-npx ts-node test-adapters.ts      # 100+ adapter tests (all 14 frameworks)
+npx ts-node test-standalone.ts    # 88 core tests
+npx ts-node test-security.ts      # 34 security tests
+npx ts-node test-adapters.ts      # 176 adapter tests (all 17 frameworks)
 npx ts-node test-cli.ts           # 65 CLI tests
 ```
 
@@ -230,7 +230,7 @@ npx ts-node test-cli.ts           # 65 CLI tests
 
 ```bash
 npx ts-node setup.ts --check      # Verify installation
-npx ts-node setup.ts --list       # List all 16 adapters
+npx ts-node setup.ts --list       # List all 17 adapters
 npx ts-node setup.ts --example    # Generate example.ts
 ```
 
@@ -347,7 +347,8 @@ Your App
             ├── OpenAIAssistantsAdapter── OpenAI Assistants
             ├── HaystackAdapter     ─── Haystack pipelines
             ├── DSPyAdapter         ─── DSPy modules
-            └── AgnoAdapter         ─── Agno agents/teams
+            ├── AgnoAdapter         ─── Agno agents/teams
+            └── APSAdapter          ─── APS delegation-chain trust
 ```
 
 ---
@@ -568,7 +569,7 @@ import SwarmOrchestrator, {
 // Factory
 import { createSwarmOrchestrator } from 'network-ai';
 
-// All 16 adapters
+// All 17 adapters
 import {
   AdapterRegistry, BaseAdapter,
   OpenClawAdapter, LangChainAdapter, AutoGenAdapter,

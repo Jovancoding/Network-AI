@@ -5,6 +5,23 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.0] - 2026-03-21
+
+### Added
+- **APS adapter** — New `APSAdapter` mapping Agent Permission Service delegation chains to AuthGuardian trust levels. Features: depth-decayed trust formula (`baseTrust × (1 - (currentDepth / maxDepth × depthDecay))`), local/MCP/BYOC signature verification, APS scope-to-resource mapping (`file:read` → `FILE_SYSTEM`, `shell:exec` → `SHELL_EXEC`, etc.), namespace derivation, and executeAgent pass-through. Adapter count now 17.
+- 13 new tests for APS adapter: root delegation, mid-chain decay, max depth, unverified signature, custom config, BYOC verifier, input validation, depth overflow, executeAgent, namespace derivation, MCP mode, capabilities (total: 1,617 across 20 suites)
+- `CODEX.md` — Project instructions for OpenAI Codex CLI (mirrors CLAUDE.md)
+- `.github/copilot-instructions.md` — GitHub Copilot workspace instructions
+
+### Changed
+- All documentation updated: adapter count 16 → 17, test count 1,582 → 1,617 across README, QUICKSTART, ARCHITECTURE, ENTERPRISE, INTEGRATION_GUIDE, CONTRIBUTING, CLAUDE.md, CODEX.md, copilot-instructions.md, SKILL.md, skill.json, package.json
+- Security policy updated: 4.10.x now current, 4.9.x moved to security-fixes-only
+- `references/adapter-system.md` — Added APS adapter section with trust formula, verification modes, and usage example
+- `references/auth-guardian.md` — Added APS Integration section documenting delegation-chain → trust mapping
+
+### Fixed
+- Removed unused `grant2` variable in test.ts (CodeQL alert #90)
+
 ## [4.9.1] - 2026-03-19
 
 ### Changed

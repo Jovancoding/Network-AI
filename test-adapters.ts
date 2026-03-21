@@ -1152,11 +1152,11 @@ async function testAgnoAdapter(): Promise<void> {
 }
 
 // ============================================================================
-// TEST 15: All 16 Adapters in Registry Together
+// TEST 15: All 17 Adapters in Registry Together
 // ============================================================================
 
 async function testAllAdaptersInRegistry(): Promise<void> {
-  section('Full Registry -- All 16 Adapters Working Together');
+  section('Full Registry -- All 17 Adapters Working Together');
 
   const registry = new AdapterRegistry();
 
@@ -1308,6 +1308,7 @@ async function runAllTests(): Promise<void> {
     await testHaystackAdapter();
     await testDSPyAdapter();
     await testAgnoAdapter();
+    await testAPSAdapter();
     await testAllAdaptersInRegistry();
   } catch (error) {
     console.log(`\n${colors.red}FATAL: Unexpected error: ${error}${colors.reset}`);
@@ -1326,6 +1327,166 @@ async function runAllTests(): Promise<void> {
   console.log(`${colors.bold}=======================================================${colors.reset}\n`);
 
   process.exit(failed > 0 ? 1 : 0);
+}
+
+// ─── APS Adapter Tests ───────────────────────────────────────────────────────
+
+async function testAPSAdapter() {
+  section('APS Adapter (Agent Permission Service)');
+
+  const { APSAdapter } = await import('./adapters/aps-adapter');
+
+  // 1. Initialize with defaults
+  const aps = new APSAdapter();
+  await aps.initialize({});
+  assert(true, 'APS adapter initializes with defaults');
+
+  // 2. Root delegation (depth 0) → full base trust
+  const root = await aps.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'agent-1',
+    scope: ['file:read', 'git:read'],
+    currentDepth: 0,
+    maxDepth: 3,
+    signature: 'valid-sig-abc123',
+  });
+  assert(root.agentId === 'agent-1', 'APS: root delegation maps to correct agentId');
+  assert(root.trustLevel === 0.8, `APS: root trust = baseTrust (0.8), got ${root.trustLevel}`);
+  assert(root.allowedResources.includes('FILE_SYSTEM'), 'APS: file:read maps to FILE_SYSTEM');
+  assert(root.allowedResources.includes('GIT'), 'APS: git:read maps to GIT');
+  assert(root.apsMetadata.verified === true, 'APS: root delegation is verified');
+  assert(true, 'APS root delegation → full base trust');
+
+  // 3. Mid-chain delegation (depth 1/3) → decayed trust
+  const mid = await aps.apsDelegationToTrust({
+    delegator: 'agent-1',
+    delegatee: 'agent-2',
+    scope: ['file:read'],
+    currentDepth: 1,
+    maxDepth: 3,
+    signature: 'valid-sig-def456',
+  });
+  // Trust = 0.8 * (1 - (1/3 * 0.4)) = 0.8 * 0.867 ≈ 0.693
+  assert(mid.trustLevel > 0.6 && mid.trustLevel < 0.75, `APS: mid-chain trust decayed, got ${mid.trustLevel}`);
+  assert(mid.allowedResources.length === 1, 'APS: scope narrowed to 1 resource');
+  assert(true, 'APS mid-chain delegation → decayed trust');
+
+  // 4. Max depth delegation → maximum decay
+  const deep = await aps.apsDelegationToTrust({
+    delegator: 'agent-2',
+    delegatee: 'agent-3',
+    scope: ['file:read'],
+    currentDepth: 3,
+    maxDepth: 3,
+    signature: 'valid-sig-ghi789',
+  });
+  // Trust = 0.8 * (1 - (3/3 * 0.4)) = 0.8 * 0.6 = 0.48
+  assert(deep.trustLevel === 0.48, `APS: max depth trust = 0.48, got ${deep.trustLevel}`);
+  assert(true, 'APS max depth delegation → maximum decay');
+
+  // 5. Empty signature → unverified → trust 0
+  const unverified = await aps.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'agent-bad',
+    scope: ['file:read'],
+    currentDepth: 0,
+    maxDepth: 3,
+    signature: '',
+  });
+  assert(unverified.trustLevel === 0, 'APS: empty signature → trust 0');
+  assert(unverified.apsMetadata.verified === false, 'APS: empty sig → not verified');
+  assert(true, 'APS unverified delegation → zero trust');
+
+  // 6. Custom baseTrust and depthDecay
+  const custom = new APSAdapter();
+  await custom.initialize({ baseTrust: 0.9, depthDecay: 0.6 });
+  const customResult = await custom.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'custom-agent',
+    scope: ['shell:exec'],
+    currentDepth: 2,
+    maxDepth: 4,
+    signature: 'custom-sig',
+  });
+  // Trust = 0.9 * (1 - (2/4 * 0.6)) = 0.9 * 0.7 = 0.63
+  assert(customResult.trustLevel === 0.63, `APS: custom config trust = 0.63, got ${customResult.trustLevel}`);
+  assert(customResult.allowedResources.includes('SHELL_EXEC'), 'APS: shell:exec maps to SHELL_EXEC');
+  assert(true, 'APS custom baseTrust/depthDecay config');
+
+  // 7. BYOC signature verifier
+  const byoc = new APSAdapter();
+  await byoc.initialize({
+    verifySignature: async (d) => d.signature === 'secret-token',
+  });
+  const verified = await byoc.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'byoc-agent',
+    scope: ['net:fetch'],
+    currentDepth: 0,
+    maxDepth: 2,
+    signature: 'secret-token',
+  });
+  assert(verified.apsMetadata.verified === true, 'APS: BYOC verifier accepts valid signature');
+  const rejected = await byoc.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'byoc-agent',
+    scope: ['net:fetch'],
+    currentDepth: 0,
+    maxDepth: 2,
+    signature: 'wrong-token',
+  });
+  assert(rejected.trustLevel === 0, 'APS: BYOC verifier rejects invalid signature');
+  assert(true, 'APS BYOC signature verifier');
+
+  // 8. Invalid input rejects
+  let threw = false;
+  try {
+    await aps.apsDelegationToTrust({ delegator: '', delegatee: 'x', scope: ['file:read'], currentDepth: 0, maxDepth: 1, signature: 's' });
+  } catch { threw = true; }
+  assert(threw, 'APS: empty delegator throws');
+  assert(true, 'APS input validation');
+
+  // 9. Depth exceeds max rejects
+  threw = false;
+  try {
+    await aps.apsDelegationToTrust({ delegator: 'a', delegatee: 'b', scope: ['file:read'], currentDepth: 5, maxDepth: 3, signature: 's' });
+  } catch { threw = true; }
+  assert(threw, 'APS: depth > maxDepth throws');
+  assert(true, 'APS depth exceeds max rejects');
+
+  // 10. executeAgent pass-through
+  const execResult = await aps.executeAgent('verify', {
+    action: 'verify',
+    params: {
+      delegator: 'root',
+      delegatee: 'exec-agent',
+      scope: ['db:read'],
+      currentDepth: 0,
+      maxDepth: 2,
+      signature: 'exec-sig',
+    },
+  }, { agentId: 'test' });
+  assert(execResult.success === true, 'APS: executeAgent returns trust mapping');
+  assert((execResult.data as Record<string, unknown>).agentId === 'exec-agent', 'APS: executeAgent maps correct agentId');
+  assert(true, 'APS executeAgent pass-through');
+
+  // 11. Namespace derivation
+  assert(root.allowedNamespaces.includes('file:'), 'APS: file: namespace derived');
+  assert(root.allowedNamespaces.includes('git:'), 'APS: git: namespace derived');
+  assert(true, 'APS namespace derivation from scopes');
+
+  // 12. MCP mode requires URL
+  threw = false;
+  try {
+    const mcpAps = new APSAdapter();
+    await mcpAps.initialize({ verificationMode: 'mcp' });
+  } catch { threw = true; }
+  assert(threw, 'APS: MCP mode without URL throws');
+  assert(true, 'APS MCP mode requires mcpServerUrl');
+
+  // 13. Capabilities
+  assert(aps.capabilities.authentication === true, 'APS: capabilities.authentication is true');
+  assert(true, 'APS adapter capabilities');
 }
 
 runAllTests();

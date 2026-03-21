@@ -1,6 +1,6 @@
-# CLAUDE.md — Project Instructions for Claude Code
+# CODEX.md — Project Instructions for OpenAI Codex
 
-This file is read automatically by Claude Code when working in this repository.
+This file is read automatically by OpenAI Codex CLI when working in this repository.
 
 ## Project Overview
 
@@ -50,20 +50,6 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - No new runtime dependencies without explicit approval
 - Input validation required on all public API entry points
 - Keep adapter files self-contained — no cross-adapter imports
-
-## MCP Server
-
-Network-AI exposes 22 tools over MCP (stdio and SSE transports):
-
-```bash
-# Stdio (for Claude Code / Cursor / Glama):
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | npx network-ai
-
-# SSE:
-npx network-ai-server --port 3001
-```
-
-Tools: `blackboard_read`, `blackboard_write`, `blackboard_list`, `blackboard_delete`, `blackboard_exists`, `budget_status`, `budget_spend`, `budget_reset`, `token_create`, `token_validate`, `token_revoke`, `audit_query`, `config_get`, `config_set`, `agent_list`, `agent_spawn`, `agent_stop`, `fsm_transition`, and more.
 
 ## Security Requirements
 
