@@ -12,10 +12,7 @@ metadata:
       bins:
         - python3
       optional_bins: []
-    env:
-      OPENAI_API_KEY:
-        required: false
-        description: "Not used by this skill."
+    env: {}
     privacy:
       audit_log:
         path: data/audit_log.jsonl
@@ -227,7 +224,7 @@ python {baseDir}/scripts/context_manager.py update \
 ```bash
 python {baseDir}/scripts/context_manager.py update \
   --section stack \
-  --set '{"language": "TypeScript", "runtime": "Node.js 18", "framework": "Network-AI v4.5"}'
+  --set '{"language": "Python", "runtime": "Python 3.11", "framework": "SwarmOrchestrator"}'
 ```
 
 #### Banning an Approach
@@ -314,10 +311,6 @@ python {baseDir}/scripts/blackboard.py read "task:q4_analysis"
 # List all entries
 python {baseDir}/scripts/blackboard.py list
 ```
-
-### 5. Optional: Use the Node.js CLI
-
-> **Scope note:** The `network-ai` CLI is part of the **companion npm package** — it is a completely separate project and is NOT part of this ClawHub skill bundle. This skill's Python scripts work fully without it. See the [Appendix](#appendix-optional-nodejs-companion-npm) at the bottom of this file for details.
 
 ## Agent-to-Agent Handoff Protocol
 

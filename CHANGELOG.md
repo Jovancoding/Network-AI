@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.5] - 2026-03-22
+
+### Fixed
+- Removed `OPENAI_API_KEY` from skill.json and SKILL.md (scanner flagged "optional but not used" as odd)
+- Removed Node.js CLI section from SKILL.md (scanner saw Node.js references as inconsistent with Python-only bundle)
+- Replaced TypeScript/Node.js example in context_manager stack section with Python values
+- Removed dangling appendix link reference
+
 ## [4.10.4] - 2026-03-22
 
 ### Fixed
