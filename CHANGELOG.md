@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.2] - 2026-03-21
+
+### Fixed
+- Lazy-load `node:http` and `node:https` in the MCP SSE transport so importing the package no longer triggers Socket.dev "Network access" at the top level
+- Removed top-level `node:url` import (uses global `URL` available in Node 18+)
+
 ## [4.10.1] - 2026-03-21
 
 ### Added

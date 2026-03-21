@@ -29,9 +29,8 @@
  * @version 1.0.0
  */
 
-import * as http from 'node:http';
-import * as https from 'node:https';
-import { URL } from 'node:url';
+import type * as http from 'node:http';
+import type * as https from 'node:https';
 import type {
   McpTransport,
   McpJsonRpcRequest,
@@ -42,6 +41,23 @@ import {
   McpBlackboardBridge,
 } from './mcp-bridge';
 import type { MCPToolDefinition, BlackboardToolResult } from './mcp-blackboard-tools';
+
+// Lazy-loaded network modules — deferred so that importing this file does not
+// pull in node:http / node:https unless the SSE transport is actually used.
+let _http: typeof import('node:http') | undefined;
+let _https: typeof import('node:https') | undefined;
+
+/** @internal */
+function requireHttp(): typeof import('node:http') {
+  if (!_http) _http = require('node:http') as typeof import('node:http');
+  return _http;
+}
+
+/** @internal */
+function requireHttps(): typeof import('node:https') {
+  if (!_https) _https = require('node:https') as typeof import('node:https');
+  return _https;
+}
 
 // ============================================================================
 // TOOL PROVIDER INTERFACE
@@ -250,7 +266,7 @@ export class McpSseServer {
 
   /** Start listening. Resolves when the server is ready. */
   listen(): Promise<void> {
-    this._server = http.createServer((req, res) => this._handleRequest(req, res));
+    this._server = requireHttp().createServer((req, res) => this._handleRequest(req, res));
     return new Promise(resolve => {
       this._server.listen(this._opts.port, this._opts.host, () => resolve());
     });
@@ -470,7 +486,7 @@ export class McpSseTransport implements McpTransport {
     const body = JSON.stringify(request);
     const parsed = new URL(this._postUrl);
     const isHttps = parsed.protocol === 'https:';
-    const lib = isHttps ? https : http;
+    const lib = isHttps ? requireHttps() : requireHttp();
 
     return new Promise((resolve, reject) => {
       const options: http.RequestOptions = {
