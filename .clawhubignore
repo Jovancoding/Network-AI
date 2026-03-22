@@ -1,25 +1,27 @@
-# Only ship SKILL.md + supporting scripts + blackboard template
-# Exclude everything else
+# ClawHub bundle: ship only SKILL.md + scripts/*.py + swarm-blackboard.md + requirements.txt
+# Exclude everything else so TypeScript/Node.js docs don't leak into the Python-only skill bundle.
 
-# TypeScript source & build
+# ── TypeScript source & build ──
 *.ts
 dist/
 lib/
 adapters/
 types/
+bin/
 
-# Config & tooling
+# ── Node.js / config ──
 tsconfig.json
 tsconfig.build.json
 package.json
 package-lock.json
 node_modules/
+setup.ts
 
-# Tests
+# ── Tests ──
 test.ts
 test-*.ts
 
-# Docs (not needed for the skill)
+# ── All docs except SKILL.md ──
 README.md
 QUICKSTART.md
 CHANGELOG.md
@@ -27,13 +29,34 @@ LICENSE
 CONTRIBUTING.md
 CODE_OF_CONDUCT.md
 SECURITY.md
+ARCHITECTURE.md
+ENTERPRISE.md
+INTEGRATION_GUIDE.md
+BENCHMARKS.md
+ADOPTERS.md
+AUDIT_LOG_SCHEMA.md
+RELEASING.md
+CLAUDE.md
+CODEX.md
+SHOW_HN.md
+AWESOME_LISTS.md
+claude-project-prompt.md
 
-# CI/CD
+# ── Reference docs (TypeScript-specific) ──
+references/
+
+# ── OpenAPI / tooling (TypeScript MCP server) ──
+openapi.yaml
+claude-tools.json
+
+# ── Examples (TypeScript) ──
+examples/
+
+# ── CI/CD ──
 .github/
 
-# Other
+# ── Misc ──
 .gitignore
 .npmignore
-*.json
-setup.ts
-references/
+err.txt
+socket.json

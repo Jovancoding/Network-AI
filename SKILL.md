@@ -5,9 +5,10 @@ metadata:
   openclaw:
     emoji: "\U0001F41D"
     homepage: https://network-ai.org
-    bundle_scope: "Python scripts only (scripts/*.py). All execution is local."
-    network_calls: "none from bundled scripts; platform sessions_send delegations may invoke external models"
-    sessions_ops: "platform-provided"
+    bundle_scope: "Python scripts only (scripts/*.py). All execution is local. No TypeScript, Node.js, adapters, or CLI tools are included in this bundle."
+    network_calls: "none — bundled scripts make zero network calls. The host platform's sessions_send (not part of this skill) may invoke external models."
+    sessions_send: "NOT implemented or invoked by this skill. sessions_send is a host-platform built-in. This skill only provides budget guards that run before the platform delegates."
+    sessions_ops: "platform-provided — outside this skill's control"
     requires:
       bins:
         - python3
@@ -18,11 +19,21 @@ metadata:
         path: data/audit_log.jsonl
         scope: local-only
         description: "Local append-only JSONL file recording operation metadata. No data leaves the machine."
+        pii_warning: "Do not include PII, secrets, or credentials in justification fields. Log entries persist on disk."
+      data_directory:
+        path: data/
+        scope: local-only
+        files: ["audit_log.jsonl", "active_grants.json", "project-context.json"]
+        description: "All persistent state is local-only. No files are transmitted over the network."
 ---
 
 # Swarm Orchestrator Skill
 
-> **Scope:** The bundled Python scripts (`scripts/*.py`) make no network calls, use only the Python standard library, and have zero third-party dependencies. Tokens are UUID-based (`grant_{uuid4().hex}`) stored in `data/active_grants.json`. Audit logging is plain JSONL (`data/audit_log.jsonl`). Workflow delegations that use the host platform's `sessions_send` may invoke external model APIs outside this skill's control.
+> **Scope:** The bundled Python scripts (`scripts/*.py`) make **no network calls**, use only the Python standard library, and have **zero third-party dependencies**. Tokens are UUID-based (`grant_{uuid4().hex}`) stored in `data/active_grants.json`. Audit logging is plain JSONL (`data/audit_log.jsonl`).
+
+> **Data-flow notice:** This skill does NOT implement, invoke, or control `sessions_send`. That is a host-platform built-in (OpenClaw runtime). The orchestration instructions below describe *when* to call the platform's `sessions_send` after budget checks pass — but the actual network call, model endpoint, and data transmission are entirely the host platform's responsibility. If you need to prevent external network calls, disable or reroute `sessions_send` in your platform settings before installing this skill.
+
+> **PII / sensitive-data warning:** The `justification` field in permission requests and the audit log (`data/audit_log.jsonl`) store free-text strings provided by agents. **Do not include PII, secrets, or credentials in justification text.** Consider restricting file permissions on `data/` or running this skill in an isolated workspace.
 
 ## Setup
 
@@ -514,6 +525,8 @@ Sequential processing - output of one feeds into next.
 ## 📝 Audit Trail Requirements (MANDATORY)
 
 **Every sensitive action MUST be logged to `data/audit_log.jsonl`** to maintain compliance and enable forensic analysis.
+
+> **Privacy note:** Audit log entries contain agent-provided free-text fields (justifications, descriptions). These are stored locally in `data/audit_log.jsonl` and never transmitted over the network by this skill. However, **do not put PII, passwords, or API keys in justification strings** — they persist on disk. Consider periodic log rotation and restricting OS file permissions on the `data/` directory.
 
 ### What Gets Logged Automatically
 

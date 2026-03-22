@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.11.1] - 2026-03-22
+
+### Fixed
+- **ClawHub scanner: "suspicious" flag** — tightened `.clawhubignore` to exclude all TypeScript docs, OpenAPI spec, examples, and AI instruction files from the Python-only skill bundle; previously 15+ doc files referencing Node.js/TypeScript features leaked into the ClawHub package, causing a doc/bundle mismatch warning
+- **SKILL.md clarity** — added explicit data-flow notice that `sessions_send` is NOT implemented by this skill (host-platform built-in only), added PII warning for justification fields and audit log, expanded `metadata.openclaw` with `sessions_send`, `pii_warning`, and `data_directory` fields
+
 ## [4.11.0] - 2026-03-22
 
 ### Added
