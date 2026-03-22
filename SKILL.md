@@ -5,7 +5,7 @@ metadata:
   openclaw:
     emoji: "\U0001F41D"
     homepage: https://network-ai.org
-    bundle_scope: "Python scripts only (scripts/*.py). All execution is local. No TypeScript, Node.js, adapters, or CLI tools are included in this bundle."
+    bundle_scope: "Python scripts only (scripts/*.py). All execution is local. Only Python stdlib — no other runtimes, adapters, or CLI tools are included."
     network_calls: "none — bundled scripts make zero network calls. The host platform's sessions_send (not part of this skill) may invoke external models."
     sessions_send: "NOT implemented or invoked by this skill. sessions_send is a host-platform built-in. This skill only provides budget guards that run before the platform delegates."
     sessions_ops: "platform-provided — outside this skill's control"
@@ -398,7 +398,7 @@ Expected Output: JSON summary with category, revenue, growth_pct
 sessions_history data_analyst  # OpenClaw platform operation — get the response
 ```
 
-## Permission Wall (AuthGuardian)
+## Permission Wall
 
 **CRITICAL**: Always check permissions before accessing:
 - `DATABASE` - Internal database / data store access
@@ -721,7 +721,4 @@ python {baseDir}/scripts/swarm_guard.py supervisor-review --task-id "task_001"
 
 ## References
 
-- [AuthGuardian Details](references/auth-guardian.md) - Full permission system documentation
-- [Blackboard Schema](references/blackboard-schema.md) - Data structure specifications
-- [Agent Trust Levels](references/trust-levels.md) - How trust is calculated
-- [CLI Reference](QUICKSTART.md) - Full `network-ai` CLI command reference (§ 10. CLI)
+This skill is part of the larger [Network-AI](https://github.com/Jovancoding/Network-AI) project. See the repository for full documentation on the permission system, blackboard schema, and trust-level calculations.

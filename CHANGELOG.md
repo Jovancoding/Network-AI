@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.11.2] - 2026-03-22
+
+### Fixed
+- **ClawHub scanner: remaining bundle leaks** — added `docs/` (website HTML with TypeScript/Node.js meta tags) to `.clawhubignore`; this was the primary source of the "17 adapters / HMAC / Ed25519" mismatch the scanner flagged
+- **Removed `AuthGuardian` references from skill bundle** — renamed to "Permission Wall" in SKILL.md, changed `authGuardian` key to `permissionGating` in skill.json with explanatory note, updated capability descriptions
+- **Removed broken reference links** — SKILL.md linked to `references/*.md` files that are excluded from the bundle; replaced with a single link to the GitHub repo
+- **Honest PII disclosure** — `privacy.audit_log.does_not_contain` no longer claims "user PII" since justification fields are free-text; added explicit `pii_warning` field and `justification (free-text)` to `contains` list
+- **Removed `adapters` key** from skill.json (Python-only skill has no adapters)
+
 ## [4.11.1] - 2026-03-22
 
 ### Fixed

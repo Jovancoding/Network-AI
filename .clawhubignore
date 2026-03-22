@@ -52,6 +52,9 @@ claude-tools.json
 # ── Examples (TypeScript) ──
 examples/
 
+# ── Website (TypeScript/Node.js marketing site) ──
+docs/
+
 # ── CI/CD ──
 .github/
 

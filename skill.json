@@ -1,6 +1,6 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "4.11.1",
+  "version": "4.11.2",
   "description": "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. The bundled Python scripts make no network calls and have zero third-party dependencies. Workflow delegations via the host platform's sessions_send may invoke external model APIs.",
   "author": "Network-AI Community",
   "homepage": "https://network-ai.org",
@@ -47,7 +47,7 @@
         "requiresAuth": {
           "type": "boolean",
           "default": false,
-          "description": "Whether this task requires AuthGuardian permission grant"
+          "description": "Whether this task requires a permission grant (via check_permission.py)"
         }
       },
       "returns": {
@@ -123,7 +123,7 @@
       }
     },
     "request_permission": {
-      "description": "Request permission from AuthGuardian for sensitive operations",
+      "description": "Request permission for sensitive operations via the local permission gating script",
       "parameters": {
         "resourceType": {
           "type": "string",
@@ -222,15 +222,13 @@
   "permissions": {
     "required": ["local_filesystem", "internal_skill_calls"],
     "optional": ["external_api_access"],
-    "authGuardian": {
+    "permissionGating": {
       "enabled": true,
-      "protectedResources": ["DATABASE", "PAYMENTS", "EMAIL", "FILE_EXPORT"]
+      "protectedResources": ["DATABASE", "PAYMENTS", "EMAIL", "FILE_EXPORT"],
+      "note": "Permission checks are implemented locally via scripts/check_permission.py using weighted scoring (justification 40%, trust 30%, risk 30%). No external auth service."
     }
   },
   "dependencies": {},
-  "adapters": {
-    "note": "This skill runs standalone. No adapter dependencies required."
-  },
   "config": {
     "blackboardPath": "./swarm-blackboard.md",
     "maxParallelAgents": null,
@@ -243,9 +241,10 @@
     "audit_log": {
       "path": "data/audit_log.jsonl",
       "scope": "local-only",
-      "description": "Append-only JSONL audit log recording operation metadata (agentId, action, timestamp, outcome). Stays in the local data/ directory. No data is sent externally. Can be disabled with --no-audit flag or audit_log: false in config.",
-      "contains": ["agentId", "action", "timestamp", "outcome", "resource"],
-      "does_not_contain": ["user PII", "API keys", "message content", "external endpoints"]
+      "description": "Append-only JSONL audit log recording operation metadata (agentId, action, timestamp, outcome). Stays in local data/ directory. No data is sent externally by this skill.",
+      "contains": ["agentId", "action", "timestamp", "outcome", "resource", "justification (free-text, agent-provided)"],
+      "pii_warning": "Justification fields are free-text and may contain user-supplied content. Do not put PII, secrets, or credentials in justification strings. Restrict file permissions on data/ and rotate logs periodically.",
+      "does_not_contain": ["API keys", "external endpoints"]
     }
   }
 }
