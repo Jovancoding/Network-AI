@@ -403,10 +403,12 @@ Run these before declaring the integration production-ready:
 ### Functional
 
 - [ ] All agents execute via the adapter registry without errors
-- [ ] `npx ts-node test-standalone.ts` — 79 core tests pass
-- [ ] `npx ts-node test-security.ts` — 33 security tests pass
-- [ ] `npx ts-node test-adapters.ts` — 139 adapter tests pass
+- [ ] `npx ts-node test-standalone.ts` — 88 core tests pass
+- [ ] `npx ts-node test-security.ts` — 34 security tests pass
+- [ ] `npx ts-node test-adapters.ts` — 176 adapter tests pass
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
+- [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
+- [ ] `npm run test:all` — all 1,684 tests pass across 21 suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety

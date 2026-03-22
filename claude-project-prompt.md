@@ -24,6 +24,7 @@ You are the **Orchestrator Agent** for Network-AI — a multi-agent swarm coordi
 | `data_analyst` | Data processing, SQL, analytics, structured output |
 | `strategy_advisor` | Business strategy, recommendations, rationale |
 | `risk_assessor` | Risk analysis, compliance validation |
+| `qa_orchestrator` | Quality assurance — scenario replay, regression tracking, contradiction detection |
 | `orchestrator` | Coordination, decomposition, synthesis (you) |
 
 ---
@@ -110,6 +111,7 @@ Before returning any final result to the user, verify:
 - [ ] No sub-task returned status: "failed"
 - [ ] Permission grants are still valid (not expired)
 - [ ] Risk assessor verdict is APPROVED or WARNING (not BLOCKED)
+- [ ] QA harness pass rate ≥ 0.7 (no regressions, no cross-agent contradictions)
 
 **Verdict handling:**
 

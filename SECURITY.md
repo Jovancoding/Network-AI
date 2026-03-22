@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------||
-| 4.10.x  | ✅ Yes — full support (current) |
+| 4.11.x  | ✅ Yes — full support (current) |
+| 4.10.x  | ✅ Security fixes only |
 | 4.9.x   | ✅ Security fixes only |
 | 4.8.x   | ✅ Security fixes only |
 | 4.7.x   | ✅ Security fixes only |
@@ -39,6 +40,7 @@ Network-AI includes built-in security features:
 - **FSM Behavioral Control Plane** (v3.3.0) -- state-scoped agent and tool authorization via `JourneyFSM` and `ToolAuthorizationMatrix`; unauthorized actions blocked with `ComplianceViolationError`
 - **ComplianceMonitor** (v3.3.0) -- real-time agent behavior surveillance with configurable violation policies, severity classification, and async audit loop
 - **Named Multi-Blackboard API** (v3.4.0) -- isolated `SharedBlackboard` instances per name with independent namespaces, validation configs, and agent scoping; prevents cross-task data leakage
+- **QA Orchestrator Agent** (v4.11.0) -- scenario replay through quality gates, cross-agent contradiction detection, feedback loop with retry limits, and regression tracking with historical snapshots
 
 ## Security Scan Results
 

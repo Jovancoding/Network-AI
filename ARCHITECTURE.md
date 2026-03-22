@@ -51,6 +51,7 @@ flowchart TD
         AG["AuthGuardian\n(HMAC / Ed25519 permission tokens)"]:::security
         AR["AdapterRegistry\n(route tasks to frameworks)"]:::routing
         QG["QualityGateAgent\n(validate blackboard writes)"]:::quality
+        QA["QAOrchestratorAgent\n(scenario replay, regression tracking)"]:::quality
         BB["SharedBlackboard\n(shared agent state)\npropose → validate → commit\nfilesystem mutex"]:::blackboard
         AD["Adapters — plug any framework in, swap freely\nLangChain · AutoGen · CrewAI · MCP · LlamaIndex · …"]:::adapters
 
@@ -58,6 +59,7 @@ flowchart TD
         AR -->|"tasks dispatched"| AD
         AD -->|"writes results"| BB
         QG -->|"validates"| BB
+        QA -->|"orchestrates"| QG
     end
 
     SO --> AUDIT["data/audit_log.jsonl\n(HMAC / Ed25519-signed)"]:::audit
@@ -198,6 +200,12 @@ Two-layer validation before blackboard writes:
 - Quarantine system for suspicious content
 - Adds LLM latency — use selectively
 
+**Layer 3 — QAOrchestratorAgent (coordination)**
+- Scenario replay: re-run blackboard entries through quality gates as a test harness
+- Feedback loop: route rejections back to agents with structured feedback and retry limits
+- Regression tracker: historical quality snapshots with trend comparison
+- Cross-agent contradiction detection: detect conflicting outputs from multiple agents on the same key
+
 ---
 
 ## The 3-Layer Memory Model
@@ -281,6 +289,7 @@ Network-AI/
 ├── lib/
 │   ├── locked-blackboard.ts      # Atomic commits with file-system mutexes
 │   ├── blackboard-validator.ts   # Content quality gate (Layer 1 + Layer 2)
+│   ├── qa-orchestrator.ts        # QA orchestrator (scenario replay, regression, contradictions)
 │   ├── fsm-journey.ts            # FSM state machine and compliance monitor
 │   └── swarm-utils.ts            # Helper utilities
 ├── scripts/                      # Python helper scripts (local orchestration only)

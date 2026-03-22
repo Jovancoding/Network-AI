@@ -42,6 +42,7 @@ Your agents
 │  JourneyFSM        ──── FSM state governance        │
 │  ComplianceMonitor ──── real-time violation policy  │
 │  BlackboardValidator─── content quality gate        │
+│  QAOrchestratorAgent── scenario replay & regression │
 │  ProjectContextManager─ Layer-3 persistent memory   │
 └─────────────────────────────────────────────────────┘
     │
@@ -99,7 +100,7 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 
 ### Stability Signals
 
-- 1,617 passing assertions across 20 suites
+- 1,684 passing assertions across 21 suites
 - Deterministic scoring — no random outcomes in permission evaluation or budget enforcement
 - CI runs on every push and every PR
 - All examples ship with the repo and run without mocking

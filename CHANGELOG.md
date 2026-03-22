@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.11.0] - 2026-03-22
+
+### Added
+- **QA Orchestrator Agent** (`QAOrchestratorAgent`) — coordination layer on top of QualityGateAgent and ComplianceMonitor
+  - Scenario replay: re-run blackboard entries through quality gates as a test harness
+  - Feedback loop: route rejections back to agents with structured feedback and retry limits
+  - Regression tracker: historical quality snapshots with trend comparison
+  - Cross-agent contradiction detection: detect conflicting outputs from multiple agents on the same blackboard key
+  - Pluggable contradiction detector for domain-specific conflict rules
+- 67 new tests across 12 test groups (1,684 total)
+- `test:qa` script in package.json
+
 ## [4.10.5] - 2026-03-22
 
 ### Fixed

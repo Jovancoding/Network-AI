@@ -2513,6 +2513,19 @@ export type {
   ComplianceMonitorOptions,
 } from './lib/compliance-monitor';
 
+// QA Orchestrator Agent
+export { QAOrchestratorAgent } from './lib/qa-orchestrator';
+export type {
+  QAScenario,
+  QAScenarioResult,
+  QAFeedback,
+  QASnapshot,
+  QAOrchestratorOptions,
+  Contradiction,
+  QAHarnessResult,
+  RegressionReport,
+} from './lib/qa-orchestrator';
+
 // MCP Blackboard Tool Bindings
 export {
   BlackboardMCPTools,

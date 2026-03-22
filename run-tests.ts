@@ -30,6 +30,7 @@ const SUITES = [
   'test-minimax.ts',
   'test-nemoclaw.ts',
   'test-cli.ts',
+  'test-qa.ts',
 ];
 
 const WIDTH = 60;

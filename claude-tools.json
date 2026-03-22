@@ -157,5 +157,34 @@
       },
       "required": ["section"]
     }
+  },
+  {
+    "name": "run_qa_harness",
+    "description": "Run a batch of blackboard entries through the QA quality gate and return aggregate results including pass rate, contradictions between agents, and a regression snapshot.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "scenarios": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "Unique scenario identifier" },
+              "key": { "type": "string", "description": "Blackboard key" },
+              "value": { "description": "The value to gate — any JSON-serializable data" },
+              "sourceAgent": { "type": "string", "description": "Agent that produced the value" },
+              "minScore": { "type": "number", "description": "Per-scenario quality threshold override (0-1)" }
+            },
+            "required": ["id", "key", "value", "sourceAgent"]
+          },
+          "description": "Array of scenarios to run through quality gates"
+        },
+        "qualityThreshold": {
+          "type": "number",
+          "description": "Global minimum quality score (0-1). Defaults to 0.7."
+        }
+      },
+      "required": ["scenarios"]
+    }
   }
 ]

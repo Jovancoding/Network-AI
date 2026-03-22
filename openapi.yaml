@@ -6,7 +6,7 @@ info:
     blackboard coordination, parallel agent spawning, and permission gating
     via AuthGuardian. Requires the companion MCP server:
     `npm install -g network-ai && npx network-ai-server --port 3001`
-  version: 4.9.1
+  version: 4.11.0
   license:
     name: MIT
     url: https://github.com/Jovancoding/Network-AI/blob/main/LICENSE
@@ -218,6 +218,27 @@ paths:
                     type: boolean
                   previousValue: {}
 
+  /qa/harness:
+    post:
+      operationId: runQAHarness
+      summary: Run QA test harness
+      description: >
+        Run a batch of blackboard entries through the quality gate and return
+        aggregate results including pass rate, contradictions, and a regression snapshot.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QAHarnessRequest'
+      responses:
+        '200':
+          description: QA harness results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAHarnessResponse'
+
 components:
   schemas:
     DelegateTaskRequest:
@@ -360,3 +381,58 @@ components:
         complete:
           type: string
           description: Milestone name to mark completed (milestones section only)
+
+    QAHarnessRequest:
+      type: object
+      required: [scenarios]
+      properties:
+        scenarios:
+          type: array
+          items:
+            type: object
+            required: [id, key, value, sourceAgent]
+            properties:
+              id:
+                type: string
+              key:
+                type: string
+              value: {}
+              sourceAgent:
+                type: string
+              minScore:
+                type: number
+        qualityThreshold:
+          type: number
+          description: Global minimum quality score (0-1). Defaults to 0.7.
+
+    QAHarnessResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+        passed:
+          type: integer
+        failed:
+          type: integer
+        passRate:
+          type: number
+        contradictions:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              agentA:
+                type: string
+              agentB:
+                type: string
+        snapshot:
+          type: object
+          properties:
+            timestamp:
+              type: string
+            scenariosRun:
+              type: integer
+            scenarioPassRate:
+              type: number

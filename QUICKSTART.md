@@ -150,6 +150,30 @@ const orchestrator = createSwarmOrchestrator({
 });
 ```
 
+For batch testing and regression tracking, use the QA Orchestrator:
+
+```typescript
+import { QAOrchestratorAgent } from 'network-ai';
+
+const qa = new QAOrchestratorAgent({
+  qualityThreshold: 0.7,
+  maxRetries: 2,
+  onFeedback: (fb) => console.log('Fix needed:', fb.issues),
+});
+
+// Run scenarios through quality gates
+const harness = await qa.runHarness([
+  { id: 'test-1', key: 'analysis', value: agentOutput, sourceAgent: 'analyst' },
+]);
+console.log(`Pass rate: ${harness.passRate}`);
+
+// Detect cross-agent contradictions
+const contradictions = qa.detectContradictions();
+
+// Track quality regressions over time
+const report = qa.getRegressionReport();
+```
+
 ---
 
 ## 6. Security
@@ -221,7 +245,8 @@ export class MyFrameworkAdapter extends BaseAdapter {
 npx ts-node test-standalone.ts    # 88 core tests
 npx ts-node test-security.ts      # 34 security tests
 npx ts-node test-adapters.ts      # 176 adapter tests (all 17 frameworks)
-npx ts-node test-cli.ts           # 65 CLI tests
+ npx ts-node test-cli.ts           # 65 CLI tests
+npx ts-node test-qa.ts             # 67 QA orchestrator tests
 ```
 
 ---
@@ -335,6 +360,7 @@ Your App
        ├── TaskDecomposer          — Break tasks into subtasks
        ├── BlackboardValidator     — Quality gate (Layer 1)
        ├── QualityGateAgent        — AI review (Layer 2)
+       ├── QAOrchestratorAgent     — Scenario replay, feedback loops, regression tracking
        └── AdapterRegistry         — Routes to any framework
             ├── CustomAdapter       ─── your functions / HTTP
             ├── LangChainAdapter    ─── LangChain / LangGraph
