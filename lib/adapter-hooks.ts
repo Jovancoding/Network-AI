@@ -116,7 +116,7 @@ export class AdapterHookManager {
    * @returns true if a hook was removed
    */
   unregister(name: string): boolean {
-    for (const [phase, list] of this.hooks.entries()) {
+    for (const [, list] of this.hooks.entries()) {
       const idx = list.findIndex(h => h.name === name);
       if (idx !== -1) {
         list.splice(idx, 1);

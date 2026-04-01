@@ -66,10 +66,7 @@ function assertThrows(fn: () => void, test: string) {
   catch { pass(test); }
 }
 
-async function assertThrowsAsync(fn: () => Promise<unknown>, test: string) {
-  try { await fn(); fail(test, 'Expected to throw'); }
-  catch { pass(test); }
-}
+
 
 // ============================================================================
 // MOCK ADAPTER
@@ -594,7 +591,7 @@ async function testSkillComposition() {
 
   // 6. batch with concurrency limit
   {
-    const { registry, mock } = await makeRegistry();
+    const { registry } = await makeRegistry();
     const composer = new SkillComposer(registry, baseCtx);
     const steps: ComposableStep[] = Array.from({ length: 4 }, (_, i) => ({
       agentId: 'mock:w' + i,
