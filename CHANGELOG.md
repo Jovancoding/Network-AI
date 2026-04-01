@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.13.0] - 2026-04-01
+
+### Added
+- **Phase Pipeline** (`PhasePipeline`) — multi-phase workflow orchestration with approval gates. Ordered phases with parallel or sequential agent execution, `requiresApproval` gates, `payloadFactory`, `autoApprove` mode, and lifecycle callbacks (`onPhaseStart`/`onPhaseComplete`). New module: `lib/phase-pipeline.ts`.
+- **Confidence Filter** (`ConfidenceFilter`) — multi-agent result scoring, threshold filtering, secondary validation with configurable `validationPayloadFactory`, and `validateRejected()` for re-evaluation. Aggregation strategies: `highest`, `average`, `unanimous`, `majority`. New module: `lib/confidence-filter.ts`.
+- **Matcher-Based Hook Filtering** — `HookMatcher` interface on `ExecutionHook` with `agentPattern`, `actionPattern`, `toolPattern` (e.g. `'Bash(git *)'`), and `condition` function. Hooks only fire when all matcher conditions pass (AND logic). New exports: `matchGlob()`, `matchToolPattern()`.
+- **Fan-Out / Fan-In** (`FanOutFanIn`) — parallel agent spawning with concurrency control and pluggable result aggregation. Fan-in strategies: `merge`, `firstSuccess`, `vote`, `consensus`, `custom` (with `FanInReducer`). Convenience `run()` method combines both phases. New module: `lib/fan-out.ts`.
+- 146 new tests in `test-phase8.ts` (1,924 total across 23 suites)
+
 ## [4.12.1] - 2026-04-01
 
 ### Fixed

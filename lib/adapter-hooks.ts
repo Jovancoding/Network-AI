@@ -53,6 +53,23 @@ export interface ExecutionHook {
   priority?: number;
   /** The hook handler — may mutate ctx and return it */
   handler: (ctx: HookContext) => Promise<HookContext> | HookContext;
+  /** Optional matcher — if provided, hook only fires when matcher passes */
+  matcher?: HookMatcher;
+}
+
+/**
+ * Matcher for filtering when a hook should fire.
+ * All specified conditions must match (AND logic).
+ */
+export interface HookMatcher {
+  /** Glob-style pattern matched against agentId. Supports '*' and '?' wildcards. */
+  agentPattern?: string;
+  /** Glob-style pattern matched against payload.action. Supports '*' and '?' wildcards. */
+  actionPattern?: string;
+  /** Tool pattern in format 'ToolName(argGlob)' — e.g. 'Bash(git *)' or 'Edit(*.env)' */
+  toolPattern?: string;
+  /** Custom condition function — return true for the hook to fire */
+  condition?: (ctx: HookContext) => boolean;
 }
 
 // ============================================================================
@@ -199,8 +216,66 @@ export class AdapterHookManager {
     const hooks = this.hooks.get(phase) ?? [];
     let current = ctx;
     for (const hook of hooks) {
+      if (hook.matcher && !this.matchesHook(hook.matcher, current)) {
+        continue; // skip — matcher did not pass
+      }
       current = await hook.handler(current);
     }
     return current;
   }
+
+  /**
+   * Check whether a HookMatcher passes for the given context.
+   */
+  private matchesHook(matcher: HookMatcher, ctx: HookContext): boolean {
+    if (matcher.agentPattern && !matchGlob(matcher.agentPattern, ctx.agentId)) {
+      return false;
+    }
+    if (matcher.actionPattern && !matchGlob(matcher.actionPattern, ctx.payload.action)) {
+      return false;
+    }
+    if (matcher.toolPattern) {
+      const toolStr = (ctx.metadata?.tool as string) ?? '';
+      if (!matchToolPattern(matcher.toolPattern, toolStr)) {
+        return false;
+      }
+    }
+    if (matcher.condition && !matcher.condition(ctx)) {
+      return false;
+    }
+    return true;
+  }
+}
+
+// ============================================================================
+// GLOB MATCHING UTILITIES
+// ============================================================================
+
+/**
+ * Simple glob matcher supporting `*` (any chars) and `?` (single char).
+ * Case-insensitive.
+ */
+export function matchGlob(pattern: string, value: string): boolean {
+  const regexStr = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape regex specials (except * and ?)
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  return new RegExp(`^${regexStr}$`, 'i').test(value);
+}
+
+/**
+ * Match a tool pattern like "Bash(git *)" against a tool string like "Bash(git push)".
+ */
+export function matchToolPattern(pattern: string, toolStr: string): boolean {
+  const pMatch = pattern.match(/^([^(]+)\((.+)\)$/);
+  if (!pMatch) {
+    // No parens — match the whole string as a glob
+    return matchGlob(pattern, toolStr);
+  }
+  const [, toolName, argPattern] = pMatch;
+  const tMatch = toolStr.match(/^([^(]+)\((.+)\)$/);
+  if (!tMatch) return false;
+  const [, actualTool, actualArgs] = tMatch;
+
+  return matchGlob(toolName, actualTool) && matchGlob(argPattern, actualArgs);
 }

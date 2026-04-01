@@ -2528,11 +2528,12 @@ export type {
 } from './lib/qa-orchestrator';
 
 // Adapter Hook Middleware (Phase 7b)
-export { AdapterHookManager } from './lib/adapter-hooks';
+export { AdapterHookManager, matchGlob, matchToolPattern } from './lib/adapter-hooks';
 export type {
   HookPhase,
   HookContext,
   ExecutionHook,
+  HookMatcher,
 } from './lib/adapter-hooks';
 
 // Skill Composer (Phase 7d)
@@ -2550,6 +2551,39 @@ export type {
   EmbeddingFn,
   SearchResult,
 } from './lib/semantic-search';
+
+// Phase Pipeline — Multi-phase workflows with approval gates (Phase 8a)
+export { PhasePipeline } from './lib/phase-pipeline';
+export type {
+  PhaseDefinition,
+  PhaseResult,
+  PhaseStatus,
+  PipelineResult,
+  PipelineExecutionContext,
+  ApprovalCallback,
+  PhasePipelineOptions,
+} from './lib/phase-pipeline';
+
+// Confidence Filter — Multi-agent result scoring & filtering (Phase 8b)
+export { ConfidenceFilter } from './lib/confidence-filter';
+export type {
+  Finding,
+  FilterResult,
+  AggregationStrategy,
+  AggregatedResult,
+  ConfidenceFilterOptions,
+} from './lib/confidence-filter';
+
+// Fan-Out / Fan-In — Parallel agent aggregation (Phase 8d)
+export { FanOutFanIn } from './lib/fan-out';
+export type {
+  FanOutStep,
+  TaggedResult,
+  FanInStrategy,
+  FanInResult,
+  FanInReducer,
+  FanOutOptions,
+} from './lib/fan-out';
 
 // MCP Blackboard Tool Bindings
 export {

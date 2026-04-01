@@ -11,7 +11,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, gu
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 1,778 tests across 22 suites
+npm run test:all              # Run all 1,924 tests across 23 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 17 adapter tests
