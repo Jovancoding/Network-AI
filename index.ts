@@ -2386,6 +2386,7 @@ export type {
 
 // Adapter system re-exports for convenience
 export { AdapterRegistry } from './adapters/adapter-registry';
+export type { AdapterFactory } from './adapters/adapter-registry';
 export { BaseAdapter } from './adapters/base-adapter';
 export { OpenClawAdapter } from './adapters/openclaw-adapter';
 export { LangChainAdapter } from './adapters/langchain-adapter';
@@ -2525,6 +2526,30 @@ export type {
   QAHarnessResult,
   RegressionReport,
 } from './lib/qa-orchestrator';
+
+// Adapter Hook Middleware (Phase 7b)
+export { AdapterHookManager } from './lib/adapter-hooks';
+export type {
+  HookPhase,
+  HookContext,
+  ExecutionHook,
+} from './lib/adapter-hooks';
+
+// Skill Composer (Phase 7d)
+export { SkillComposer } from './lib/skill-composer';
+export type {
+  ComposableStep,
+  ComposedResult,
+  LoopOptions,
+  VerifyOptions,
+} from './lib/skill-composer';
+
+// Semantic Memory Search (Phase 7e)
+export { SemanticMemory } from './lib/semantic-search';
+export type {
+  EmbeddingFn,
+  SearchResult,
+} from './lib/semantic-search';
 
 // MCP Blackboard Tool Bindings
 export {

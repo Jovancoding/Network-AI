@@ -22,6 +22,7 @@
 // Core infrastructure
 export { BaseAdapter } from './base-adapter';
 export { AdapterRegistry, getRegistry } from './adapter-registry';
+export type { AdapterFactory } from './adapter-registry';
 
 // Framework adapters -- Original 6
 export { OpenClawAdapter } from './openclaw-adapter';

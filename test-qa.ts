@@ -87,13 +87,6 @@ const goodResult: QAScenario = {
   sourceAgent: 'security-scanner',
 };
 
-const badResult: QAScenario = {
-  id: 'bad-result',
-  key: 'analysis:shallow',
-  value: 'Looks fine',
-  sourceAgent: 'lazy-agent',
-};
-
 const dangerousCode: QAScenario = {
   id: 'dangerous-code',
   key: 'code:auth',

@@ -227,6 +227,7 @@ export type AdapterEventType =
   | 'adapter:registered'
   | 'adapter:initialized'
   | 'adapter:shutdown'
+  | 'adapter:deferred'
   | 'adapter:error'
   | 'agent:execution:start'
   | 'agent:execution:complete'

@@ -52,6 +52,8 @@ export interface LockedBlackboardOptions {
    *  - `'priority-wins'`: Higher-priority changes preempt lower-priority pending/committed writes on the same key.
    */
   conflictResolution?: ConflictResolutionStrategy;
+  /** Minimum milliseconds between consecutive write/commit operations (0 = no throttle) */
+  throttleMs?: number;
 }
 
 export interface BlackboardEntry {
@@ -305,6 +307,9 @@ export class LockedBlackboard {
   private pendingChanges: Map<string, PendingChange> = new Map();
   private auditLogger?: SecureAuditLogger;
   private conflictResolution: ConflictResolutionStrategy;
+  private paused = false;
+  private throttleMs = 0;
+  private lastWriteTime = 0;
 
   constructor(basePath: string = '.', auditLoggerOrOptions?: SecureAuditLogger | LockedBlackboardOptions, options?: LockedBlackboardOptions) {
     // Resolve to an absolute path to prevent insecure relative/temp-dir path propagation
@@ -318,11 +323,14 @@ export class LockedBlackboard {
     // Support both signatures:
     //   new LockedBlackboard(path, auditLogger, options)
     //   new LockedBlackboard(path, options)
-    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && 'conflictResolution' in auditLoggerOrOptions) {
-      this.conflictResolution = auditLoggerOrOptions.conflictResolution ?? 'first-commit-wins';
+    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && ('conflictResolution' in auditLoggerOrOptions || 'throttleMs' in auditLoggerOrOptions)) {
+      const opts = auditLoggerOrOptions as LockedBlackboardOptions;
+      this.conflictResolution = opts.conflictResolution ?? 'first-commit-wins';
+      this.throttleMs = opts.throttleMs ?? 0;
     } else {
       this.auditLogger = auditLoggerOrOptions as SecureAuditLogger | undefined;
       this.conflictResolution = options?.conflictResolution ?? 'first-commit-wins';
+      this.throttleMs = options?.throttleMs ?? 0;
     }
     
     this.initialize();
@@ -503,6 +511,70 @@ ${cacheContent}
   }
 
   // ==========================================================================
+  // FLOW CONTROL: PAUSE / RESUME / THROTTLE
+  // ==========================================================================
+
+  /**
+   * Pause all write and commit operations.
+   * Read operations continue to work while paused.
+   */
+  pause(): void {
+    this.paused = true;
+  }
+
+  /**
+   * Resume write and commit operations after a pause.
+   */
+  resume(): void {
+    this.paused = false;
+  }
+
+  /**
+   * Check if the blackboard is currently paused.
+   */
+  isPaused(): boolean {
+    return this.paused;
+  }
+
+  /**
+   * Set the minimum interval between write/commit operations.
+   * @param ms Milliseconds between writes (0 to disable throttling)
+   */
+  setThrottle(ms: number): void {
+    this.throttleMs = Math.max(0, Math.floor(ms));
+  }
+
+  /**
+   * Get the current throttle interval.
+   */
+  getThrottle(): number {
+    return this.throttleMs;
+  }
+
+  /**
+   * Guard called before any mutating operation.
+   * Throws if paused; enforces throttle delay.
+   */
+  private enforceFlowControl(): void {
+    if (this.paused) {
+      throw new LockAcquisitionError('blackboard is paused');
+    }
+    if (this.throttleMs > 0) {
+      const elapsed = Date.now() - this.lastWriteTime;
+      if (elapsed < this.throttleMs) {
+        throw new LockAcquisitionError(`throttled — retry after ${this.throttleMs - elapsed}ms`);
+      }
+    }
+  }
+
+  /**
+   * Record the timestamp of a successful mutating operation.
+   */
+  private recordWrite(): void {
+    this.lastWriteTime = Date.now();
+  }
+
+  // ==========================================================================
   // PUBLIC API: ATOMIC COMMIT WORKFLOW
   // ==========================================================================
 
@@ -645,6 +717,7 @@ ${cacheContent}
    * @returns CommitResult with success status
    */
   commit(changeId: string): CommitResult {
+    this.enforceFlowControl();
     const change = this.pendingChanges.get(changeId);
     const lockStart = Date.now();
 
@@ -757,6 +830,7 @@ ${cacheContent}
       
       // Persist to disk (still under lock)
       this.persistToDiskInternal();
+      this.recordWrite();
       
       // Archive the change
       this.archivePendingChange(change);
@@ -924,6 +998,7 @@ ${cacheContent}
    * Direct write with automatic locking (use propose/validate/commit for multi-agent safety).
    */
   write(key: string, value: unknown, sourceAgent: string, ttl?: number): BlackboardEntry {
+    this.enforceFlowControl();
     const holderId = `write-${randomUUID().substring(0, 8)}`;
     const lockStart = Date.now();
     
@@ -949,6 +1024,7 @@ ${cacheContent}
 
       this.cache.set(key, entry);
       this.persistToDiskInternal();
+      this.recordWrite();
 
       this.audit('BLACKBOARD_WRITE', sourceAgent, 'write', 'success', {
         key, version: newVersion, lockHolder: holderId,
@@ -966,6 +1042,7 @@ ${cacheContent}
    * Delete a key from the blackboard.
    */
   delete(key: string): boolean {
+    this.enforceFlowControl();
     const holderId = `delete-${randomUUID().substring(0, 8)}`;
     const lockStart = Date.now();
     

@@ -25,6 +25,12 @@ import type {
 import { AdapterAlreadyRegisteredError, AdapterNotFoundError, ValidationError } from '../lib/errors';
 
 /**
+ * Factory function that creates an adapter instance on demand.
+ * Used with registerDeferred() for lazy initialization.
+ */
+export type AdapterFactory = () => IAgentAdapter;
+
+/**
  * Central registry that manages multiple agent framework adapters and
  * routes execution requests to the correct one.
  *
@@ -51,6 +57,7 @@ export class AdapterRegistry {
   private defaultAdapterName: string | null = null;
   private eventHandlers: Map<AdapterEventType, AdapterEventHandler[]> = new Map();
   private agentCache: Map<string, string> = new Map(); // agentId -> adapterName
+  private deferredFactories: Map<string, { factory: AdapterFactory; config: AdapterConfig }> = new Map();
 
   constructor(config?: RegistryConfig) {
     if (config) {
@@ -121,6 +128,45 @@ export class AdapterRegistry {
   }
 
   /**
+   * Register an adapter factory for deferred (lazy) initialization.
+   * The adapter instance is created and initialized only when first needed.
+   * @param name Unique adapter name
+   * @param factory Function that creates the adapter instance
+   * @param config Configuration to pass during initialization
+   */
+  registerDeferred(name: string, factory: AdapterFactory, config: AdapterConfig = {}): void {
+    if (this.adapters.has(name)) {
+      throw new AdapterAlreadyRegisteredError(name);
+    }
+    this.deferredFactories.set(name, { factory, config });
+    this.emit('adapter:deferred', name);
+  }
+
+  /**
+   * Materialize a deferred adapter: create instance, initialize, and move to active map.
+   * @returns The initialized adapter, or null if no deferred factory exists
+   */
+  private async materializeDeferred(name: string): Promise<IAgentAdapter | null> {
+    const deferred = this.deferredFactories.get(name);
+    if (!deferred) return null;
+
+    const adapter = deferred.factory();
+    await adapter.initialize(deferred.config);
+    this.adapters.set(name, adapter);
+    this.deferredFactories.delete(name);
+    this.emit('adapter:registered', name);
+    this.emit('adapter:initialized', name);
+    return adapter;
+  }
+
+  /**
+   * Check whether a deferred factory is registered for the given name.
+   */
+  hasDeferred(name: string): boolean {
+    return this.deferredFactories.has(name);
+  }
+
+  /**
    * Get a registered adapter by name
    */
   getAdapter(adapterName: string): IAgentAdapter | undefined {
@@ -128,14 +174,21 @@ export class AdapterRegistry {
   }
 
   /**
-   * List all registered adapters
+   * List all registered adapters (active and deferred)
    */
-  listAdapters(): Array<{ name: string; version: string; ready: boolean }> {
-    return Array.from(this.adapters.values()).map(a => ({
+  listAdapters(): Array<{ name: string; version: string; ready: boolean; deferred?: boolean }> {
+    const active = Array.from(this.adapters.values()).map(a => ({
       name: a.name,
       version: a.version,
       ready: a.isReady(),
     }));
+    const deferred = Array.from(this.deferredFactories.keys()).map(name => ({
+      name,
+      version: 'deferred',
+      ready: false,
+      deferred: true,
+    }));
+    return [...active, ...deferred];
   }
 
   /**
@@ -217,6 +270,48 @@ export class AdapterRegistry {
     return null;
   }
 
+  /**
+   * Async version of resolveAdapter that materializes deferred adapters on demand.
+   * Prefer this over resolveAdapter() when deferred factories may be registered.
+   */
+  async resolveAdapterAsync(agentId: string): Promise<IAgentAdapter | null> {
+    // Try synchronous resolution first
+    const resolved = this.resolveAdapter(agentId);
+    if (resolved) return resolved;
+
+    // Check deferred factories via routing rules
+    for (const route of this.routes) {
+      if (this.matchPattern(agentId, route.pattern) && this.deferredFactories.has(route.adapterName)) {
+        const adapter = await this.materializeDeferred(route.adapterName);
+        if (adapter?.isReady()) {
+          this.agentCache.set(agentId, route.adapterName);
+          return adapter;
+        }
+      }
+    }
+
+    // Check deferred via prefix convention
+    const colonIndex = agentId.indexOf(':');
+    if (colonIndex > 0) {
+      const prefix = agentId.substring(0, colonIndex);
+      if (this.deferredFactories.has(prefix)) {
+        const adapter = await this.materializeDeferred(prefix);
+        if (adapter?.isReady()) {
+          this.agentCache.set(agentId, prefix);
+          return adapter;
+        }
+      }
+    }
+
+    // Check deferred default adapter
+    if (this.defaultAdapterName && this.deferredFactories.has(this.defaultAdapterName)) {
+      const adapter = await this.materializeDeferred(this.defaultAdapterName);
+      if (adapter?.isReady()) return adapter;
+    }
+
+    return null;
+  }
+
   private matchPattern(agentId: string, pattern: string): boolean {
     if (pattern === '*') return true;
     if (pattern === agentId) return true;
@@ -258,7 +353,8 @@ export class AdapterRegistry {
     payload: AgentPayload,
     context: AgentContext
   ): Promise<AgentResult> {
-    const adapter = this.resolveAdapter(agentId);
+    // Try sync resolution first, then async (materializes deferred adapters)
+    const adapter = this.resolveAdapter(agentId) ?? await this.resolveAdapterAsync(agentId);
     if (!adapter) {
       return {
         success: false,
@@ -425,6 +521,7 @@ export class AdapterRegistry {
     }
     this.adapters.clear();
     this.agentCache.clear();
+    this.deferredFactories.clear();
     this.routes = [];
   }
 }

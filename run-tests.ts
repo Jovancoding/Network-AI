@@ -31,6 +31,7 @@ const SUITES = [
   'test-nemoclaw.ts',
   'test-cli.ts',
   'test-qa.ts',
+  'test-phase7.ts',
 ];
 
 const WIDTH = 60;

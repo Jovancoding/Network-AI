@@ -1,5 +1,5 @@
 ﻿---
-name: Network-AI
+name: network-ai
 description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. The bundled Python scripts make no network calls and have zero third-party dependencies. Workflow delegations via the host platform's sessions_send may invoke external model APIs."
 metadata:
   openclaw:

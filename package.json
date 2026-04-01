@@ -33,6 +33,7 @@
     "test:nemoclaw": "npx ts-node test-nemoclaw.ts",
     "test:cli": "npx ts-node test-cli.ts",
     "test:qa": "npx ts-node test-qa.ts",
+    "test:phase7": "npx ts-node test-phase7.ts",
     "test:all": "npx ts-node run-tests.ts",
     "setup": "npx ts-node setup.ts",
     "setup:check": "npx ts-node setup.ts --check",
