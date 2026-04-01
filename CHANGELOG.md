@@ -5,6 +5,11 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.13.1] - 2026-04-01
+
+### Changed
+- Updated all documentation for v4.13.0 Phase 8 features: SECURITY.md (both root and .github), README test table and "What's Included" table, ARCHITECTURE.md project structure, references/adapter-system.md (4 new sections with code examples), SKILL.md, CLAUDE.md, CODEX.md, CONTRIBUTING.md, copilot-instructions.md
+
 ## [4.13.0] - 2026-04-01
 
 ### Added
