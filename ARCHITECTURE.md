@@ -291,7 +291,13 @@ Network-AI/
 │   ├── blackboard-validator.ts   # Content quality gate (Layer 1 + Layer 2)
 │   ├── qa-orchestrator.ts        # QA orchestrator (scenario replay, regression, contradictions)
 │   ├── fsm-journey.ts            # FSM state machine and compliance monitor
-│   └── swarm-utils.ts            # Helper utilities
+│   ├── swarm-utils.ts            # Helper utilities
+│   ├── adapter-hooks.ts          # Lifecycle hooks + matcher-based filtering (v4.12–4.13)
+│   ├── skill-composer.ts         # chain/batch/loop/verify meta-operations (v4.12)
+│   ├── semantic-search.ts        # BYOE vector store with cosine similarity (v4.12)
+│   ├── phase-pipeline.ts         # Multi-phase workflows with approval gates (v4.13)
+│   ├── confidence-filter.ts      # Multi-agent result scoring and filtering (v4.13)
+│   └── fan-out.ts                # Parallel agent spawning with pluggable aggregation (v4.13)
 ├── scripts/                      # Python helper scripts (local orchestration only)
 │   ├── blackboard.py             # Shared state management with atomic commits
 │   ├── swarm_guard.py            # Handoff tax prevention, budget tracking

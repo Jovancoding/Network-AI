@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---------|-----------||
-| 4.12.x  | ✅ Yes — full support (current) |
-| 4.11.x  | ✅ Security fixes only |
+| 4.13.x  | ✅ Yes — full support (current) |
+| 4.12.x  | ✅ Security fixes only |
 | 4.9.x   | ✅ Security fixes only |
 | 4.8.x   | ✅ Security fixes only |
 | 4.7.x   | ✅ Security fixes only |
@@ -44,6 +44,9 @@ Network-AI includes built-in security features:
 - **Deferred Adapter Initialization** (v4.12.0) -- adapters are materialized only on first use via `registerDeferred()`, preventing untrusted adapter code from running at startup
 - **Adapter Hook Middleware** (v4.12.0) -- `beforeExecute` / `afterExecute` / `onError` lifecycle hooks; enables request-level logging, tracing, and custom security gates without modifying adapters
 - **Flow Control** (v4.12.0) -- `pause()` / `resume()` / `setThrottle()` on the blackboard; prevents write floods and enables coordinated maintenance windows
+- **Matcher-Based Hook Filtering** (v4.13.0) -- `HookMatcher` with `agentPattern`, `actionPattern`, `toolPattern` globs, and custom `condition` functions; hooks only fire when all conditions pass, enabling fine-grained security policies per tool or agent pattern
+- **Phase Pipeline with Approval Gates** (v4.13.0) -- `PhasePipeline` orchestrates multi-phase workflows; `requiresApproval` boolean halts execution until explicit human approval is granted, enforcing human-in-the-loop for sensitive operations
+- **Confidence-Based Filtering** (v4.13.0) -- `ConfidenceFilter` rejects low-confidence agent findings below configurable thresholds and validates rejected results with secondary agents; aggregation strategies (unanimous, majority) enforce consensus before accepting multi-agent results
 
 ## Security Scan Results
 

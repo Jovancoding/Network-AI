@@ -27,9 +27,12 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, gu
 - `lib/locked-blackboard.ts` — LockedBlackboard with atomic propose → validate → commit
 - `lib/fsm-journey.ts` — JourneyFSM behavioral control plane
 - `lib/compliance-monitor.ts` — Real-time agent behavior surveillance
-- `lib/adapter-hooks.ts` — AdapterHookManager lifecycle hooks
+- `lib/adapter-hooks.ts` — AdapterHookManager lifecycle hooks + matcher-based filtering
 - `lib/skill-composer.ts` — SkillComposer meta-operations (chain/batch/loop/verify)
 - `lib/semantic-search.ts` — SemanticMemory BYOE vector store
+- `lib/phase-pipeline.ts` — PhasePipeline multi-phase workflows with approval gates
+- `lib/confidence-filter.ts` — ConfidenceFilter multi-agent result scoring and filtering
+- `lib/fan-out.ts` — FanOutFanIn parallel agent spawning with pluggable aggregation
 - `adapters/` — 17 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, etc.)
 
 ## Build & Test

@@ -444,3 +444,140 @@ bb.getThrottle();     // 500
 // Constructor option
 const bb2 = new LockedBlackboard({ throttleMs: 100, conflictResolution: 'last-write-wins' });
 ```
+
+## Matcher-Based Hook Filtering (v4.13.0)
+
+Target hooks to specific agents, actions, or tools using glob patterns:
+
+```typescript
+import { AdapterHookManager, HookMatcher, matchGlob } from 'network-ai';
+
+const hooks = new AdapterHookManager();
+
+// Matcher: only fire for agents matching 'security-*' using tool 'file_*'
+const matcher: HookMatcher = {
+  agentPattern: 'security-*',
+  toolPattern: 'file_*',
+};
+
+hooks.beforeExecute(async (ctx) => {
+  console.log(`Security hook for ${ctx.agentId}`);
+}, { priority: 5, matcher });
+
+// Custom condition function for dynamic filtering
+const dynamicMatcher: HookMatcher = {
+  condition: (ctx) => ctx.payload?.handoff?.risk === 'high',
+};
+
+hooks.beforeExecute(async (ctx) => {
+  return { abort: true, reason: 'High-risk operations require approval' };
+}, { priority: 1, matcher: dynamicMatcher });
+```
+
+- `agentPattern` — glob matched against `ctx.agentId`
+- `actionPattern` — glob matched against `ctx.action`
+- `toolPattern` — glob matched against `ctx.tool`
+- `condition` — arbitrary predicate `(ctx) => boolean`
+- All specified fields use AND logic; hook fires only when all match
+- `matchGlob(pattern, value)` and `matchToolPattern(pattern, tool)` are exported utilities
+
+## Phase Pipeline (v4.13.0)
+
+Orchestrate multi-phase workflows with approval gates:
+
+```typescript
+import { PhasePipeline, PhaseDefinition } from 'network-ai';
+
+const phases: PhaseDefinition[] = [
+  {
+    name: 'research',
+    agents: ['researcher-1', 'researcher-2'],
+    parallel: true,
+  },
+  {
+    name: 'review',
+    agents: ['reviewer'],
+    requiresApproval: true,  // halts until approved
+  },
+  {
+    name: 'deploy',
+    agents: ['deployer'],
+    payloadFactory: (prev) => ({ ...prev, approved: true }),
+  },
+];
+
+const pipeline = new PhasePipeline(phases, executeFn, {
+  autoApprove: false,
+  approvalCallback: async (phase) => {
+    // Human-in-the-loop: return true to proceed, false to reject
+    return await askHuman(`Approve phase "${phase.name}"?`);
+  },
+  onPhaseStart: (name) => console.log(`Starting: ${name}`),
+  onPhaseComplete: (name, result) => console.log(`Done: ${name}`),
+});
+
+const result = await pipeline.run(initialPayload);
+// result.phases — per-phase results
+// result.status — 'completed' | 'rejected' | 'error'
+```
+
+## Confidence Filter (v4.13.0)
+
+Score, filter, and aggregate multi-agent results:
+
+```typescript
+import { ConfidenceFilter, Finding } from 'network-ai';
+
+const filter = new ConfidenceFilter({ threshold: 0.7 });
+
+// Score individual findings
+const findings: Finding[] = [
+  { id: 'f1', source: 'agent-a', content: 'SQL injection found', confidence: 0.92 },
+  { id: 'f2', source: 'agent-b', content: 'Minor style issue', confidence: 0.45 },
+];
+
+const result = filter.filter(findings);
+// result.accepted  — [f1] (above threshold)
+// result.rejected  — [f2] (below threshold)
+
+// Validate rejected findings with a secondary agent
+const validated = await filter.validateRejected(result, async (finding) => {
+  return { ...finding, confidence: 0.8 };  // secondary agent re-scores
+});
+
+// Aggregate across multiple agents
+const aggregated = filter.aggregate(findings, 'majority');
+// Strategies: 'highest', 'average', 'unanimous', 'majority'
+```
+
+## Fan-Out / Fan-In (v4.13.0)
+
+Spawn parallel agents with concurrency control and pluggable aggregation:
+
+```typescript
+import { FanOutFanIn, FanOutStep } from 'network-ai';
+
+const fan = new FanOutFanIn(executeFn);
+
+const steps: FanOutStep[] = [
+  { agentId: 'researcher-1', payload: { query: 'topic A' }, tag: 'r1' },
+  { agentId: 'researcher-2', payload: { query: 'topic B' }, tag: 'r2' },
+  { agentId: 'researcher-3', payload: { query: 'topic C' }, tag: 'r3' },
+];
+
+// Fan-out with concurrency limit
+const results = await fan.fanOut(steps, { concurrency: 2, continueOnError: true });
+// results — TaggedResult[] with { tag, result, success, error? }
+
+// Fan-in with strategy
+const merged = fan.fanIn(results, 'merge');
+// Strategies: 'merge', 'firstSuccess', 'vote', 'consensus'
+
+// Or use run() for convenience (fan-out + fan-in in one call)
+const final = await fan.run(steps, 'vote', { concurrency: 2 });
+
+// Custom reducer
+const custom = fan.fanIn(results, 'custom', (tagged) => {
+  return { combined: tagged.map(t => t.result) };
+});
+```

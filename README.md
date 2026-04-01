@@ -7,7 +7,7 @@
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/badge/release-v4.13.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-1778%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1924%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-17%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -94,6 +94,10 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | ✅ Flow control | Pause / resume / throttle writes on the blackboard |
 | ✅ Skill composition | `chain()` / `batch()` / `loop()` / `verify()` meta-operations over agent calls |
 | ✅ Semantic memory search | BYOE vector store with cosine similarity over blackboard data |
+| ✅ Phase pipeline | Multi-phase workflows with human-in-the-loop approval gates |
+| ✅ Confidence filtering | Multi-agent result scoring, threshold validation, and consensus aggregation |
+| ✅ Matcher-based hooks | Glob patterns on agent/action/tool for targeted hook filtering |
+| ✅ Fan-out / fan-in | Parallel agent spawning with pluggable aggregation strategies |
 | ✅ TypeScript native | ES2022 strict mode, zero native dependencies |
 
 ---
@@ -389,7 +393,7 @@ npm run test:priority     # Priority & preemption
 npm run test:cli          # CLI layer
 ```
 
-**1,778 passing assertions across 22 test suites** (`npm run test:all`):
+**1,924 passing assertions across 23 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -414,6 +418,7 @@ npm run test:cli          # CLI layer
 | `test-cli.ts` | 65 | CLI layer: bb, auth, budget, audit commands |
 | `test-qa.ts` | 67 | QA orchestrator: scenarios, feedback loop, regression, contradictions |
 | `test-phase7.ts` | 94 | Deferred init, hook middleware, flow control, skill composer, semantic search |
+| `test-phase8.ts` | 146 | Phase pipeline, confidence filter, matcher-based hooks, fan-out/fan-in |
 
 ---
 
