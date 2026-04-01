@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 4.11.x  | ✅ Yes — full support (current) |
-| 4.10.x  | ✅ Security fixes only |
+| 4.12.x  | ✅ Yes — full support (current) |
+| 4.11.x  | ✅ Security fixes only |
 | 4.9.x   | ✅ Security fixes only |
 | 4.8.x   | ✅ Security fixes only |
 | 4.7.x   | ✅ Security fixes only |
@@ -41,6 +41,9 @@ Network-AI includes built-in security features:
 - **ComplianceMonitor** (v3.3.0) -- real-time agent behavior surveillance with configurable violation policies, severity classification, and async audit loop
 - **Named Multi-Blackboard API** (v3.4.0) -- isolated `SharedBlackboard` instances per name with independent namespaces, validation configs, and agent scoping; prevents cross-task data leakage
 - **QA Orchestrator Agent** (v4.11.0) -- scenario replay through quality gates, cross-agent contradiction detection, feedback loop with retry limits, and regression tracking with historical snapshots
+- **Deferred Adapter Initialization** (v4.12.0) -- adapters are materialized only on first use via `registerDeferred()`, preventing untrusted adapter code from running at startup
+- **Adapter Hook Middleware** (v4.12.0) -- `beforeExecute` / `afterExecute` / `onError` lifecycle hooks; enables request-level logging, tracing, and custom security gates without modifying adapters
+- **Flow Control** (v4.12.0) -- `pause()` / `resume()` / `setThrottle()` on the blackboard; prevents write floods and enables coordinated maintenance windows
 
 ## Security Scan Results
 

@@ -408,7 +408,8 @@ Run these before declaring the integration production-ready:
 - [ ] `npx ts-node test-adapters.ts` — 176 adapter tests pass
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
 - [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
-- [ ] `npm run test:all` — all 1,684 tests pass across 21 suites
+- [ ] `npx ts-node test-phase7.ts` — 94 Phase 7 tests pass (hooks, flow control, composer, semantic search)
+- [ ] `npm run test:all` — all 1,778 tests pass across 22 suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety

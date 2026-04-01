@@ -5,6 +5,27 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.12.0] - 2026-04-01
+
+### Added
+- **Deferred Adapter Initialization** — `registerDeferred(name, factory, config)` on `AdapterRegistry`; adapters are created and initialized only on first use via `resolveAdapterAsync()`. `executeAgent()` auto-materializes deferred adapters transparently. `listAdapters()` shows deferred entries with `deferred: true`.
+- **Adapter Hook Middleware** (`AdapterHookManager`) — lifecycle hooks (`beforeExecute` / `afterExecute` / `onError`) that wrap any adapter's `executeAgent` call. Priority-ordered execution, payload/result mutation, abort support. New module: `lib/adapter-hooks.ts`.
+- **Flow Control** on `LockedBlackboard` — `pause()` / `resume()` / `isPaused()` blocks writes/commits while paused (reads continue); `setThrottle(ms)` / `getThrottle()` enforces minimum interval between mutating operations; `throttleMs` option in constructor.
+- **Skill Composer** (`SkillComposer`) — `chain()`, `batch()`, `loop()`, `verify()` meta-operations for composing multi-agent workflows. Chain passes `previousResult` downstream; batch supports concurrency limits; loop has condition + maxIterations; verify retries until validator passes. New module: `lib/skill-composer.ts`.
+- **Semantic Memory Search** (`SemanticMemory`) — BYOE (bring your own embedding function) in-memory vector store with cosine similarity search, `topK` + `threshold`, `indexSnapshot()` for bulk blackboard import. New module: `lib/semantic-search.ts`.
+- `adapter:deferred` event type in `AdapterEventType`
+- `AdapterFactory` type export from adapter-registry
+- 94 new tests in `test-phase7.ts` (1,778 total across 22 suites)
+
+### Fixed
+- **CodeQL #91** — removed unused `badResult` variable in `test-qa.ts`
+- Constructor detection in `LockedBlackboard` now recognizes options with only `throttleMs` (without `conflictResolution`)
+
+### Changed
+- `AdapterRegistry.listAdapters()` return type now includes optional `deferred` field
+- `LockedBlackboardOptions` interface extended with `throttleMs` property
+- CI: bumped `github/codeql-action` from 4.34.1 to 4.35.1 (PR #79)
+
 ## [4.11.2] - 2026-03-22
 
 ### Fixed

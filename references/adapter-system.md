@@ -356,3 +356,91 @@ The adapter system is additive — everything from v1/v2 is preserved:
 - **Budget tracking** — unchanged
 - **Handoff protocol** — unchanged
 - **OpenClaw skill interface** — `SwarmOrchestrator` still implements `OpenClawSkill`
+
+## Deferred Adapter Initialization (v4.12.0)
+
+Register adapters lazily so they are only created and initialized on first use:
+
+```typescript
+import { AdapterRegistry, LangChainAdapter } from 'network-ai';
+
+const registry = new AdapterRegistry();
+
+// Factory is NOT called until the adapter is actually needed
+registry.registerDeferred('langchain', () => new LangChainAdapter(), {
+  autoInit: true,              // call initialize() after construction (default true)
+  initOptions: { model: 'gpt-4o' },
+});
+
+// Shows up in listings with deferred: true
+const list = registry.listAdapters();
+// → [{ name: 'langchain', deferred: true }]
+
+// First executeAgent or resolveAdapterAsync triggers materialization
+const adapter = await registry.resolveAdapterAsync('langchain');
+// Factory runs → initialize() called → adapter cached for reuse
+
+// executeAgent auto-resolves deferred adapters transparently
+const result = await registry.executeAgent('lc:research', payload, context);
+```
+
+- `registerDeferred(name, factory, config?)` — register a lazy factory
+- `resolveAdapterAsync(name)` — explicitly materialize a deferred adapter
+- `executeAgent()` — auto-materializes deferred adapters on demand
+- Emits `adapter:deferred` event when a deferred adapter is first materialized
+
+## Adapter Hook Middleware (v4.12.0)
+
+Wrap any adapter's `executeAgent` with lifecycle hooks:
+
+```typescript
+import { AdapterHookManager } from 'network-ai';
+
+const hooks = new AdapterHookManager();
+
+// beforeExecute — inspect or mutate payload, or abort
+hooks.beforeExecute(async (ctx) => {
+  console.log(`Executing ${ctx.agentId} on ${ctx.adapterName}`);
+  // Mutate payload:  ctx.payload.handoff.instruction = 'modified';
+  // Abort execution: return { abort: true, reason: 'blocked' };
+}, { priority: 10 });
+
+// afterExecute — inspect or mutate result
+hooks.afterExecute(async (ctx) => {
+  ctx.result.metadata.hookedAt = Date.now();
+}, { priority: 10 });
+
+// onError — handle or rethrow errors
+hooks.onError(async (ctx) => {
+  console.error(`Error in ${ctx.agentId}:`, ctx.error);
+  // Optionally return a fallback result
+});
+
+// Wrap an adapter
+const wrappedExecute = hooks.wrap(adapter);
+const result = await wrappedExecute('research', payload, context);
+```
+
+Hooks run in priority order (lower = first). Multiple hooks per phase are supported. `beforeExecute` hooks can abort by returning `{ abort: true, reason }`.
+
+## Flow Control on LockedBlackboard (v4.12.0)
+
+Pause, resume, and throttle write operations on the blackboard:
+
+```typescript
+import { LockedBlackboard } from 'network-ai';
+
+const bb = new LockedBlackboard({ throttleMs: 200 });
+
+// Pause — blocks propose() and commit() while paused; read() still works
+bb.pause();
+bb.isPaused();  // true
+bb.resume();
+
+// Throttle — enforces minimum ms between mutating operations
+bb.setThrottle(500);  // 500ms between writes
+bb.getThrottle();     // 500
+
+// Constructor option
+const bb2 = new LockedBlackboard({ throttleMs: 100, conflictResolution: 'last-write-wins' });
+```

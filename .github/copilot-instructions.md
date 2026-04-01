@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v4.11.0). 1,684 tests across 21 suites.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v4.12.0). 1,778 tests across 22 suites.
 
 ## Architecture
 
@@ -27,13 +27,16 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, gu
 - `lib/locked-blackboard.ts` — LockedBlackboard with atomic propose → validate → commit
 - `lib/fsm-journey.ts` — JourneyFSM behavioral control plane
 - `lib/compliance-monitor.ts` — Real-time agent behavior surveillance
+- `lib/adapter-hooks.ts` — AdapterHookManager lifecycle hooks
+- `lib/skill-composer.ts` — SkillComposer meta-operations (chain/batch/loop/verify)
+- `lib/semantic-search.ts` — SemanticMemory BYOE vector store
 - `adapters/` — 17 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, etc.)
 
 ## Build & Test
 
 ```bash
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # All 1,684 tests across 21 suites
+npm run test:all              # All 1,778 tests across 22 suites
 npm test                      # Core orchestrator tests
 npm run test:adapters         # All 17 adapters
 ```
