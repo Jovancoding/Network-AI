@@ -581,3 +581,72 @@ const custom = fan.fanIn(results, 'custom', (tagged) => {
   return { combined: tagged.map(t => t.result) };
 });
 ```
+
+## Agent Runtime Sandbox (v4.14.0)
+
+Sandboxed execution environment that wraps adapter calls with policy enforcement and approval gates:
+
+```typescript
+import { AgentRuntime } from 'network-ai';
+
+const runtime = new AgentRuntime({
+  policy: {
+    basePath: '/workspace',
+    allowedCommands: ['npm *', 'node *', 'git status'],
+    allowedPaths: ['.', 'src'],
+    autoApproveReads: true,
+  },
+  autoApproveAll: false,
+  onApproval: async (req) => {
+    // Custom approval logic
+    return { approved: req.risk !== 'high', approvedBy: 'policy-engine' };
+  },
+});
+
+// Sandboxed shell execution
+const result = await runtime.exec('npm test', 'agent-1');
+// result: { stdout, stderr, exitCode, durationMs, timedOut }
+
+// Scoped file access with traversal protection
+const file = await runtime.readFile('src/index.ts', 'agent-1');
+const written = await runtime.writeFile('output.json', data, 'agent-1');
+
+// Full audit trail
+const log = runtime.getAuditLog();
+```
+
+## Strategy Agent (v4.14.0)
+
+Meta-orchestrator for coordinating large-scale agent swarms (1K–1M agents):
+
+```typescript
+import { StrategyAgent, AgentPool, WorkloadPartitioner } from 'network-ai';
+
+// Create pools with capacity limits
+const pool = new AgentPool('research', { capacity: 100, adapter: 'langchain' });
+
+// Partition workload across pools
+const partitioner = new WorkloadPartitioner();
+partitioner.addRoute({ priority: 'high', pool: 'research', weight: 3 });
+partitioner.addRoute({ priority: 'low', pool: 'general', weight: 1 });
+
+// Strategy agent with adaptive scaling
+const strategy = new StrategyAgent({
+  pools: [pool],
+  partitioner,
+  budget: federatedBudget,
+  adapters: adapterRegistry,
+  scalingPolicy: {
+    scaleUpThreshold: 0.8,   // scale up when pool is 80% utilized
+    scaleDownThreshold: 0.2, // scale down when under 20%
+    cooldownMs: 30_000,
+  },
+});
+
+// Submit work — strategy routes to best pool
+const result = await strategy.submit({
+  taskId: 'research-001',
+  priority: 'high',
+  input: 'Analyze quarterly reports',
+});
+```

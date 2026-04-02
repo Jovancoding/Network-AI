@@ -54,12 +54,18 @@ flowchart TD
         QA["QAOrchestratorAgent\n(scenario replay, regression tracking)"]:::quality
         BB["SharedBlackboard\n(shared agent state)\npropose → validate → commit\nfilesystem mutex"]:::blackboard
         AD["Adapters — plug any framework in, swap freely\nLangChain · AutoGen · CrewAI · MCP · LlamaIndex · …"]:::adapters
+        RT["AgentRuntime\n(sandbox policy, approval gates)"]:::security
+        CUI["ConsoleUI\n(TUI dashboard + pipe mode)"]:::app
+        SA["StrategyAgent\n(AgentPool, WorkloadPartitioner,\nadaptive scaling)"]:::routing
 
         AG -->|"grant / deny"| AR
         AR -->|"tasks dispatched"| AD
         AD -->|"writes results"| BB
         QG -->|"validates"| BB
         QA -->|"orchestrates"| QG
+        RT -->|"sandbox exec"| AD
+        SA -->|"scale / partition"| AR
+        CUI -->|"operator control"| SO
     end
 
     SO --> AUDIT["data/audit_log.jsonl\n(HMAC / Ed25519-signed)"]:::audit

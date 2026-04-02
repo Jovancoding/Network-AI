@@ -47,6 +47,10 @@ Network-AI includes built-in security features:
 - **Matcher-Based Hook Filtering** (v4.13.0) -- `HookMatcher` with `agentPattern`, `actionPattern`, `toolPattern` globs, and custom `condition` functions; hooks only fire when all conditions pass, enabling fine-grained security policies per tool or agent pattern
 - **Phase Pipeline with Approval Gates** (v4.13.0) -- `PhasePipeline` orchestrates multi-phase workflows; `requiresApproval` boolean halts execution until explicit human approval is granted, enforcing human-in-the-loop for sensitive operations
 - **Confidence-Based Filtering** (v4.13.0) -- `ConfidenceFilter` rejects low-confidence agent findings below configurable thresholds and validates rejected results with secondary agents; aggregation strategies (unanimous, majority) enforce consensus before accepting multi-agent results
+- **Agent Runtime Sandbox** (v4.14.0) -- `SandboxPolicy` enforces command allowlists/blocklists, path scoping with traversal protection, and risk assessment; `ShellExecutor` sandboxes child processes with timeout/output limits; `FileAccessor` restricts file I/O to scoped base paths
+- **Approval Gates** (v4.14.0) -- `ApprovalGate` requires explicit human or callback approval for high-risk operations (writes, shell commands, budget spend); auto-approve mode for trusted environments; full approval history with audit trail
+- **Pipe Mode Authentication** (v4.14.0) -- JSON stdin/stdout protocol for programmatic agent control; commands processed one-at-a-time with structured responses; no shell injection surface
+- **Strategy Agent Pool Isolation** (v4.14.0) -- `AgentPool` enforces per-pool capacity ceilings; `WorkloadPartitioner` routes tasks by priority class; adaptive scaling respects budget constraints before spawning agents
 
 ## Security Scan Results
 

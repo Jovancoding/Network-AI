@@ -409,7 +409,7 @@ Run these before declaring the integration production-ready:
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
 - [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
 - [ ] `npx ts-node test-phase7.ts` — 94 Phase 7 tests pass (hooks, flow control, composer, semantic search)
-- [ ] `npm run test:all` — all 1,924 tests pass across 23 suites
+- [ ] `npm run test:all` — all 2,204 tests pass across 24 suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety
@@ -477,4 +477,4 @@ Run these before declaring the integration production-ready:
 
 ---
 
-*Network-AI v4.0.6 · MIT License · https://github.com/Jovancoding/Network-AI*
+*Network-AI v4.14.0 · MIT License · https://github.com/Jovancoding/Network-AI*

@@ -4,14 +4,14 @@ This file is read automatically by Claude Code when working in this repository.
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 4.13.1.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 4.14.0.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 1,924 tests across 23 suites
+npm run test:all              # Run all 2,204 tests across 24 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 17 adapter tests
@@ -34,9 +34,13 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/phase-pipeline.ts` — PhasePipeline: multi-phase workflows with approval gates
 - `lib/confidence-filter.ts` — ConfidenceFilter: multi-agent result scoring and filtering
 - `lib/fan-out.ts` — FanOutFanIn: parallel agent spawning with pluggable aggregation
+- `lib/agent-runtime.ts` — AgentRuntime: sandboxed execution with SandboxPolicy, ShellExecutor, FileAccessor, ApprovalGate
+- `lib/console-ui.ts` — ConsoleUI: interactive terminal dashboard with ANSI TUI
+- `lib/strategy-agent.ts` — StrategyAgent: meta-orchestrator with AgentPool, WorkloadPartitioner, adaptive scaling
 - `adapters/` — 17 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)
+- `bin/console.ts` — Interactive console with pipe mode (`npx network-ai-console`)
 - `scripts/` — Python helper scripts (blackboard, permissions, token management)
 - `types/` — TypeScript declaration files
 - `data/` — Runtime data (gitignored): audit log, pending changes

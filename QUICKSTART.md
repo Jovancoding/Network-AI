@@ -405,6 +405,15 @@ npx ts-node run.ts
 # Run tests
 npm test
 npm run test:all
+
+# Interactive console (TUI dashboard)
+npx network-ai-console
+
+# Pipe mode for AI-driven control (JSON stdin/stdout)
+npx network-ai-console --pipe
+
+# Console with custom settings
+npx network-ai-console --base-path ./workspace --budget 50000 --allow "npm *,git status"
 ```
 
 To persist `OPENAI_API_KEY` across sessions, add it to your PowerShell profile or set it via *System Properties → Environment Variables*.

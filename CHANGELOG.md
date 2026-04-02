@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.0] - 2026-04-02
+
+### Added
+- **Agent Runtime** (`AgentRuntime`) — sandboxed execution environment with `SandboxPolicy` (command allowlists/blocklists, path scoping, traversal protection, risk assessment), `ShellExecutor` (child_process.spawn with timeout/output limits/concurrency tracking), `FileAccessor` (scoped read/write/list), and `ApprovalGate` (callback/auto-approve/history/stats). New module: `lib/agent-runtime.ts`.
+- **Console UI** (`ConsoleUI`) — interactive terminal dashboard with ANSI TUI, readline-based command input, live event feed, status bar (agents/budget/FSM/pending), and 20+ commands for controlling the orchestrator. New module: `lib/console-ui.ts`.
+- **Console Entry Point** (`bin/console.ts`) — `npx network-ai-console` with `--base-path`, `--auto-approve`, `--allow`, `--budget`, `--pipe` flags. Wired to shared `SwarmOrchestrator`, `LockedBlackboard`, `FederatedBudget`, `JourneyFSM`, and `AdapterRegistry`.
+- **Pipe Mode** — `--pipe` flag enables JSON stdin/stdout protocol for programmatic AI-to-orchestrator control. Commands: `status`, `exec`, `bb_read`, `bb_write`, `bb_list`, `bb_delete`, `bb_propose`, `bb_validate`, `bb_commit`, `budget`, `budget_spend`, `budget_reset`, `fsm`, `fsm_transition`, `agents`, `spawn`, `health`, `policy`.
+- **Strategy Agent** (`StrategyAgent`) — meta-orchestrator with `AgentPool` (elastic spawn/recycle, capacity enforcement), `WorkloadPartitioner` (task chunking with priority routing and weighted distribution), and `adaptiveStrategy` (auto-scale up/down, budget reallocation, cooldown). Designed for 1K–1M agent coordination. New module: `lib/strategy-agent.ts`.
+- **Console Orchestrator Commands** — `agents`, `spawn`, `stop`, `bb` (read/write/list/delete/propose/validate/commit/pending), `budget` (show/spend/reset), `fsm` (show/transition/events/history/reset), `health`
+- 280 new tests in `test-phase9.ts` (2,204 total across 24 suites)
+
 ## [4.13.1] - 2026-04-01
 
 ### Changed

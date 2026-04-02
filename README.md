@@ -5,9 +5,9 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.13.1-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.14.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-1924%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-2204%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-17%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -98,6 +98,10 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | ✅ Confidence filtering | Multi-agent result scoring, threshold validation, and consensus aggregation |
 | ✅ Matcher-based hooks | Glob patterns on agent/action/tool for targeted hook filtering |
 | ✅ Fan-out / fan-in | Parallel agent spawning with pluggable aggregation strategies |
+| ✅ Agent runtime sandbox | Sandboxed shell execution with policy enforcement and approval gates |
+| ✅ Interactive console | TUI dashboard for live monitoring, agent control, blackboard/budget/FSM management |
+| ✅ Pipe mode | JSON stdin/stdout protocol for programmatic AI-to-orchestrator control |
+| ✅ Strategy agent | Meta-orchestrator with elastic agent pools, workload partitioning, and adaptive scaling |
 | ✅ TypeScript native | ES2022 strict mode, zero native dependencies |
 
 ---
@@ -391,9 +395,10 @@ npm run test:a2a          # A2A protocol adapter
 npm run test:codex        # Codex adapter
 npm run test:priority     # Priority & preemption
 npm run test:cli          # CLI layer
+npm run test:phase9       # Agent runtime, console, strategy agent
 ```
 
-**1,924 passing assertions across 23 test suites** (`npm run test:all`):
+**2,204 passing assertions across 24 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -419,6 +424,7 @@ npm run test:cli          # CLI layer
 | `test-qa.ts` | 67 | QA orchestrator: scenarios, feedback loop, regression, contradictions |
 | `test-phase7.ts` | 94 | Deferred init, hook middleware, flow control, skill composer, semantic search |
 | `test-phase8.ts` | 146 | Phase pipeline, confidence filter, matcher-based hooks, fan-out/fan-in |
+| `test-phase9.ts` | 280 | Agent runtime, sandbox policy, shell executor, file accessor, approval gate, console UI, orchestrator wiring, pipe mode, strategy agent |
 
 ---
 

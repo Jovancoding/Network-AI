@@ -498,7 +498,7 @@ Use for redundancy - take first successful result.
 ### Strategy 4: Chain
 Sequential processing - output of one feeds into next.
 
-> **TypeScript engine (v4.13.0):** These strategies map directly to the `FanOutFanIn` module (`lib/fan-out.ts`) which provides `merge`, `vote`, `firstSuccess`, and `consensus` fan-in strategies with concurrency control. For multi-phase workflows with approval gates, see `PhasePipeline` (`lib/phase-pipeline.ts`). For result scoring and threshold filtering, see `ConfidenceFilter` (`lib/confidence-filter.ts`). Matcher-based hooks (`lib/adapter-hooks.ts`) can target specific agents or tools via glob patterns.
+> **TypeScript engine (v4.14.0):** These strategies map directly to the `FanOutFanIn` module (`lib/fan-out.ts`) which provides `merge`, `vote`, `firstSuccess`, and `consensus` fan-in strategies with concurrency control. For multi-phase workflows with approval gates, see `PhasePipeline` (`lib/phase-pipeline.ts`). For result scoring and threshold filtering, see `ConfidenceFilter` (`lib/confidence-filter.ts`). Matcher-based hooks (`lib/adapter-hooks.ts`) can target specific agents or tools via glob patterns. For sandboxed agent execution, see `AgentRuntime` (`lib/agent-runtime.ts`). For large-scale agent coordination, see `StrategyAgent` (`lib/strategy-agent.ts`).
 
 ### Example Parallel Workflow
 
