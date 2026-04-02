@@ -33,6 +33,7 @@ const SUITES = [
   'test-qa.ts',
   'test-phase7.ts',
   'test-phase8.ts',
+  'test-phase9.ts',
 ];
 
 const WIDTH = 60;

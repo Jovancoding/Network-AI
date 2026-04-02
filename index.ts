@@ -2585,6 +2585,58 @@ export type {
   FanOutOptions,
 } from './lib/fan-out';
 
+// Agent Runtime — Sandboxed execution environment (Phase 9a)
+export {
+  SandboxPolicy,
+  ShellExecutor,
+  FileAccessor,
+  ApprovalGate,
+  AgentRuntime,
+  RuntimePolicyError,
+  RuntimeApprovalError,
+  RuntimeExecutionError,
+} from './lib/agent-runtime';
+export type {
+  SandboxPolicyConfig,
+  ShellResult,
+  ShellOptions,
+  FileResult,
+  ApprovalRequest,
+  ApprovalDecision,
+  ApprovalCallback as RuntimeApprovalCallback,
+  RuntimeAuditEntry,
+  RuntimeEvents,
+  AgentRuntimeOptions,
+} from './lib/agent-runtime';
+
+// Console UI — Interactive terminal dashboard (Phase 9b)
+export { ConsoleUI, ansi } from './lib/console-ui';
+export type {
+  ConsoleStatus,
+  FeedEntry,
+  CommandHandler,
+  ConsoleUIOptions,
+} from './lib/console-ui';
+
+// Strategy Agent — AI Meta-Orchestrator (Phase 9c)
+export {
+  AgentPool,
+  WorkloadPartitioner,
+  StrategyAgent,
+  adaptiveStrategy,
+} from './lib/strategy-agent';
+export type {
+  AgentTemplate,
+  ManagedAgent,
+  WorkChunk,
+  StrategyPlan,
+  SystemSnapshot,
+  PoolStatus,
+  StrategyFunction,
+  StrategyEvents,
+  StrategyAgentOptions,
+} from './lib/strategy-agent';
+
 // MCP Blackboard Tool Bindings
 export {
   BlackboardMCPTools,

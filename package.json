@@ -7,7 +7,8 @@
   "types": "dist/index.d.ts",
   "bin": {
     "network-ai": "./dist/bin/cli.js",
-    "network-ai-server": "./dist/bin/mcp-server.js"
+    "network-ai-server": "./dist/bin/mcp-server.js",
+    "network-ai-console": "./dist/bin/console.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -35,6 +36,7 @@
     "test:qa": "npx ts-node test-qa.ts",
     "test:phase7": "npx ts-node test-phase7.ts",
     "test:phase8": "npx ts-node test-phase8.ts",
+    "test:phase9": "npx ts-node test-phase9.ts",
     "test:all": "npx ts-node run-tests.ts",
     "setup": "npx ts-node setup.ts",
     "setup:check": "npx ts-node setup.ts --check",
