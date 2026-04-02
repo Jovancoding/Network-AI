@@ -93,31 +93,6 @@ class FailingAdapter extends BaseAdapter {
   }
 }
 
-class DelayAdapter extends BaseAdapter {
-  readonly name: string;
-  readonly version = '1.0.0';
-  private delayMs: number;
-
-  constructor(name: string, delayMs: number) { super(); this.name = name; this.delayMs = delayMs; }
-
-  async executeAgent(agentId: string, payload: AgentPayload): Promise<AgentResult> {
-    await new Promise(r => setTimeout(r, this.delayMs));
-    return { success: true, data: { agentId, delayed: this.delayMs } };
-  }
-}
-
-class ValueAdapter extends BaseAdapter {
-  readonly name: string;
-  readonly version = '1.0.0';
-  private value: unknown;
-
-  constructor(name: string, value: unknown) { super(); this.name = name; this.value = value; }
-
-  async executeAgent(agentId: string): Promise<AgentResult> {
-    return { success: true, data: this.value };
-  }
-}
-
 /** Helper: create a registry with a mock adapter registered for all agents */
 async function makeRegistry(adapterName = 'mock'): Promise<{ registry: AdapterRegistry; adapter: MockAdapter }> {
   const registry = new AdapterRegistry();
@@ -182,7 +157,7 @@ async function testPhasePipeline() {
 
   // 5. Parallel agents in a phase
   {
-    const { registry, adapter } = await makeRegistry();
+    const { registry } = await makeRegistry();
     const pipeline = new PhasePipeline(registry, baseCtx, {
       phases: [{ name: 'scan', agents: ['a', 'b', 'c'], parallel: true }],
     });

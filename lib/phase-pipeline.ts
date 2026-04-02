@@ -191,7 +191,7 @@ export class PhasePipeline {
 
       const phaseStart = Date.now();
       const agentResults = new Map<string, AgentResult>();
-      let phaseStatus: PhaseStatus = 'running';
+      let phaseStatus: PhaseStatus;
 
       // --- Execute agents -------------------------------------------------
       try {
