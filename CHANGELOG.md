@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.15.2] - 2026-04-04
+
+### Fixed
+- **CodeQL #107 — Bad HTML filtering regexp** (`security.ts`): Changed `<\/script>` to `<\/script\s*>` to match browser-accepted variants like `</script >` per HTML spec.
+- **CodeQL #99 — Unused variable `startTime`** (`lib/agent-runtime.ts`): Removed unused local.
+- **CodeQL #100/#104 — Unused loop variable `target`** (`lib/strategy-agent.ts`): Renamed to `_target`.
+- **CodeQL #101 — Unused imports `AgentPool`, `WorkloadPartitioner`** (`test-phase9.ts`): Removed.
+- **CodeQL #102 — Unused function `assertThrows`** (`test-phase9.ts`): Removed.
+- **CodeQL #103 — Unused variable `echoCmd`** (`test-phase9.ts`): Removed.
+- **ClawHub suspicious flag** — Added `scripts/postinstall.js` to `.clawhubignore` so Node-only dev tooling is excluded from the Python skill bundle; updated `skill.json` description to acknowledge the TypeScript engine.
+
 ## [4.15.1] - 2026-04-04
 
 ### Fixed

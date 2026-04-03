@@ -47,8 +47,6 @@ import { FederatedBudget } from './lib/federated-budget';
 import { JourneyFSM } from './lib/fsm-journey';
 import { AdapterRegistry } from './adapters/adapter-registry';
 import {
-  AgentPool,
-  WorkloadPartitioner,
   StrategyAgent,
   adaptiveStrategy,
 } from './lib/strategy-agent';
@@ -93,11 +91,6 @@ function fail(test: string, err?: string) {
 function assert(condition: boolean, test: string, detail?: string) {
   if (condition) pass(test);
   else fail(test, detail);
-}
-
-function assertThrows(fn: () => void, test: string) {
-  try { fn(); fail(test, 'Expected to throw'); }
-  catch { pass(test); }
 }
 
 async function assertRejects(fn: () => Promise<unknown>, test: string) {
@@ -293,7 +286,6 @@ async function testShellExecutor() {
   header('Phase 9b — ShellExecutor');
 
   const isWindows = process.platform === 'win32';
-  const echoCmd = isWindows ? 'echo hello' : 'echo hello';
 
   // 1. Execute a simple command
   {

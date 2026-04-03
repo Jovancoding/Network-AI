@@ -689,7 +689,7 @@ export class StrategyAgent extends EventEmitter {
     }
 
     // Scale down: mark excess agents for recycling
-    for (const [poolId, target] of plan.scaleDown) {
+    for (const [poolId, _target] of plan.scaleDown) {
       const pool = this.pools.get(poolId);
       if (!pool) continue;
       const before = pool.active;

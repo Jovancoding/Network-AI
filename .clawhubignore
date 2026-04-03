@@ -16,6 +16,7 @@ package.json
 package-lock.json
 node_modules/
 setup.ts
+scripts/postinstall.js
 
 # ── Tests ──
 test.ts

@@ -369,7 +369,6 @@ export class ShellExecutor {
     const maxBytes = opts.maxOutputBytes ?? this.policy.defaultMaxOutputBytes;
 
     this.activeProcesses++;
-    const startTime = Date.now();
 
     try {
       return await this.spawnCommand(command, cwd, timeoutMs, maxBytes, opts.env);
