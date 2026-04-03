@@ -358,11 +358,15 @@ export function createLLMPlanner(
  * Parse JSON from an LLM response string, handling markdown fences and preamble.
  */
 export function parsePlanJSON(text: string): PlannedTask[] {
-  // Strip markdown code fences
+  // Strip markdown code fences (indexOf-based to avoid ReDoS — CodeQL #105)
   let cleaned = text.trim();
-  const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  if (fenceMatch) {
-    cleaned = fenceMatch[1].trim();
+  const fenceOpen = cleaned.indexOf('```');
+  if (fenceOpen !== -1) {
+    const afterOpen = cleaned.indexOf('\n', fenceOpen);
+    const fenceClose = cleaned.indexOf('```', afterOpen !== -1 ? afterOpen : fenceOpen + 3);
+    if (afterOpen !== -1 && fenceClose > afterOpen) {
+      cleaned = cleaned.substring(afterOpen + 1, fenceClose).trim();
+    }
   }
 
   // Find the JSON array in the text

@@ -10,12 +10,25 @@ const targets = [
 ];
 
 for (const file of targets) {
-  if (!fs.existsSync(file)) continue;
-  let text = fs.readFileSync(file, 'utf8');
-  if (text.includes('ignoreDeprecations')) continue;
-  text = text.replace(
-    /"moduleResolution":\s*"node"/,
-    '"moduleResolution": "node",\n    "ignoreDeprecations": "6.0"',
-  );
-  fs.writeFileSync(file, text);
+  // Use fd-based read+write to avoid TOCTOU race (CodeQL #106)
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r+');
+  } catch {
+    continue; // file doesn't exist — skip
+  }
+  try {
+    const text = fs.readFileSync(fd, 'utf8');
+    if (text.includes('ignoreDeprecations')) continue;
+    const patched = text.replace(
+      '"moduleResolution": "node"',
+      '"moduleResolution": "node",\n    "ignoreDeprecations": "6.0"',
+    );
+    if (patched !== text) {
+      fs.ftruncateSync(fd);
+      fs.writeSync(fd, patched, 0, 'utf8');
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
 }

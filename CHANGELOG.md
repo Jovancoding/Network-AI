@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.15.1] - 2026-04-04
+
+### Fixed
+- **CodeQL #105 — ReDoS in `parsePlanJSON()`** (`lib/goal-decomposer.ts`): Replaced ambiguous regex `/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/` with indexOf-based code-fence stripping to eliminate polynomial backtracking.
+- **CodeQL #106 — TOCTOU race in postinstall** (`scripts/postinstall.js`): Replaced `existsSync` → `readFileSync` → `writeFileSync` pattern with `openSync('r+')` + `readFileSync(fd)` + `ftruncateSync` + `writeSync` to eliminate time-of-check-to-time-of-use race condition.
+- **ReDoS in InputSanitizer** (`security.ts`): Replaced `<script[\s\S]*?>[\s\S]*?<\/script>` pattern (nested quantifiers) with `<script\b[^>]*>[\s\S]*?<\/script>` (unambiguous open-tag match).
+- **Shell injection risk in NemoClawAdapter** (`adapters/nemoclaw-adapter.ts`): Replaced `command.split(' ')` with `tokenizeCommand()` helper that respects single/double-quoted arguments, preventing argument injection via embedded spaces.
+
 ## [4.15.0] - 2026-04-04
 
 ### Added

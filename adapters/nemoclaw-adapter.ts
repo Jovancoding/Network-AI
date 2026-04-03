@@ -204,6 +204,30 @@ function buildSandboxCommand(payload: AgentPayload, config: NemoClawAgentConfig)
 }
 
 /**
+ * Tokenize a command string into an argument array, respecting single
+ * and double quotes. Prevents command-injection when forwarding to exec.
+ */
+function tokenizeCommand(command: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let quote: string | null = null;
+  for (const ch of command) {
+    if (quote) {
+      if (ch === quote) { quote = null; continue; }
+      current += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === ' ' || ch === '\t') {
+      if (current) { tokens.push(current); current = ''; }
+    } else {
+      current += ch;
+    }
+  }
+  if (current) tokens.push(current);
+  return tokens;
+}
+
+/**
  * Parse JSON sandbox status output, handling malformed input safely.
  */
 function parseSandboxStatus(output: string, name: string): SandboxStatus {
@@ -378,7 +402,7 @@ export class NemoClawAdapter extends BaseAdapter {
     env?: Record<string, string>
   ): Promise<string> {
     const exec = this.getExecutor();
-    return exec('sandbox', ['connect', sandboxName, '--', ...command.split(' ')], { env });
+    return exec('sandbox', ['connect', sandboxName, '--', ...tokenizeCommand(command)], { env });
   }
 
   // -------------------------------------------------------------------------
@@ -552,7 +576,7 @@ export class NemoClawAdapter extends BaseAdapter {
 
       const output = await exec(
         'sandbox',
-        ['connect', config.sandboxName, '--', ...command.split(' ')],
+        ['connect', config.sandboxName, '--', ...tokenizeCommand(command)],
         { env }
       );
 
