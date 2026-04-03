@@ -4,7 +4,9 @@
 
 | Version | Supported |
 |---------|-----------|
-| 4.13.x  | ✅ Yes — full support (current) |
+| 4.15.x  | ✅ Yes — full support (current) |
+| 4.14.x  | ✅ Security fixes only |
+| 4.13.x  | ✅ Security fixes only |
 | 4.12.x  | ✅ Security fixes only |
 | 4.9.x   | ✅ Security fixes only |
 | 4.8.x   | ✅ Security fixes only |
@@ -51,6 +53,8 @@ Network-AI includes built-in security features:
 - **Approval Gates** (v4.14.0) -- `ApprovalGate` requires explicit human or callback approval for high-risk operations (writes, shell commands, budget spend); auto-approve mode for trusted environments; full approval history with audit trail
 - **Pipe Mode Authentication** (v4.14.0) -- JSON stdin/stdout protocol for programmatic agent control; commands processed one-at-a-time with structured responses; no shell injection surface
 - **Strategy Agent Pool Isolation** (v4.14.0) -- `AgentPool` enforces per-pool capacity ceilings; `WorkloadPartitioner` routes tasks by priority class; adaptive scaling respects budget constraints before spawning agents
+- **Goal Decomposer DAG Validation** (v4.15.0) -- `validateDAG()` enforces acyclicity (Kahn's algorithm), rejects self-dependencies and unknown task references; task graphs are validated before execution to prevent infinite loops or orphaned tasks
+- **Team Runner Approval Gate** (v4.15.0) -- optional `approvalCallback` on `runTeam()` requires explicit approval of the full task DAG before any agent execution begins; rejection skips all tasks with audit-ready status
 
 ## Security Scan Results
 

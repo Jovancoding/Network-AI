@@ -5,14 +5,14 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.14.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v4.15.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-2204%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-2357%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-17%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://typescriptlang.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6.svg)](https://typescriptlang.org)
 [![ClawHub](https://img.shields.io/badge/ClawHub-network--ai-orange.svg)](https://clawhub.ai/skills/network-ai)
 [![Integration Guide](https://img.shields.io/badge/docs-integration%20guide-informational.svg)](INTEGRATION_GUIDE.md)
 [![Sponsor](https://img.shields.io/badge/sponsor-support%20the%20project-f15bb5.svg)](https://github.com/sponsors/Jovancoding)
@@ -102,6 +102,7 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | ✅ Interactive console | TUI dashboard for live monitoring, agent control, blackboard/budget/FSM management |
 | ✅ Pipe mode | JSON stdin/stdout protocol for programmatic AI-to-orchestrator control |
 | ✅ Strategy agent | Meta-orchestrator with elastic agent pools, workload partitioning, and adaptive scaling |
+| ✅ Goal decomposer | LLM-powered goal → task DAG → parallel execution with `runTeam()` one-liner |
 | ✅ TypeScript native | ES2022 strict mode, zero native dependencies |
 
 ---
@@ -396,9 +397,10 @@ npm run test:codex        # Codex adapter
 npm run test:priority     # Priority & preemption
 npm run test:cli          # CLI layer
 npm run test:phase9       # Agent runtime, console, strategy agent
+npm run test:phase10      # Goal decomposer, task DAG, runTeam
 ```
 
-**2,204 passing assertions across 24 test suites** (`npm run test:all`):
+**2,357 passing assertions across 25 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -425,6 +427,7 @@ npm run test:phase9       # Agent runtime, console, strategy agent
 | `test-phase7.ts` | 94 | Deferred init, hook middleware, flow control, skill composer, semantic search |
 | `test-phase8.ts` | 146 | Phase pipeline, confidence filter, matcher-based hooks, fan-out/fan-in |
 | `test-phase9.ts` | 280 | Agent runtime, sandbox policy, shell executor, file accessor, approval gate, console UI, orchestrator wiring, pipe mode, strategy agent |
+| `test-phase10.ts` | 153 | Goal decomposer, task DAG validation, topological layers, JSON parsing, team runner, concurrency, timeouts, events, runTeam one-liner, dependency injection, LLM planner |
 
 ---
 

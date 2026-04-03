@@ -78,7 +78,7 @@ Unsolicited PRs without a linked, approved issue will be closed.
 git clone https://github.com/Jovancoding/Network-AI.git
 cd Network-AI
 npm install
-npm run test:all  # Run all 2,204 tests (24 suites)
+npm run test:all  # Run all 2,357 tests (25 suites)
 npm run test:phase4  # Phase 4 behavioral control plane tests only
 npx tsc --noEmit  # Type-check
 ```

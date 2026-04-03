@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.15.0] - 2026-04-04
+
+### Added
+- **Goal Decomposer** (`GoalDecomposer`) — LLM-powered goal → task DAG → parallel execution. Takes a natural language goal, decomposes it into a validated `TaskDAG` via an LLM planner, respects dependencies, and executes with concurrency control. New module: `lib/goal-decomposer.ts`.
+- **Team Runner** (`TeamRunner`) — DAG execution engine with topological-layer scheduling, concurrency limits, per-task and total timeouts, dependency result injection (`_dependencyResults`), priority ordering within layers, and `continueOnFailure` mode.
+- **`runTeam()` one-liner** — single function call: `runTeam(goal, agents, { planner, executor })` to go from natural language goal to results. Includes optional approval gate, planner retries, and full event emission.
+- **`createLLMPlanner()`** — built-in planner factory that sends structured prompts to any LLM agent via the adapter system and parses JSON responses (handles code fences, preamble text, nested `{ tasks }` / `{ text }` / `{ content }` shapes).
+- **DAG utilities** — `validateDAG()` (cycle detection via Kahn's algorithm, self-dependency and unknown-ref checks), `topologicalLayers()` (parallel scheduling), `parsePlanJSON()` (robust LLM response parsing).
+- **TypeScript 6.0** — upgraded from 5.9.3 to 6.0.2; added `ignoreDeprecations: "6.0"` and postinstall script for third-party tsconfig patching.
+- 153 new tests in `test-phase10.ts` (2,357 total across 25 suites)
+
 ## [4.14.0] - 2026-04-02
 
 ### Added

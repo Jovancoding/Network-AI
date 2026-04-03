@@ -303,7 +303,11 @@ Network-AI/
 │   ├── semantic-search.ts        # BYOE vector store with cosine similarity (v4.12)
 │   ├── phase-pipeline.ts         # Multi-phase workflows with approval gates (v4.13)
 │   ├── confidence-filter.ts      # Multi-agent result scoring and filtering (v4.13)
-│   └── fan-out.ts                # Parallel agent spawning with pluggable aggregation (v4.13)
+│   ├── fan-out.ts                # Parallel agent spawning with pluggable aggregation (v4.13)
+│   ├── agent-runtime.ts          # Sandboxed execution with SandboxPolicy, ShellExecutor (v4.14)
+│   ├── console-ui.ts             # Interactive terminal dashboard with ANSI TUI (v4.14)
+│   ├── strategy-agent.ts         # Meta-orchestrator with AgentPool, WorkloadPartitioner (v4.14)
+│   └── goal-decomposer.ts        # LLM-powered goal → task DAG → parallel execution (v4.15)
 ├── scripts/                      # Python helper scripts (local orchestration only)
 │   ├── blackboard.py             # Shared state management with atomic commits
 │   ├── swarm_guard.py            # Handoff tax prevention, budget tracking

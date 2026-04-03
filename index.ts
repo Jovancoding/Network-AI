@@ -2637,6 +2637,28 @@ export type {
   StrategyAgentOptions,
 } from './lib/strategy-agent';
 
+// Goal Decomposer — LLM-powered goal → task DAG → parallel execution (Phase 10)
+export {
+  GoalDecomposer,
+  TeamRunner,
+  runTeam,
+  createLLMPlanner,
+  validateDAG,
+  topologicalLayers,
+  parsePlanJSON,
+} from './lib/goal-decomposer';
+export type {
+  TaskNode,
+  TaskDAG,
+  TeamAgent,
+  PlannedTask,
+  PlannerFunction,
+  ExecutorFunction,
+  RunTeamOptions,
+  TeamResult,
+  TeamRunnerEvents,
+} from './lib/goal-decomposer';
+
 // MCP Blackboard Tool Bindings
 export {
   BlackboardMCPTools,
