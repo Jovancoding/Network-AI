@@ -201,7 +201,7 @@ export class InputSanitizer {
   // Dangerous patterns that could indicate injection attempts
   private static DANGEROUS_PATTERNS = [
     /\$\{.*\}/g,           // Template injection
-    /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, // XSS (handles </script > variants)
+    /<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, // XSS (handles </script foo="bar"> etc.)
     /javascript:/gi,        // JavaScript protocol
     /on\w+\s*=/gi,         // Event handlers
     /\.\.\//g,             // Path traversal
