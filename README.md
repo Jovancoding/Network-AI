@@ -23,6 +23,10 @@
   <img src="assets/demo.svg" alt="Network-AI control-plane demo — atomic blackboard, priority preemption, AuthGuardian, FSM governance" width="720">
 </p>
 
+<p align="center">
+  <b>If Network-AI is useful to you, consider <a href="https://github.com/Jovancoding/Network-AI">giving it a star ⭐</a> — it helps others find the project.</b>
+</p>
+
 Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordination, guardrails, and governance to any AI agent stack.
 
 - **Shared blackboard with locking** — atomic `propose → validate → commit` prevents race conditions and split-brain failures across parallel agents
