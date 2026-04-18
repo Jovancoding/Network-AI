@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.2] - 2026-04-18
+
+### Fixed
+- **CodeQL #125–#146** — Eliminated all `innerHTML` XSS sinks in `lib/work-tree-dashboard.html`: every panel (`showTreeDetail`, `updateAgentsPanel`, `updateAgentDetailPanel`, `updateSupervisorPanel`) now uses pure DOM APIs (`createElement` + `textContent` + `appendChild`)
+- **CodeQL #130** — Converted `agentMap` from `Object.create(null)` to `Map` (31 occurrences) to eliminate remote property injection
+- **CodeQL #144** — Replaced `safeSetHTML` DOMParser wrapper with direct DOM construction
+- **CodeQL #146** — Removed unused `escapeHtml` function (dead code after DOM API conversion)
+- All WebSocket-sourced data (`diagnostics`, `orchestratorLogs`, `stats`) now sanitized via `JSON.parse(JSON.stringify())` at ingestion
+
 ## [5.1.1] - 2026-04-18
 
 ### Fixed
