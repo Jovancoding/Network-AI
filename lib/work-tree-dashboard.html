@@ -1267,9 +1267,6 @@
     try { return new Date(iso).toLocaleTimeString(); } catch(e) { return iso; }
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
   function safeObj(src){if(!src||typeof src!=='object')return Object.create(null);var o=Object.create(null);return Object.assign(o,JSON.parse(JSON.stringify(src)));}
   function safeObjToMap(src){var m=new Map();if(!src||typeof src!=='object')return m;var clean=JSON.parse(JSON.stringify(src));var keys=Object.keys(clean);for(var i=0;i<keys.length;i++)m.set(keys[i],clean[keys[i]]);return m;}
 
