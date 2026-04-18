@@ -269,17 +269,17 @@ var activeWS = null;  // selected workspace name
 var activeTab = 'home';
 
 // Tree state
-var nodes = {}, rootId = null, stats = null;
+var nodes = Object.create(null), rootId = null, stats = null;
 var treeLayout = {}, treeCam = {x:0,y:0,zoom:1}, treeDragging=false, treeDragStart={x:0,y:0}, treeCamStart={x:0,y:0};
 var treeSelectedId = null;
 
 // Agents state
-var agentMap = {}, orchestratorLogs = [];
+var agentMap = Object.create(null), orchestratorLogs = [];
 var agentsLayout = {}, agentsCam = {x:0,y:0,zoom:1}, agentsDragging=false, agentsDragStart={x:0,y:0}, agentsCamStart={x:0,y:0};
 var selectedAgent = null;
 
 // Blackboard state
-var bbEntries = {}, bbPending = [], bbLock = {locked:false}, bbPaused = false;
+var bbEntries = Object.create(null), bbPending = [], bbLock = {locked:false}, bbPaused = false;
 var bbFilter = '';
 
 // Capability flags for current workspace
@@ -410,8 +410,8 @@ function renderWSList() {
     if (w.hasBlackboard) html += '<span class="ws-card-badge bb">📋 Blackboard</span>';
     html += '</div>';
     html += '<div class="ws-card-stats">';
-    if (w.hasTree) html += '<span>'+w.nodeCount+' nodes</span><span>'+Math.round(w.progress*100)+'%</span>';
-    if (w.hasBlackboard) html += '<span>'+w.bbKeyCount+' keys</span>';
+    if (w.hasTree) html += '<span>'+esc(w.nodeCount)+' nodes</span><span>'+esc(Math.round(w.progress*100))+'%</span>';
+    if (w.hasBlackboard) html += '<span>'+esc(w.bbKeyCount)+' keys</span>';
     html += '</div>';
     if (w.hasTree) {
       html += '<div class="ws-card-progress"><div class="ws-card-progress-track"><div class="ws-card-progress-fill" style="width:'+Math.round(w.progress*100)+'%"></div></div></div>';
@@ -458,7 +458,7 @@ function handleMsg(msg) {
     if (msg.tree) {
       var prevNodes = nodes;
       rootId = msg.tree.rootId;
-      nodes = msg.tree.nodes;
+      nodes = safeObj(msg.tree.nodes);
       stats = msg.tree.stats;
       for (var id in nodes) {
         if (prevNodes[id]&&prevNodes[id].status!==nodes[id].status) {
@@ -467,10 +467,10 @@ function handleMsg(msg) {
         }
       }
     }
-    if (msg.agents) agentMap = msg.agents;
+    if (msg.agents) agentMap = safeObj(msg.agents);
     if (msg.orchestratorLogs) orchestratorLogs = msg.orchestratorLogs;
     if (msg.blackboard) {
-      bbEntries = msg.blackboard.entries||{};
+      bbEntries = safeObj(msg.blackboard.entries||{});
       bbPending = msg.blackboard.pending||[];
       bbLock = msg.blackboard.lock||{locked:false};
       bbPaused = !!msg.blackboard.paused;
@@ -580,7 +580,7 @@ function renderBlackboard(){
     html+='<td class="bb-key">'+esc(e.key)+'</td>';
     html+='<td class="bb-value" title="'+esc(typeof e.value==='string'?e.value:JSON.stringify(e.value))+'">'+esc(val)+'</td>';
     html+='<td class="bb-agent">'+esc(e.source_agent)+'</td>';
-    html+='<td class="bb-version">v'+e.version+'</td>';
+    html+='<td class="bb-version">v'+esc(e.version)+'</td>';
     html+='<td class="bb-time">'+esc(fmtTime(e.timestamp))+'</td>';
     html+='</tr>';
   }
@@ -594,7 +594,7 @@ function renderBlackboard(){
     var ph='';
     for(var j=0;j<activePending.length;j++){
       var p=activePending[j];
-      ph+='<span class="pending-chip '+p.status+'">'+esc(p.key)+' ('+p.status+' by '+esc(p.source_agent)+')</span>';
+      ph+='<span class="pending-chip '+esc(p.status)+'">'+esc(p.key)+' ('+esc(p.status)+' by '+esc(p.source_agent)+')</span>';
     }
     bbPendingList.innerHTML=ph;
   } else { bbPendingSection.style.display='none'; }
@@ -657,14 +657,14 @@ function updateAgentsPanel(){
   var logs=orchestratorLogs.length>0?orchestratorLogs:genNarr();var html='';for(var i=logs.length-1;i>=Math.max(0,logs.length-15);i--)html+='<div class="narr-entry"><span class="narr-time">'+esc(logs[i].time||'')+'</span><span class="narr-msg">'+esc(logs[i].message)+'</span></div>';
   orchestratorNarrative.innerHTML=html||'<div style="color:var(--text-dim);font-size:12px">Waiting…</div>';
   var names=Object.keys(agentMap),bC=0,iC=0,eC=0;for(var j=0;j<names.length;j++){var s=agentMap[names[j]].status;if(s==='busy')bC++;else if(s==='error')eC++;else iC++;}
-  agentStatsGrid.innerHTML='<div class="stat-card"><div class="stat-value" style="color:var(--cyan)">'+names.length+'</div><div class="stat-label">Agents</div></div><div class="stat-card"><div class="stat-value" style="color:var(--yellow)">'+bC+'</div><div class="stat-label">Busy</div></div><div class="stat-card"><div class="stat-value" style="color:var(--green)">'+iC+'</div><div class="stat-label">Idle</div></div><div class="stat-card"><div class="stat-value" style="color:var(--red)">'+eC+'</div><div class="stat-label">Error</div></div>';
+  agentStatsGrid.innerHTML='<div class="stat-card"><div class="stat-value" style="color:var(--cyan)">'+esc(names.length)+'</div><div class="stat-label">Agents</div></div><div class="stat-card"><div class="stat-value" style="color:var(--yellow)">'+esc(bC)+'</div><div class="stat-label">Busy</div></div><div class="stat-card"><div class="stat-value" style="color:var(--green)">'+esc(iC)+'</div><div class="stat-label">Idle</div></div><div class="stat-card"><div class="stat-value" style="color:var(--red)">'+esc(eC)+'</div><div class="stat-label">Error</div></div>';
   updateAgentDetailPanel();
 }
 function updateAgentDetailPanel(){
   if(!selectedAgent||!agentMap[selectedAgent]){agentLogPanel.innerHTML='<div style="color:var(--text-dim);font-size:12px">Click an agent to see logs</div>';return;}
-  var a=agentMap[selectedAgent],html='<div class="agent-log-header"><span class="agent-name">'+esc(a.name)+'</span>';var bc=a.status==='busy'?'var(--yellow)':a.status==='error'?'var(--red)':'var(--green)';html+='<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;background:'+bc+';color:#000">'+a.status+'</span></div>';
+  var a=agentMap[selectedAgent],html='<div class="agent-log-header"><span class="agent-name">'+esc(a.name)+'</span>';var bc=a.status==='busy'?'var(--yellow)':a.status==='error'?'var(--red)':'var(--green)';html+='<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;background:'+bc+';color:#000">'+esc(a.status)+'</span></div>';
   var tasks=a.tasks||[];if(tasks.length>0){html+='<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Tasks:</div>';for(var i=0;i<tasks.length;i++)html+='<div style="font-size:11px;padding:2px 0">'+(STATUS_ICON[tasks[i].status]||'?')+' '+esc(tasks[i].label)+'</div>';html+='<div style="border-bottom:1px solid var(--border);margin:4px 0"></div>';}
-  var logs=a.logs||[];if(logs.length>0){html+='<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Log ('+logs.length+'):</div>';for(var li=logs.length-1;li>=Math.max(0,logs.length-20);li--){var lg=logs[li],cls=lg.level==='error'?' log-error':lg.level==='warn'?' log-warn':'';html+='<div class="log-line'+cls+'"><span class="log-t">'+esc(lg.time||'')+'</span><span class="log-m">'+esc(lg.message)+'</span></div>';}}else html+='<div style="font-size:11px;color:var(--text-dim)">No logs</div>';
+  var logs=a.logs||[];if(logs.length>0){html+='<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Log ('+esc(logs.length)+'):</div>';for(var li=logs.length-1;li>=Math.max(0,logs.length-20);li--){var lg=logs[li],cls=lg.level==='error'?' log-error':lg.level==='warn'?' log-warn':'';html+='<div class="log-line'+cls+'"><span class="log-t">'+esc(lg.time||'')+'</span><span class="log-m">'+esc(lg.message)+'</span></div>';}}else html+='<div style="font-size:11px;color:var(--text-dim)">No logs</div>';
   agentLogPanel.innerHTML=html;
 }
 function genNarr(){var e=[],names=Object.keys(agentMap);if(!names.length)return e;var now=new Date().toLocaleTimeString();var bA=[],eA=[],iA=[];for(var i=0;i<names.length;i++){var a=agentMap[names[i]];if(a.status==='busy')bA.push(a);else if(a.status==='error')eA.push(a);else iA.push(a);}if(stats)e.push({time:now,message:'Overall: '+Math.round(stats.progress*100)+'% ('+stats.completed+'/'+stats.total+' done)'});for(var b=0;b<bA.length;b++)e.push({time:now,message:bA[b].name+' working on "'+(bA[b].currentTask||'…')+'"'});for(var x=0;x<eA.length;x++)e.push({time:now,message:'⚠ '+eA[x].name+' error'});return e;}
@@ -676,6 +676,8 @@ function addFeed(icon,msg){var e=document.createElement('div');e.className='feed
 function fmtTok(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return String(n);}
 function fmtTime(iso){if(!iso)return'—';try{return new Date(iso).toLocaleTimeString();}catch(e){return iso;}}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function safeObj(src){var o=Object.create(null);if(src&&typeof src==='object'){for(var k in src){if(Object.prototype.hasOwnProperty.call(src,k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype'){o[k]=src[k];}}}return o;}
+function safeObj(src){var o=Object.create(null);if(src&&typeof src==='object'){for(var k in src){if(Object.prototype.hasOwnProperty.call(src,k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype'){o[k]=src[k];}}}return o;}
 
 // ═══════════════════════════════════════════════════════════════════
 // INIT

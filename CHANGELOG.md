@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.1] - 2026-04-18
+
+### Fixed
+- **CodeQL #114–#129** — 12 XSS and remote property injection alerts in `lib/control-plane.html`: all dynamic values now pass through `esc()`, state maps use `Object.create(null)` with `safeObj()` to block prototype pollution
+- **CodeQL #115–#118** — 4 prototype-polluting assignment alerts in `lib/work-tree-dashboard.html`: WebSocket data sanitized via `safeObj()` copy into null-prototype objects
+- **CodeQL #123–#125** — 3 XSS alerts in `lib/work-tree-dashboard.html`: all innerHTML values now pass through `escapeHtml()`
+- **CodeQL #130–#134** — 5 remote property injection alerts in `lib/work-tree-dashboard.html`: lookup maps use `Object.create(null)`
+- **CodeQL #135** — Removed unused `elapsed` variable in `adapters/orchestrator-adapter.ts` catch block
+- **CodeQL #136** — Removed unused `agentsFitted` variable in `lib/work-tree-dashboard.html`
+
+### Changed
+- Security policy updated: 5.1.x is now current supported version
+
 ## [5.1.0] - 2026-04-18
 
 ### Added

@@ -247,7 +247,6 @@ export class OrchestratorAdapter extends BaseAdapter {
         elapsed
       );
     } catch (error) {
-      const elapsed = Date.now() - startTime;
       if (error instanceof Error && error.message === 'ORCHESTRATOR_TIMEOUT') {
         return this.errorResult(
           'CHILD_TIMEOUT',

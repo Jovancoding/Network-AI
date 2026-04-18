@@ -278,13 +278,13 @@
   // SHARED STATE
   // ═══════════════════════════════════════════════════════════════════════════
 
-  var nodes = {};
+  var nodes = Object.create(null);
   var rootId = null;
   var stats = null;
   var ws = null;
   var activeTab = 'tree';
 
-  var agentMap = {};
+  var agentMap = Object.create(null);
   var orchestratorLogs = [];
   var hasServerAgents = false;
   var diagnostics = null;
@@ -415,7 +415,7 @@
     if (msg.type === 'snapshot') {
       var prevNodes = nodes;
       rootId = msg.rootId;
-      nodes = msg.nodes;
+      nodes = safeObj(msg.nodes);
       stats = msg.stats;
       for (var id in msg.nodes) {
         if (prevNodes[id] && prevNodes[id].status !== msg.nodes[id].status) {
@@ -423,7 +423,7 @@
           addFeed(STATUS_ICON[n.status], n.label + ' → ' + n.status + (n.agent ? ' (@' + n.agent + ')' : ''));
         }
       }
-      if (msg.agents) { agentMap = msg.agents; hasServerAgents = true; }
+      if (msg.agents) { agentMap = safeObj(msg.agents); hasServerAgents = true; }
       if (msg.orchestratorLogs) { orchestratorLogs = msg.orchestratorLogs; }
       if (msg.diagnostics) { diagnostics = msg.diagnostics; }
       if (!msg.agents) { deriveAgentsFromTree(); }
@@ -443,7 +443,7 @@
   }
 
   function deriveAgentsFromTree() {
-    agentMap = {};
+    agentMap = Object.create(null);
     for (var id in nodes) {
       var node = nodes[id];
       if (!node.agent) continue;
@@ -1032,7 +1032,7 @@
       if (agent.currentTask) {
         html += '<div class="agent-card-task">↳ ' + escapeHtml(agent.currentTask) + '</div>';
       }
-      html += '<div class="agent-card-meta">' + tc.total + ' tasks · ' + tc.done + ' done · ' + formatTokens(agent.tokens) + ' tok</div>';
+      html += '<div class="agent-card-meta">' + escapeHtml(tc.total + ' tasks · ' + tc.done + ' done · ' + formatTokens(agent.tokens) + ' tok') + '</div>';
       html += '</div>';
     }
 
@@ -1071,12 +1071,12 @@
     // Header
     var bc = agent.status === 'busy' ? 'var(--yellow)' : agent.status === 'error' ? 'var(--red)' : 'var(--green)';
     html += '<div class="agent-log-header"><span class="agent-name">' + escapeHtml(agent.name) + '</span>';
-    html += '<span class="agent-status-badge" style="background:' + bc + ';color:#000">' + agent.status + '</span></div>';
+    html += '<span class="agent-status-badge" style="background:' + bc + ';color:#000">' + escapeHtml(agent.status) + '</span></div>';
 
     // Tasks
     var tasks = agent.tasks || [];
     if (tasks.length > 0) {
-      html += '<div style="font-size:11px;color:var(--text-dim);margin:8px 0 4px">Tasks (' + tasks.length + '):</div>';
+      html += '<div style="font-size:11px;color:var(--text-dim);margin:8px 0 4px">Tasks (' + escapeHtml(String(tasks.length)) + '):</div>';
       for (var i = 0; i < tasks.length; i++) {
         var taskColor = tasks[i].status === 'completed' ? 'var(--green)' : tasks[i].status === 'running' ? 'var(--yellow)' : tasks[i].status === 'failed' ? 'var(--red)' : 'var(--text-dim)';
         html += '<div style="font-size:11px;padding:3px 0;color:' + taskColor + '">';
@@ -1087,7 +1087,7 @@
 
     // Logs
     var logs = agent.logs || [];
-    html += '<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Log' + (logs.length > 0 ? ' (' + logs.length + ')' : '') + ':</div>';
+    html += '<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Log' + (logs.length > 0 ? ' (' + escapeHtml(String(logs.length)) + ')' : '') + ':</div>';
     if (logs.length > 0) {
       for (var li = logs.length - 1; li >= Math.max(0, logs.length - 30); li--) {
         var log = logs[li];
@@ -1230,14 +1230,15 @@
   }
 
   function escapeHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
+  function safeObj(src){var o=Object.create(null);if(src&&typeof src==='object'){for(var k in src){if(Object.prototype.hasOwnProperty.call(src,k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype'){o[k]=src[k];}}}return o;}
 
   // ═══════════════════════════════════════════════════════════════════════════
   // INIT
   // ═══════════════════════════════════════════════════════════════════════════
 
-  var treeFitted = false, agentsFitted = false;
+  var treeFitted = false;
 
   window.addEventListener('resize', function() {
     if (activeTab === 'tree') { treeResize(); treeDraw(); }
