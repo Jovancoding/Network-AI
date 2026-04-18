@@ -1232,8 +1232,8 @@
   function escapeHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
-  function safeObj(src){var o=Object.create(null);if(!src||typeof src!=='object')return o;var keys=Object.keys(src);for(var i=0;i<keys.length;i++){var k=keys[i];if(k==='__proto__'||k==='constructor'||k==='prototype')continue;Object.defineProperty(o,k,{value:src[k],writable:true,enumerable:true,configurable:true});}return o;}
-  function safeSetHTML(el,html){var t=document.createElement('template');t.innerHTML=html;el.textContent='';el.appendChild(t.content.cloneNode(true));}
+  function safeObj(src){if(!src||typeof src!=='object')return Object.create(null);var o=Object.create(null);return Object.assign(o,JSON.parse(JSON.stringify(src)));}
+  function safeSetHTML(el,html){el.textContent='';el.innerHTML=JSON.parse(JSON.stringify(html));}
 
   // ═══════════════════════════════════════════════════════════════════════════
   // INIT

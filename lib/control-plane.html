@@ -676,7 +676,7 @@ function addFeed(icon,msg){var e=document.createElement('div');e.className='feed
 function fmtTok(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return String(n);}
 function fmtTime(iso){if(!iso)return'—';try{return new Date(iso).toLocaleTimeString();}catch(e){return iso;}}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function safeObj(src){var o=Object.create(null);if(!src||typeof src!=='object')return o;var keys=Object.keys(src);for(var i=0;i<keys.length;i++){var k=keys[i];if(k==='__proto__'||k==='constructor'||k==='prototype')continue;Object.defineProperty(o,k,{value:src[k],writable:true,enumerable:true,configurable:true});}return o;}
+function safeObj(src){if(!src||typeof src!=='object')return Object.create(null);var o=Object.create(null);return Object.assign(o,JSON.parse(JSON.stringify(src)));}
 
 // ═══════════════════════════════════════════════════════════════════
 // INIT
