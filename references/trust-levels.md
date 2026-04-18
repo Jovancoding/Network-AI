@@ -194,3 +194,39 @@ network-ai auth token unknown_bot \
 ```
 
 Trust levels are numeric integers (`1`–`4`) in the CLI implementation, which map to the 0.5–0.9 scoring band. Configure agent trust in `scripts/check_permission.py` under `DEFAULT_TRUST_LEVELS`.
+
+## APS Delegation-Chain Trust (v5.0)
+
+The `APSAdapter` introduced delegation-chain trust mapping: when Agent A delegates work to Agent B, the trust chain is preserved and attenuated. This integrates with AuthGuardian so that delegated agents inherit a bounded trust level.
+
+### How It Works
+
+1. Parent agent has trust `T_parent`
+2. Each delegation hop applies a configurable attenuation factor (default 0.9)
+3. Delegated agent trust: `T_delegated = T_parent × attenuation ^ depth`
+4. AuthGuardian evaluates permission requests using the attenuated trust
+
+### Example
+
+```
+orchestrator (0.9) → analyst (depth 1) → sub-agent (depth 2)
+
+analyst trust  = 0.9 × 0.9^1 = 0.81
+sub-agent trust = 0.9 × 0.9^2 = 0.729
+```
+
+### Configuration
+
+```typescript
+import { APSAdapter } from 'network-ai';
+
+const aps = new APSAdapter({
+  client: apsClient,
+  trustAttenuation: 0.9,  // per-hop multiplier
+  maxDelegationDepth: 5,   // cap chain length
+});
+```
+
+### IAuthValidator and Trust (v5.0)
+
+The `IAuthValidator` interface exposes `getAgentTrust(agentId)`, which returns the effective trust level for any agent — including APS-delegated agents whose trust was computed from the delegation chain. See [auth-guardian.md](auth-guardian.md) for the full interface.

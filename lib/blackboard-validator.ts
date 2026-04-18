@@ -114,6 +114,156 @@ export type AIReviewCallback = (
 }>;
 
 // ============================================================================
+// JSON SCHEMA SUBSET — zero-dependency structured output validation
+// ============================================================================
+
+/**
+ * Subset of JSON Schema Draft-07 supported by the built-in validator.
+ *
+ * Supports: type, required, properties, items, enum, const,
+ * minLength/maxLength, minimum/maximum, pattern, minItems/maxItems,
+ * additionalProperties, oneOf/anyOf/allOf.
+ */
+export interface JsonSchema {
+  type?: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null' | string[];
+  properties?: Record<string, JsonSchema>;
+  required?: string[];
+  items?: JsonSchema;
+  enum?: unknown[];
+  const?: unknown;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  pattern?: string;
+  minItems?: number;
+  maxItems?: number;
+  additionalProperties?: boolean | JsonSchema;
+  oneOf?: JsonSchema[];
+  anyOf?: JsonSchema[];
+  allOf?: JsonSchema[];
+  description?: string;
+}
+
+/**
+ * Validate a value against a {@link JsonSchema}.
+ * Returns an array of human-readable error strings (empty = valid).
+ */
+export function validateJsonSchema(value: unknown, schema: JsonSchema, path: string = '$'): string[] {
+  const errors: string[] = [];
+
+  // --- allOf / anyOf / oneOf ---
+  if (schema.allOf) {
+    for (const sub of schema.allOf) {
+      errors.push(...validateJsonSchema(value, sub, path));
+    }
+  }
+  if (schema.anyOf) {
+    const anyMatch = schema.anyOf.some(sub => validateJsonSchema(value, sub, path).length === 0);
+    if (!anyMatch) errors.push(`${path}: must match at least one of anyOf schemas`);
+  }
+  if (schema.oneOf) {
+    const matches = schema.oneOf.filter(sub => validateJsonSchema(value, sub, path).length === 0).length;
+    if (matches !== 1) errors.push(`${path}: must match exactly one of oneOf schemas (matched ${matches})`);
+  }
+
+  // --- const / enum ---
+  if (schema.const !== undefined && value !== schema.const) {
+    errors.push(`${path}: must equal ${JSON.stringify(schema.const)}`);
+  }
+  if (schema.enum && !schema.enum.includes(value)) {
+    errors.push(`${path}: must be one of [${schema.enum.map(e => JSON.stringify(e)).join(', ')}]`);
+  }
+
+  // --- type ---
+  if (schema.type) {
+    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+    const actual = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+    const typeOk = types.some(t => {
+      if (t === 'integer') return typeof value === 'number' && Number.isInteger(value);
+      return actual === t;
+    });
+    if (!typeOk) {
+      errors.push(`${path}: expected type ${types.join('|')}, got ${actual}`);
+      return errors; // No point checking further constraints if type is wrong
+    }
+  }
+
+  // --- string constraints ---
+  if (typeof value === 'string') {
+    if (schema.minLength !== undefined && value.length < schema.minLength) {
+      errors.push(`${path}: string length ${value.length} < minLength ${schema.minLength}`);
+    }
+    if (schema.maxLength !== undefined && value.length > schema.maxLength) {
+      errors.push(`${path}: string length ${value.length} > maxLength ${schema.maxLength}`);
+    }
+    if (schema.pattern) {
+      try {
+        if (!new RegExp(schema.pattern).test(value)) {
+          errors.push(`${path}: does not match pattern /${schema.pattern}/`);
+        }
+      } catch {
+        errors.push(`${path}: invalid regex pattern /${schema.pattern}/`);
+      }
+    }
+  }
+
+  // --- number constraints ---
+  if (typeof value === 'number') {
+    if (schema.minimum !== undefined && value < schema.minimum) {
+      errors.push(`${path}: ${value} < minimum ${schema.minimum}`);
+    }
+    if (schema.maximum !== undefined && value > schema.maximum) {
+      errors.push(`${path}: ${value} > maximum ${schema.maximum}`);
+    }
+  }
+
+  // --- object constraints ---
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    if (schema.required) {
+      for (const req of schema.required) {
+        if (!(req in obj)) {
+          errors.push(`${path}: missing required property '${req}'`);
+        }
+      }
+    }
+    if (schema.properties) {
+      for (const [prop, propSchema] of Object.entries(schema.properties)) {
+        if (prop in obj) {
+          errors.push(...validateJsonSchema(obj[prop], propSchema, `${path}.${prop}`));
+        }
+      }
+    }
+    if (schema.additionalProperties === false && schema.properties) {
+      const allowed = new Set(Object.keys(schema.properties));
+      for (const key of Object.keys(obj)) {
+        if (!allowed.has(key)) {
+          errors.push(`${path}: unexpected property '${key}'`);
+        }
+      }
+    }
+  }
+
+  // --- array constraints ---
+  if (Array.isArray(value)) {
+    if (schema.minItems !== undefined && value.length < schema.minItems) {
+      errors.push(`${path}: array length ${value.length} < minItems ${schema.minItems}`);
+    }
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+      errors.push(`${path}: array length ${value.length} > maxItems ${schema.maxItems}`);
+    }
+    if (schema.items) {
+      for (let i = 0; i < value.length; i++) {
+        errors.push(...validateJsonSchema(value[i], schema.items, `${path}[${i}]`));
+      }
+    }
+  }
+
+  return errors;
+}
+
+// ============================================================================
 // DEFAULT CONFIGURATION
 // ============================================================================
 
@@ -137,29 +287,76 @@ const DEFAULT_CONFIG: ValidationConfig = {
 
 export class BlackboardValidator {
   private config: ValidationConfig;
+  /** Schema registry: key-prefix → JSON Schema. Checked in validate(). */
+  private schemas: Map<string, JsonSchema> = new Map();
 
   constructor(config?: Partial<ValidationConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config, customRules: [...(config?.customRules ?? DEFAULT_CONFIG.customRules)] };
+  }
+
+  // ---------- Schema Registry ----------
+
+  /**
+   * Register a JSON Schema for a blackboard key prefix.
+   * Any value written to a key matching the prefix will be validated against the schema.
+   *
+   * @param keyPrefix Key prefix (e.g. `'result:'`, `'task:code-review'`)
+   * @param schema    A {@link JsonSchema} definition
+   */
+  registerSchema(keyPrefix: string, schema: JsonSchema): void {
+    if (!keyPrefix || typeof keyPrefix !== 'string') throw new Error('keyPrefix must be a non-empty string');
+    this.schemas.set(keyPrefix, schema);
+  }
+
+  /**
+   * Remove a previously registered schema.
+   */
+  unregisterSchema(keyPrefix: string): boolean {
+    return this.schemas.delete(keyPrefix);
+  }
+
+  /**
+   * List all registered schema prefixes.
+   */
+  getRegisteredSchemas(): string[] {
+    return Array.from(this.schemas.keys());
   }
 
   // ---------- Public API ----------
 
   /**
    * Validate any entry by auto-detecting its type from the key prefix.
+   * Also runs registered JSON Schema validation if a matching prefix exists.
    */
   validate(key: string, value: unknown, metadata?: Record<string, unknown>): ValidationResult {
     const entryType = this.detectEntryType(key, value);
 
+    let result: ValidationResult;
     switch (entryType) {
       case 'task':
-        return this.validateTask(key, value);
+        result = this.validateTask(key, value);
+        break;
       case 'result':
-        return this.validateResult(key, value, metadata);
+        result = this.validateResult(key, value, metadata);
+        break;
       case 'code':
-        return this.validateCode(key, value);
+        result = this.validateCode(key, value);
+        break;
       default:
-        return this.validateGeneric(key, value);
+        result = this.validateGeneric(key, value);
+        break;
     }
+
+    // Layer: JSON Schema validation (if a matching schema is registered)
+    const schemaIssues = this.validateAgainstSchemas(key, value);
+    if (schemaIssues.length > 0) {
+      result.issues.push(...schemaIssues);
+      result.rulesApplied.push('schema');
+      result.score = this.calculateScore(result.issues);
+      result.passed = !result.issues.some(i => i.severity === 'error');
+    }
+
+    return result;
   }
 
   /**
@@ -696,6 +893,28 @@ export class BlackboardValidator {
         if (issue) issues.push(issue);
       }
     }
+  }
+
+  /**
+   * Run registered JSON Schema validations for the given key.
+   * Matches the longest matching prefix.
+   */
+  private validateAgainstSchemas(key: string, value: unknown): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    for (const [prefix, schema] of this.schemas) {
+      if (key.startsWith(prefix)) {
+        const schemaErrors = validateJsonSchema(value, schema);
+        for (const msg of schemaErrors) {
+          issues.push({
+            rule: `schema:${prefix}`,
+            severity: 'error',
+            message: msg,
+            suggestion: 'Ensure the output matches the registered JSON Schema',
+          });
+        }
+      }
+    }
+    return issues;
   }
 
   private calculateScore(issues: ValidationIssue[]): number {

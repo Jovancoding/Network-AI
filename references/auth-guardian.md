@@ -12,6 +12,25 @@ AuthGuardian is the security layer that evaluates all permission requests before
 
 > **Note**: These are abstract local resource type names. No external API credentials are required — all evaluation is local.
 
+## IAuthValidator Interface (v5.0)
+
+As of v5.0, the authorization contract is defined by the `IAuthValidator` interface in `lib/auth-validator.ts`. This decouples consumers from the concrete `AuthGuardian` class:
+
+```typescript
+import type { IAuthValidator, PermissionRequest, PermissionResult, AgentTrust } from 'network-ai';
+
+interface IAuthValidator {
+  checkPermission(request: PermissionRequest): Promise<PermissionResult> | PermissionResult;
+  getAgentTrust(agentId: string): AgentTrust | undefined;
+  getAgentNamespaces(agentId: string): string[];
+}
+```
+
+**Implementations:**
+- `AuthGuardian` — full weighted scoring (default)
+- `NoOpAuthValidator` — always grants, for testing
+- Custom implementations for external auth providers (LDAP, OAuth, etc.)
+
 ## Evaluation Algorithm
 
 ### Weighted Scoring Model

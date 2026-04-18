@@ -203,3 +203,46 @@ export class TimeoutError extends NetworkAIError {
     this.name = 'TimeoutError';
   }
 }
+
+// ============================================================================
+// ERROR MAPPING UTILITY
+// ============================================================================
+
+/** Error codes that are considered recoverable (caller can retry). */
+const RECOVERABLE_CODES = new Set([
+  'LOCK_ACQUISITION_FAILED',
+  'TIMEOUT',
+  'CONFLICT_DETECTED',
+]);
+
+/**
+ * Convert any error to a standardised SkillResult with `success: false`.
+ *
+ * For {@link NetworkAIError} subclasses the machine-readable `code` and
+ * `details` are preserved.  Unknown errors are wrapped as `INTERNAL_ERROR`.
+ */
+export function mapErrorToSkillResult(
+  error: unknown,
+): { success: false; error: { code: string; message: string; recoverable: boolean; trace?: Record<string, unknown> } } {
+  if (error instanceof NetworkAIError) {
+    return {
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        recoverable: RECOVERABLE_CODES.has(error.code),
+        trace: error.details,
+      },
+    };
+  }
+
+  const msg = error instanceof Error ? error.message : String(error);
+  return {
+    success: false,
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: msg,
+      recoverable: false,
+    },
+  };
+}

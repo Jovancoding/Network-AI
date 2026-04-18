@@ -31,6 +31,29 @@ import { AdapterAlreadyRegisteredError, AdapterNotFoundError, ValidationError } 
 export type AdapterFactory = () => IAgentAdapter;
 
 /**
+ * Configurable retry behaviour for adapter execution.
+ *
+ * The policy uses exponential backoff with optional jitter.
+ * Only errors marked `recoverable` in the {@link AgentResult} trigger a retry.
+ */
+export interface RetryPolicy {
+  /** Maximum number of retry attempts (0 = no retries, default). */
+  maxRetries: number;
+  /** Base delay in ms before the first retry (doubled each attempt). */
+  baseDelayMs: number;
+  /** Maximum delay cap in ms. */
+  maxDelayMs: number;
+  /** Optional fallback adapter name to try when all retries are exhausted. */
+  fallbackAdapter?: string;
+}
+
+const DEFAULT_RETRY_POLICY: RetryPolicy = {
+  maxRetries: 0,
+  baseDelayMs: 200,
+  maxDelayMs: 5000,
+};
+
+/**
  * Central registry that manages multiple agent framework adapters and
  * routes execution requests to the correct one.
  *
@@ -58,12 +81,22 @@ export class AdapterRegistry {
   private eventHandlers: Map<AdapterEventType, AdapterEventHandler[]> = new Map();
   private agentCache: Map<string, string> = new Map(); // agentId -> adapterName
   private deferredFactories: Map<string, { factory: AdapterFactory; config: AdapterConfig }> = new Map();
+  /** Opt-in retry policy for adapter execution. */
+  private retryPolicy: RetryPolicy;
 
-  constructor(config?: RegistryConfig) {
+  constructor(config?: RegistryConfig & { retryPolicy?: Partial<RetryPolicy> }) {
     if (config) {
       this.defaultAdapterName = config.defaultAdapter ?? null;
       this.routes = config.routes ?? [];
     }
+    this.retryPolicy = { ...DEFAULT_RETRY_POLICY, ...config?.retryPolicy };
+  }
+
+  /**
+   * Update the retry policy at runtime.
+   */
+  setRetryPolicy(policy: Partial<RetryPolicy>): void {
+    this.retryPolicy = { ...this.retryPolicy, ...policy };
   }
 
   // =========================================================================
@@ -366,6 +399,63 @@ export class AdapterRegistry {
         },
       };
     }
+
+    const result = await this.executeWithRetry(adapter, agentId, payload, context);
+
+    // If all retries exhausted and a fallback adapter is configured, try it
+    if (!result.success && result.error?.recoverable && this.retryPolicy.fallbackAdapter) {
+      const fallback = this.adapters.get(this.retryPolicy.fallbackAdapter);
+      if (fallback && fallback !== adapter) {
+        this.emit('agent:execution:fallback', this.retryPolicy.fallbackAdapter, { agentId, originalAdapter: adapter.name });
+        return this.executeOnce(fallback, agentId, payload, context);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Execute with exponential-backoff retries for recoverable errors.
+   */
+  private async executeWithRetry(
+    adapter: IAgentAdapter,
+    agentId: string,
+    payload: AgentPayload,
+    context: AgentContext
+  ): Promise<AgentResult> {
+    let lastResult = await this.executeOnce(adapter, agentId, payload, context);
+
+    let attempt = 0;
+    while (
+      attempt < this.retryPolicy.maxRetries &&
+      !lastResult.success &&
+      lastResult.error?.recoverable
+    ) {
+      attempt++;
+      const delay = Math.min(
+        this.retryPolicy.baseDelayMs * Math.pow(2, attempt - 1),
+        this.retryPolicy.maxDelayMs
+      );
+      await new Promise(r => setTimeout(r, delay));
+      this.emit('agent:execution:retry', adapter.name, { agentId, attempt, delayMs: delay });
+      lastResult = await this.executeOnce(adapter, agentId, payload, context);
+    }
+
+    if (lastResult.metadata) {
+      lastResult.metadata.retryAttempts = attempt;
+    }
+    return lastResult;
+  }
+
+  /**
+   * Single adapter execution attempt with event emission.
+   */
+  private async executeOnce(
+    adapter: IAgentAdapter,
+    agentId: string,
+    payload: AgentPayload,
+    context: AgentContext
+  ): Promise<AgentResult> {
 
     this.emit('agent:execution:start', adapter.name, { agentId, payload });
     const startTime = Date.now();

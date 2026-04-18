@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------||
-| 4.15.x  | ✅ Yes — full support (current) |
+| 5.0.x   | ✅ Yes — full support (current) |
+| 4.15.x  | ✅ Security fixes only |
 | 4.14.x  | ✅ Security fixes only |
 | 4.13.x  | ✅ Security fixes only |
 | 4.12.x  | ✅ Security fixes only |
@@ -55,6 +56,11 @@ Network-AI includes built-in security features:
 - **Strategy Agent Pool Isolation** (v4.14.0) -- `AgentPool` enforces per-pool capacity ceilings; `WorkloadPartitioner` routes tasks by priority class; adaptive scaling respects budget constraints before spawning agents
 - **Goal Decomposer DAG Validation** (v4.15.0) -- `validateDAG()` enforces acyclicity (Kahn's algorithm), rejects self-dependencies and unknown task references; task graphs are validated before execution to prevent infinite loops or orphaned tasks
 - **Team Runner Approval Gate** (v4.15.0) -- optional `approvalCallback` on `runTeam()` requires explicit approval of the full task DAG before any agent execution begins; rejection skips all tasks with audit-ready status
+- **IAuthValidator Interface** (v5.0.0) -- `IAuthValidator` decouples authorization checks from the concrete `AuthGuardian` class; enables pluggable auth backends and `NoOpAuthValidator` for testing without permission infrastructure
+- **Approval Inbox** (v5.0.0) -- `ApprovalInbox` provides a web-accessible approval queue with REST API (`/list`, `/approve/:id`, `/deny/:id`, `/stats`) and SSE streaming for real-time approval notifications; auto-expiry on stale requests
+- **Transport Layer HMAC Auth** (v5.0.0) -- `SwarmTransportServer` implements JSON-RPC 2.0 over HTTP with HMAC-SHA256 request signing, per-request TTL enforcement, request size limits, and node allowlisting
+- **Job Queue Crash Recovery** (v5.0.0) -- `JobQueue` with `FileJobStore` detects stale in-progress jobs on restart and re-queues them; priority FIFO with exponential backoff retries
+- **Agent VCR** (v5.0.0) -- `AgentVCR` records and replays agent execution calls with cassette files; request fingerprinting via SHA-256; prevents accidental LLM calls in CI
 
 ## Security Scan Results
 

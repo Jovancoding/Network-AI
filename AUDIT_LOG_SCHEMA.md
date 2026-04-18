@@ -1,4 +1,4 @@
-# Audit Log Schema — Network-AI
+# Audit Log Schema — Network-AI v5.0
 
 Network-AI writes a JSONL audit trail during permission management and swarm execution. This document describes every field and event type.
 
@@ -234,6 +234,24 @@ Permission decisions use a three-factor weighted score:
 ## Node.js Layer (TypeScript package)
 
 When using the `network-ai` npm package directly, the `SecureAuditLogger` class in `security.ts` produces HMAC-SHA256-signed entries with the same envelope format plus a `signature` field. This is separate from the Python script layer described above.
+
+---
+
+## v5.0 Event Types
+
+The following event types were added in v5.0:
+
+| Action | Source Module | Description |
+|--------|--------------|-------------|
+| `approval_submitted` | ApprovalInbox | Approval request queued for human review |
+| `approval_decided` | ApprovalInbox | Human approved or rejected a pending request |
+| `job_enqueued` | JobQueue | Job added to the persistent priority queue |
+| `job_completed` | JobQueue | Job finished (success or failure) |
+| `job_recovered` | JobQueue | Crashed job recovered and re-queued |
+| `transport_auth_fail` | TransportLayer | HMAC auth failed on inbound JSON-RPC message |
+| `vcr_record_start` | AgentVCR | Recording session started |
+| `vcr_record_stop` | AgentVCR | Recording session stopped |
+| `vcr_replay` | AgentVCR | Replay of recorded session executed |
 
 ---
 

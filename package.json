@@ -1,14 +1,15 @@
 {
   "name": "network-ai",
-  "version": "4.15.3",
-  "description": "AI agent orchestration framework for TypeScript/Node.js - 17 adapters (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS + streaming variants). Built-in CLI, security, swarm intelligence, real-time streaming, and agentic workflow patterns.",
+  "version": "5.0.0",
+  "description": "AI agent orchestration framework for TypeScript/Node.js - 26 adapters (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS, Copilot, LangGraph, Anthropic Computer Use, OpenAI Agents SDK, Vertex AI, Pydantic AI, Browser Agent + streaming variants). Built-in CLI, security, swarm intelligence, real-time streaming, and agentic workflow patterns.",
   "homepage": "https://network-ai.org",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "network-ai": "./dist/bin/cli.js",
     "network-ai-server": "./dist/bin/mcp-server.js",
-    "network-ai-console": "./dist/bin/console.js"
+    "network-ai-console": "./dist/bin/console.js",
+    "network-ai-dashboard": "./dist/bin/dashboard.js"
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
@@ -39,6 +40,7 @@
     "test:phase8": "npx ts-node test-phase8.ts",
     "test:phase9": "npx ts-node test-phase9.ts",
     "test:phase10": "npx ts-node test-phase10.ts",
+    "test:topology": "npx ts-node test-topology.ts",
     "test:all": "npx ts-node run-tests.ts",
     "setup": "npx ts-node setup.ts",
     "setup:check": "npx ts-node setup.ts --check",

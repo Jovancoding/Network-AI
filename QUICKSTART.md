@@ -18,7 +18,7 @@ npm install
 npx ts-node setup.ts --check
 ```
 
-**Zero external AI dependencies.** All 17 adapters are self-contained — add framework SDKs only when you need them.
+**Zero external AI dependencies.** All 26 adapters are self-contained — add framework SDKs only when you need them.
 
 ---
 
@@ -43,6 +43,13 @@ npx ts-node setup.ts --check
 | `codex` | Codex | `openai` | OpenAI Codex CLI |
 | `minimax` | MiniMax | none | MiniMax chat completions |
 | `nemoclaw` | NemoClaw | none | NVIDIA sandboxed agent execution |\n| `aps` | APS | none | Delegation-chain trust mapping |
+| `copilot` | GitHub Copilot | none | Code generate/review/explain/fix/test/refactor |
+| `langgraph` | LangGraph | `@langchain/langgraph` | Compiled StateGraph execution |
+| `anthropic-computer-use` | Anthropic Computer Use | `@anthropic-ai/sdk` | Screenshot/click/type/scroll automation |
+| `openai-agents` | OpenAI Agents SDK | `openai` | Tool use, handoffs, guardrails |
+| `vertex-ai` | Vertex AI / Gemini | `@google-cloud/vertexai` | Function calling, multi-modal |
+| `pydantic-ai` | Pydantic AI | none | Structured output with validation |
+| `browser-agent` | Browser Automation | none | Playwright/Puppeteer/CDP browser control |
 
 ---
 
@@ -244,7 +251,7 @@ export class MyFrameworkAdapter extends BaseAdapter {
 ```bash
 npx ts-node test-standalone.ts    # 88 core tests
 npx ts-node test-security.ts      # 34 security tests
-npx ts-node test-adapters.ts      # 176 adapter tests (all 17 frameworks)
+npx ts-node test-adapters.ts      # 176 adapter tests (all 26 frameworks)
  npx ts-node test-cli.ts           # 65 CLI tests
 npx ts-node test-qa.ts             # 67 QA orchestrator tests
 ```
@@ -374,7 +381,15 @@ Your App
             ├── HaystackAdapter     ─── Haystack pipelines
             ├── DSPyAdapter         ─── DSPy modules
             ├── AgnoAdapter         ─── Agno agents/teams
-            └── APSAdapter          ─── APS delegation-chain trust
+            ├── AgnoAdapter         ─── Agno agents/teams
+            ├── APSAdapter          ─── APS delegation-chain trust
+            ├── CopilotAdapter      ─── GitHub Copilot
+            ├── LangGraphAdapter    ─── LangGraph state graphs
+            ├── VertexAIAdapter     ─── Vertex AI / Gemini
+            ├── PydanticAIAdapter   ─── Pydantic AI structured output
+            ├── OpenAIAgentsAdapter ─── OpenAI Agents SDK
+            ├── AnthropicComputerUseAdapter ─── Computer Use
+            └── BrowserAgentAdapter ─── Browser automation
 ```
 
 ---
@@ -604,13 +619,25 @@ import SwarmOrchestrator, {
 // Factory
 import { createSwarmOrchestrator } from 'network-ai';
 
-// All 17 adapters
+// All 26 adapters
 import {
   AdapterRegistry, BaseAdapter,
   OpenClawAdapter, LangChainAdapter, AutoGenAdapter,
   CrewAIAdapter, MCPAdapter, CustomAdapter,
   LlamaIndexAdapter, SemanticKernelAdapter, OpenAIAssistantsAdapter,
   HaystackAdapter, DSPyAdapter, AgnoAdapter,
+  CopilotAdapter, LangGraphAdapter, AnthropicComputerUseAdapter,
+  OpenAIAgentsAdapter, VertexAIAdapter, PydanticAIAdapter, BrowserAgentAdapter,
+} from 'network-ai';
+
+// v5.0 modules
+import {
+  AgentVCR, ComparisonRunner, CoverageReporter,
+  JobQueue, FileJobStore, ApprovalInbox,
+  SwarmTransportServer, SwarmTransportClient,
+  startPlayground, createAdapterTestSuite,
+  parseGoal, validateGoal, compileGoal,
+  NoOpAuthValidator,
 } from 'network-ai';
 
 // Types

@@ -79,8 +79,11 @@ export interface AgentResult {
     executionTimeMs?: number;
     /** Which adapter handled this */
     adapter?: string;
+    /** Number of retry attempts before this result */
+    retryAttempts?: number;
     /** Framework-specific trace data */
     trace?: Record<string, unknown>;
+    [key: string]: unknown;
   };
 }
 
@@ -232,6 +235,8 @@ export type AdapterEventType =
   | 'agent:execution:start'
   | 'agent:execution:complete'
   | 'agent:execution:error'
+  | 'agent:execution:retry'
+  | 'agent:execution:fallback'
   | 'agent:discovered'
   | 'agent:unavailable';
 

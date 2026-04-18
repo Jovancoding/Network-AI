@@ -64,14 +64,16 @@ Answers drive `AuthGuardian` configuration and audit log retention policy.
 
 ## 2. Framework Mapping
 
-Network-AI ships 17 adapters. Map your existing agents to the right one:
+Network-AI ships 26 adapters. Map your existing agents to the right one:
 
 | Your Stack | Network-AI Adapter | Notes |
 |-----------|-------------------|-------|
 | LangChain (JS/TS) | `LangChainAdapter` | Supports Runnables, chains, agents |
+| LangGraph | `LangGraphAdapter` | Compiled StateGraph execution |
 | AutoGen / AG2 | `AutoGenAdapter` | Supports `.run()` and `.generateReply()` |
 | CrewAI | `CrewAIAdapter` | Individual agents and full crew objects |
 | OpenAI Assistants | `OpenAIAssistantsAdapter` | Thread management included |
+| OpenAI Agents SDK | `OpenAIAgentsAdapter` | Tool use, handoffs, guardrails |
 | LlamaIndex | `LlamaIndexAdapter` | Query engines, chat engines, agent runners |
 | Semantic Kernel | `SemanticKernelAdapter` | Microsoft SK kernels, functions, planners |
 | Haystack | `HaystackAdapter` | Pipelines, agents, components |
@@ -84,6 +86,11 @@ Network-AI ships 17 adapters. Map your existing agents to the right one:
 | MiniMax | `MiniMaxAdapter` | MiniMax chat completions (M2.5) |
 | NVIDIA NemoClaw | `NemoClawAdapter` | Sandboxed agent execution via OpenShell |
 | APS delegation chains | `APSAdapter` | Delegation-chain trust mapping for AuthGuardian |
+| GitHub Copilot | `CopilotAdapter` | Code generate/review/explain/fix/test/refactor/chat |
+| Anthropic Computer Use | `AnthropicComputerUseAdapter` | Screenshot/click/type/scroll browser automation |
+| Google Vertex AI / Gemini | `VertexAIAdapter` | Function calling, multi-modal (text+image) |
+| Pydantic AI | `PydanticAIAdapter` | Structured output with validation, deps injection |
+| Browser automation | `BrowserAgentAdapter` | Playwright/Puppeteer/CDP browser control |
 | **Anything else** | `CustomAdapter` | Wrap any async function or HTTP endpoint |
 
 ### No matching framework?
@@ -409,7 +416,7 @@ Run these before declaring the integration production-ready:
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
 - [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
 - [ ] `npx ts-node test-phase7.ts` — 94 Phase 7 tests pass (hooks, flow control, composer, semantic search)
-- [ ] `npm run test:all` — all 2,357 tests pass across 25 suites
+- [ ] `npm run test:all` — all 2,531 tests pass across 25+ suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety
@@ -467,7 +474,7 @@ Run these before declaring the integration production-ready:
 |----------|---------------|
 | [QUICKSTART.md](QUICKSTART.md) | Get running in 5 minutes |
 | [QUICKSTART.md § CLI](QUICKSTART.md) | CLI reference — bb, auth, budget, audit commands |
-| [references/adapter-system.md](references/adapter-system.md) | All 17 adapters with code examples |
+| [references/adapter-system.md](references/adapter-system.md) | All 26 adapters with code examples |
 | [references/trust-levels.md](references/trust-levels.md) | Trust scoring formula and agent roles |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission system, justification scoring, token lifecycle |
 | [references/blackboard-schema.md](references/blackboard-schema.md) | Blackboard key conventions and namespacing |
@@ -477,4 +484,4 @@ Run these before declaring the integration production-ready:
 
 ---
 
-*Network-AI v4.15.3 · MIT License · https://github.com/Jovancoding/Network-AI*
+*Network-AI v5.0.0 · MIT License · https://github.com/Jovancoding/Network-AI*

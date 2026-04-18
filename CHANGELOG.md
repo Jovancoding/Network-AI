@@ -5,6 +5,28 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-04-18
+
+### Added
+- **9 new adapters** — CopilotAdapter, LangGraphAdapter, AnthropicComputerUseAdapter, OpenAIAgentsAdapter, VertexAIAdapter, PydanticAIAdapter, BrowserAgentAdapter, LangChainStreamingAdapter, CustomStreamingAdapter (26 total)
+- **StreamingBaseAdapter** — base class for adapters that yield partial results via `AsyncIterable`
+- **Goal DSL** (`lib/goal-dsl.ts`) — YAML/JSON goal definitions compiled to TaskDAG
+- **Agent VCR** (`lib/agent-vcr.ts`) — record and replay agent interactions for deterministic testing
+- **Comparison Runner** (`lib/comparison-runner.ts`) — side-by-side adapter evaluation with scoring
+- **Coverage Reporter** (`lib/coverage-reporter.ts`) — adapter capability coverage analysis
+- **Job Queue** (`lib/job-queue.ts`) — persistent priority FIFO with crash recovery and retry
+- **Approval Inbox** (`lib/approval-inbox.ts`) — web-accessible human approval queue for sensitive operations
+- **Transport Layer** (`lib/transport.ts`) — JSON-RPC 2.0 over WebSocket/HTTP with HMAC authentication
+- **Playground REPL** (`lib/playground.ts`) — interactive multi-adapter experimentation console
+- **Adapter Test Harness** (`lib/adapter-test-harness.ts`) — automated conformance testing for adapters
+- **IAuthValidator interface** (`lib/auth-validator.ts`) — decoupled authorization contract with `NoOpAuthValidator` for testing
+- **ConsoleUI dashboard** (`lib/console-ui.ts`) — interactive terminal dashboard with ANSI TUI
+
+### Changed
+- Adapter count: 17 → 26
+- Test count: 2,357 → 2,531 across 25+ suites
+- All documentation updated for v5.0
+
 ## [4.15.3] - 2026-04-04
 
 ### Fixed

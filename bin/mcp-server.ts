@@ -162,11 +162,12 @@ async function runStdio(combined: McpCombinedBridge): Promise<void> {
     let request: McpJsonRpcRequest;
     try {
       request = JSON.parse(trimmed);
-    } catch {
+    } catch (parseErr) {
+      const detail = parseErr instanceof Error ? parseErr.message : String(parseErr);
       const err = {
         jsonrpc: '2.0' as const,
         id: null,
-        error: { code: -32700, message: 'Parse error' },
+        error: { code: -32700, message: `Parse error: ${detail}` },
       };
       process.stdout.write(JSON.stringify(err) + '\n');
       return;

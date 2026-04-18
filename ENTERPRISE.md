@@ -12,7 +12,7 @@ This document exists so an engineer or architect can evaluate Network-AI in unde
 | Do I control all data? | **Yes.** All state lives in your `data/` directory on your own infrastructure. Nothing is transmitted. |
 | Is the source auditable? | **Yes.** MIT-licensed, fully open source, no obfuscated code, no telemetry. |
 | Does it have an audit trail? | **Yes.** Every permission request, grant, denial, and revocation is appended to `data/audit_log.jsonl` with a UTC timestamp. See [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md). |
-| Can I plug in my own LLM / provider? | **Yes.** The adapter registry supports LangChain, AutoGen, CrewAI, LlamaIndex, Semantic Kernel, OpenAI Assistants, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS, and a `CustomAdapter` for anything else. |
+| Can I plug in my own LLM / provider? | **Yes.** The adapter registry supports 26 adapters: LangChain, AutoGen, CrewAI, LlamaIndex, Semantic Kernel, OpenAI Assistants, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS, Copilot, LangGraph, Anthropic Computer Use, OpenAI Agents SDK, Vertex AI, Pydantic AI, Browser Agent, and a `CustomAdapter` for anything else. |
 | Does it work with our existing agent framework? | **Yes.** It wraps around your framework — you keep what you have and add guardrails on top. |
 | Is there a security review? | **Yes.** CodeQL scanning on every push, Dependabot auto-merge, Socket.dev supply chain score A, OpenSSF Scorecard. See [SECURITY.md](SECURITY.md). |
 | What does it cost to operate? | **Zero licensing cost.** MIT license. Infrastructure cost = your own compute. |
@@ -23,7 +23,7 @@ This document exists so an engineer or architect can evaluate Network-AI in unde
 
 ## What It Does (One Paragraph)
 
-Network-AI is a TypeScript/Node.js orchestration layer that sits between your agents and your shared state. It enforces: atomic blackboard writes (no race conditions when two agents write simultaneously), permission gating (agents must request access to sensitive resources and provide a scored justification), budget ceilings (per-agent token limits; rogue agents get cut off mid-task), FSM-based workflow governance (agents are blocked from skipping pipeline stages), and real-time compliance monitoring (tool abuse, turn-taking violations, response timeouts). It ships as an npm package with a companion Python skill bundle for OpenClaw/ClawHub environments.
+Network-AI is a TypeScript/Node.js orchestration layer that sits between your agents and your shared state. It enforces: atomic blackboard writes (no race conditions when two agents write simultaneously), permission gating (agents must request access to sensitive resources and provide a scored justification), budget ceilings (per-agent token limits; rogue agents get cut off mid-task), FSM-based workflow governance (agents are blocked from skipping pipeline stages), and real-time compliance monitoring (tool abuse, turn-taking violations, response timeouts). v5.0 adds: approval inbox (web-accessible approval queue), job queue (persistent priority FIFO with crash recovery), transport layer (JSON-RPC 2.0 with HMAC auth), agent VCR (record/replay for testing), comparison runner (side-by-side adapter evaluation), and 9 new adapters. It ships as an npm package with a companion Python skill bundle for OpenClaw/ClawHub environments.
 
 ---
 
@@ -85,9 +85,10 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 
 | Version | Policy |
 |---|---|
-| 4.10.x (current) | Full support — bugs + security fixes |
-| 4.9.x | Security fixes only |
-| 4.0.x – 4.8.x | Security fixes only |
+| 5.0.x (current) | Full support — bugs + security fixes |
+| 4.15.x | Security fixes only |
+| 4.14.x | Security fixes only |
+| 4.0.x – 4.13.x | Security fixes only |
 | < 4.0 | No support |
 
 ### Response Times (GitHub Issues)
@@ -100,7 +101,7 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 
 ### Stability Signals
 
-- 2,357 passing assertions across 25 suites
+- 2,531 passing assertions across 25+ suites
 - Deterministic scoring — no random outcomes in permission evaluation or budget enforcement
 - CI runs on every push and every PR
 - All examples ship with the repo and run without mocking

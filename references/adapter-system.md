@@ -1,8 +1,8 @@
-# Adapter System — Plug-and-Play Agent Framework Support
+# Adapter System — 26 Plug-and-Play Agent Framework Adapters
 
 ## Overview
 
-The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution.
+The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.0, 26 adapters are included.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -650,3 +650,102 @@ const result = await strategy.submit({
   input: 'Analyze quarterly reports',
 });
 ```
+
+## v5.0 Adapters
+
+Nine new adapters were added in v5.0, bringing the total to 26.
+
+### CopilotAdapter
+
+```typescript
+import { CopilotAdapter } from 'network-ai';
+
+const copilot = new CopilotAdapter({ client: yourCopilotClient });
+await orchestrator.addAdapter(copilot);
+
+const result = await copilot.executeAgent('code-reviewer', {
+  action: 'review',
+  code: 'function add(a, b) { return a + b; }',
+});
+```
+
+Supported actions: `generate`, `review`, `explain`, `fix`, `test`, `refactor`, `chat`.
+
+### LangGraphAdapter
+
+```typescript
+import { LangGraphAdapter } from 'network-ai';
+
+const lg = new LangGraphAdapter({ client: compiledStateGraph });
+await orchestrator.addAdapter(lg);
+
+const result = await lg.executeAgent('workflow', {
+  input: { messages: [{ role: 'user', content: 'Plan a trip' }] },
+});
+```
+
+### AnthropicComputerUseAdapter
+
+```typescript
+import { AnthropicComputerUseAdapter } from 'network-ai';
+
+const acu = new AnthropicComputerUseAdapter({ client: anthropicClient });
+const result = await acu.executeAgent('browser-bot', {
+  action: 'screenshot',  // or 'click', 'type', 'scroll'
+  coordinate: [400, 300],
+});
+```
+
+### OpenAIAgentsAdapter
+
+```typescript
+import { OpenAIAgentsAdapter } from 'network-ai';
+
+const agents = new OpenAIAgentsAdapter({ client: openaiClient });
+const result = await agents.executeAgent('assistant', {
+  instructions: 'Summarize the document',
+  input: docText,
+});
+```
+
+### VertexAIAdapter
+
+```typescript
+import { VertexAIAdapter } from 'network-ai';
+
+const vertex = new VertexAIAdapter({ client: vertexClient });
+const result = await vertex.executeAgent('gemini', {
+  prompt: 'Describe this image',
+  images: [imageBuffer],  // multi-modal
+});
+```
+
+### PydanticAIAdapter
+
+```typescript
+import { PydanticAIAdapter } from 'network-ai';
+
+const pydantic = new PydanticAIAdapter({ client: pydanticAgent });
+const result = await pydantic.executeAgent('structured-bot', {
+  prompt: 'Extract contact info',
+  resultType: 'ContactInfo',  // validated output
+});
+```
+
+### BrowserAgentAdapter
+
+```typescript
+import { BrowserAgentAdapter } from 'network-ai';
+
+const browser = new BrowserAgentAdapter({
+  client: playwrightPage,  // or Puppeteer page, or CDP session
+});
+const result = await browser.executeAgent('scraper', {
+  action: 'navigate',
+  url: 'https://example.com',
+});
+```
+
+### Streaming Variants (v5.0)
+
+`LangChainStreamingAdapter` and `CustomStreamingAdapter` extend their base adapters with `executeAgentStream()` that yields partial results via `AsyncIterable`. Both extend `StreamingBaseAdapter`.

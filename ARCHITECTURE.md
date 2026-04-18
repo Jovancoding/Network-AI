@@ -1,5 +1,7 @@
 # Architecture
 
+Network-AI v5.0 — TypeScript/Node.js multi-agent orchestrator with 26 adapters, 2,531 tests, 65+ modules.
+
 ## The Multi-Agent Race Condition Problem
 
 Most agent frameworks let you run multiple AI agents in parallel. None of them protect you when those agents write to the same resource at the same time.
@@ -53,7 +55,7 @@ flowchart TD
         QG["QualityGateAgent\n(validate blackboard writes)"]:::quality
         QA["QAOrchestratorAgent\n(scenario replay, regression tracking)"]:::quality
         BB["SharedBlackboard\n(shared agent state)\npropose → validate → commit\nfilesystem mutex"]:::blackboard
-        AD["Adapters — plug any framework in, swap freely\nLangChain · AutoGen · CrewAI · MCP · LlamaIndex · …"]:::adapters
+        AD["Adapters — plug any framework in, swap freely\n26 adapters: LangChain · AutoGen · CrewAI · MCP · Copilot · LangGraph · Vertex AI · …"]:::adapters
         RT["AgentRuntime\n(sandbox policy, approval gates)"]:::security
         CUI["ConsoleUI\n(TUI dashboard + pipe mode)"]:::app
         SA["StrategyAgent\n(AgentPool, WorkloadPartitioner,\nadaptive scaling)"]:::routing
@@ -242,6 +244,62 @@ python scripts/context_manager.py update \
 # Mark milestone complete
 python scripts/context_manager.py update --section milestones --complete "Ship v1.0"
 ```
+
+---
+
+## v5.0 Module Inventory
+
+### New Adapters (9 new, 26 total)
+
+| Adapter | Framework | File |
+|---------|-----------|------|
+| `CopilotAdapter` | GitHub Copilot | `adapters/copilot-adapter.ts` |
+| `LangGraphAdapter` | LangGraph StateGraph | `adapters/langgraph-adapter.ts` |
+| `AnthropicComputerUseAdapter` | Anthropic Computer Use | `adapters/anthropic-computer-use-adapter.ts` |
+| `OpenAIAgentsAdapter` | OpenAI Agents SDK | `adapters/openai-agents-adapter.ts` |
+| `VertexAIAdapter` | Vertex AI / Gemini | `adapters/vertex-ai-adapter.ts` |
+| `PydanticAIAdapter` | Pydantic AI | `adapters/pydantic-ai-adapter.ts` |
+| `BrowserAgentAdapter` | Browser automation | `adapters/browser-agent-adapter.ts` |
+
+### New Core Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `MCPToolConsumer` | `lib/mcp-tool-consumer.ts` | Consume remote MCP servers (stdio + HTTP transport) |
+| `ApprovalInbox` | `lib/approval-inbox.ts` | Web approval queue with REST API + SSE streaming |
+| `AgentVCR` | `lib/agent-vcr.ts` | Record/replay agent calls with cassette files |
+| `ComparisonRunner` | `lib/comparison-runner.ts` | Side-by-side adapter comparison with scoring |
+| `CoverageReporter` | `lib/coverage-reporter.ts` | V8 coverage collection + threshold enforcement |
+| `JobQueue` / `FileJobStore` | `lib/job-queue.ts` | Persistent priority FIFO with crash recovery |
+| `SwarmTransportServer` | `lib/swarm-transport.ts` | JSON-RPC 2.0 over HTTP with HMAC auth |
+| `GoalDSL` | `lib/goal-dsl.ts` | YAML/JSON goal definitions + cycle detection |
+| `startPlayground` | `lib/playground.ts` | Interactive REPL sandbox with mock agents |
+| `createAdapterTestSuite` | `lib/adapter-test-harness.ts` | Parameterized adapter test battery |
+| `IAuthValidator` | `lib/auth-validator.ts` | Pluggable auth interface (decoupled from AuthGuardian) |
+| `NoOpAuthValidator` | `lib/auth-validator.ts` | Always-grant auth for testing |
+
+### Existing Modules (from v4.x)
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `AgentConversation` | `lib/agent-conversation.ts` | Multi-turn agent dialogues |
+| `AgentDebate` | `lib/agent-debate.ts` | Structured agent debate |
+| `AgentMemory` | `lib/agent-memory.ts` | Per-agent memory persistence |
+| `AnomalyDetector` | `lib/anomaly-detector.ts` | Behavioral anomaly detection |
+| `ConfigWatcher` | `lib/config-watcher.ts` | Live config reload |
+| `CostGovernor` | `lib/cost-governor.ts` | Cost budget enforcement |
+| `CostHeatmap` | `lib/cost-heatmap.ts` | Agent cost visualization |
+| `DashboardServer` | `lib/dashboard-server.ts` | Web dashboard |
+| `DryRun` | `lib/dry-run.ts` | Simulation mode |
+| `EventBus` | `lib/event-bus.ts` | Typed pub/sub events |
+| `Explainability` | `lib/explainability.ts` | Decision audit trails |
+| `LearningLoop` | `lib/learning-loop.ts` | Agent self-improvement |
+| `OTelBridge` | `lib/otel-bridge.ts` | OpenTelemetry export |
+| `Quadtree` | `lib/quadtree.ts` | Spatial indexing |
+| `SemanticMemory` | `lib/semantic-search.ts` | BYOE vector store |
+| `SpeculativeExecutor` | `lib/speculative-executor.ts` | Speculative execution |
+| `TimelineScrubber` | `lib/timeline-scrubber.ts` | Time-travel debugging |
+| `Topology` | `lib/topology.ts` | Agent network topology |
 
 ---
 

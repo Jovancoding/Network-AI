@@ -22,7 +22,7 @@
 // Core infrastructure
 export { BaseAdapter } from './base-adapter';
 export { AdapterRegistry, getRegistry } from './adapter-registry';
-export type { AdapterFactory } from './adapter-registry';
+export type { AdapterFactory, RetryPolicy } from './adapter-registry';
 
 // Framework adapters -- Original 6
 export { OpenClawAdapter } from './openclaw-adapter';
@@ -123,6 +123,64 @@ export type {
   NetworkPolicy,
   PolicyEndpoint,
 } from './nemoclaw-adapter';
+
+// Copilot adapter (GitHub Copilot — code generation, review, analysis)
+export { CopilotAdapter } from './copilot-adapter';
+export type { CopilotTaskType, CopilotOptions, CopilotConnection } from './copilot-adapter';
+
+// LangGraph adapter (LangChain stateful graph execution)
+export { LangGraphAdapter } from './langgraph-adapter';
+export type { LangGraphRunnable, LangGraphStreamable, LangGraphAgentConfig } from './langgraph-adapter';
+
+// Anthropic Computer Use adapter (Claude with screen/keyboard/mouse)
+export { AnthropicComputerUseAdapter } from './anthropic-computer-use-adapter';
+export type {
+  ComputerAction,
+  ComputerToolCall,
+  ComputerToolResult,
+  ComputerActionHandler,
+  AnthropicMessagesClient,
+  ComputerUseAgentConfig,
+} from './anthropic-computer-use-adapter';
+
+// OpenAI Agents SDK adapter (agent runners with tools, handoffs, guardrails)
+export { OpenAIAgentsAdapter } from './openai-agents-adapter';
+export type {
+  OAIAgentTool,
+  OAIAgentRunResult,
+  OAIAgentRunner,
+  OAIAgentsConfig,
+} from './openai-agents-adapter';
+
+// Vertex AI adapter (Google Gemini, PaLM, custom endpoints)
+export { VertexAIAdapter } from './vertex-ai-adapter';
+export type {
+  VertexFunctionDeclaration,
+  VertexContentPart,
+  VertexGenerateResponse,
+  VertexGenerativeClient,
+  VertexFunctionExecutor,
+  VertexAIAgentConfig,
+} from './vertex-ai-adapter';
+
+// Pydantic AI adapter (type-safe Python agent framework)
+export { PydanticAIAdapter } from './pydantic-ai-adapter';
+export type {
+  PydanticAIRunResult,
+  PydanticAIRunner,
+  PydanticAIHttpConfig,
+  PydanticAIAgentConfig,
+} from './pydantic-ai-adapter';
+
+// Browser Agent adapter (Playwright, Puppeteer, CDP browser automation)
+export { BrowserAgentAdapter } from './browser-agent-adapter';
+export type {
+  BrowserMode,
+  BrowserStep,
+  BrowserActionResult,
+  BrowserDriver,
+  BrowserAgentConfig,
+} from './browser-agent-adapter';
 
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from '../types/streaming-adapter';

@@ -5,10 +5,10 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v4.15.3-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.0.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-2357%20passing-brightgreen.svg)](#testing)
-[![Adapters](https://img.shields.io/badge/frameworks-17%20supported-blueviolet.svg)](#adapter-system)
+[![Tests](https://img.shields.io/badge/tests-2531%20passing-brightgreen.svg)](#testing)
+[![Adapters](https://img.shields.io/badge/frameworks-26%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -31,8 +31,9 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 
 - **Shared blackboard with locking** — atomic `propose → validate → commit` prevents race conditions and split-brain failures across parallel agents
 - **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC / Ed25519 audit trails, and permission gating
-- **17 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, MiniMax, NemoClaw, and APS — no glue code, no lock-in
+- **26 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS, Copilot, LangGraph, Anthropic Computer Use, OpenAI Agents SDK, Vertex AI, Pydantic AI, and Browser Agent — no glue code, no lock-in
 - **Persistent project memory (Layer 3)** — `context_manager.py` injects decisions, goals, stack, milestones, and banned patterns into every system prompt so agents always have full project context
+- **v5.0 modules** — Agent VCR (record/replay), comparison runner, coverage reporter, goal DSL, approval inbox, job queue, gRPC/HTTP transport, playground REPL, adapter test harness, and more
 
 > **The silent failure mode in multi-agent systems:** parallel agents writing to the same key
 > use last-write-wins by default — one agent's result silently overwrites another's mid-flight.
@@ -107,6 +108,16 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | ✅ Pipe mode | JSON stdin/stdout protocol for programmatic AI-to-orchestrator control |
 | ✅ Strategy agent | Meta-orchestrator with elastic agent pools, workload partitioning, and adaptive scaling |
 | ✅ Goal decomposer | LLM-powered goal → task DAG → parallel execution with `runTeam()` one-liner |
+| ✅ Goal DSL | YAML/JSON goal definitions with cycle detection and topological compilation |
+| ✅ Agent VCR | Record and replay LLM/agent interactions for deterministic tests |
+| ✅ Comparison runner | Side-by-side adapter comparison with scoring, timing, cost analysis |
+| ✅ Coverage reporter | V8 coverage collection with threshold enforcement |
+| ✅ Job queue | Persistent priority FIFO with retries, crash recovery, pluggable backends |
+| ✅ Approval inbox | Web-accessible approval queue with REST API and SSE streaming |
+| ✅ Transport layer | JSON-RPC 2.0 over HTTP with HMAC auth, TTL, node allowlisting |
+| ✅ Playground REPL | Interactive sandbox with mock agents for rapid prototyping |
+| ✅ Adapter test harness | Parameterized test battery for any adapter implementation |
+| ✅ IAuthValidator | Interface to decouple authorization from concrete AuthGuardian |
 | ✅ TypeScript native | ES2022 strict mode, zero native dependencies |
 
 ---
@@ -118,7 +129,7 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | Race conditions in parallel agents | Atomic blackboard: `propose → validate → commit` with file-system mutex |
 | Agent overspend / runaway costs | `FederatedBudget` — hard per-agent token ceilings with live spend tracking |
 | No visibility into what agents did | HMAC / Ed25519-signed audit log on every write, permission grant, and FSM transition |
-| Locked into one AI framework | 17 adapters — mix LangChain + AutoGen + CrewAI + Codex + MiniMax + NemoClaw + APS + custom in one swarm |
+| Locked into one AI framework | 26 adapters — mix LangChain + AutoGen + CrewAI + Codex + MiniMax + NemoClaw + APS + LangGraph + Vertex AI + custom in one swarm |
 | Agents escalating beyond their scope | `AuthGuardian` — scoped permission tokens required before sensitive operations |
 | Agents lack project context between runs | `ProjectContextManager` (Layer 3) — inject decisions, goals, stack, and milestones into every system prompt |
 | No regression tracking on agent output quality | `QAOrchestratorAgent` — scenario replay, feedback loops, cross-agent contradiction detection, historical trend tracking |
@@ -339,7 +350,7 @@ npx ts-node examples/10-nemoclaw-sandbox-swarm.ts
 
 ## Adapter System
 
-17 adapters, zero adapter dependencies. You bring your own SDK objects.
+26 adapters, zero adapter dependencies. You bring your own SDK objects.
 
 | Adapter | Framework / Protocol | Register method |
 |---|---|---|
@@ -360,6 +371,13 @@ npx ts-node examples/10-nemoclaw-sandbox-swarm.ts
 | `MiniMaxAdapter` | MiniMax LLM API (M2.5 / M2.5-highspeed) | `registerAgent(name, config)` |
 | `NemoClawAdapter` | NVIDIA NemoClaw (sandboxed agents via OpenShell) | `registerSandboxAgent(name, config)` |
 | `APSAdapter` | Agent Permission Service (delegation-chain trust) | `apsDelegationToTrust(delegation)` |
+| `CopilotAdapter` | GitHub Copilot (generate/review/explain/fix/test/refactor/chat) | `registerAgent(name, config)` |
+| `LangGraphAdapter` | LangGraph (compiled StateGraph) | `registerGraph(name, graph)` |
+| `AnthropicComputerUseAdapter` | Anthropic Computer Use (screenshot/click/type/scroll) | `registerAgent(name, config)` |
+| `OpenAIAgentsAdapter` | OpenAI Agents SDK (tool use, handoffs, guardrails) | `registerAgent(name, runner)` |
+| `VertexAIAdapter` | Google Vertex AI / Gemini (function calling, multi-modal) | `registerAgent(name, config)` |
+| `PydanticAIAdapter` | Pydantic AI (structured output, validation, deps injection) | `registerAgent(name, config)` |
+| `BrowserAgentAdapter` | Browser automation (Playwright/Puppeteer/CDP) | `registerAgent(name, driver)` |
 
 **Streaming variants** (drop-in replacements with `.stream()` support):
 
@@ -378,7 +396,7 @@ Extend `BaseAdapter` (or `StreamingBaseAdapter` for streaming) to add your own i
 
 | Capability | Network-AI | LangGraph | CrewAI | AutoGen |
 |---|---|---|---|---|
-| Cross-framework agents in one swarm | ✅ 17 built-in adapters | ⚠️ Nodes can call any code; no adapter abstraction | ⚠️ Extensible via tools; CrewAI-native agents only | ⚠️ Extensible via plugins; AutoGen-native agents only |
+| Cross-framework agents in one swarm | ✅ 26 built-in adapters | ⚠️ Nodes can call any code; no adapter abstraction | ⚠️ Extensible via tools; CrewAI-native agents only | ⚠️ Extensible via plugins; AutoGen-native agents only |
 | Atomic shared state (conflict-safe) | ✅ `propose → validate → commit` mutex | ⚠️ State passed between nodes; last-write-wins | ⚠️ Shared memory available; no conflict resolution | ⚠️ Shared context available; no conflict resolution |
 | Hard token ceiling per agent | ✅ `FederatedBudget` (first-class API) | ⚠️ Via callbacks / custom middleware | ⚠️ Via callbacks / custom middleware | ⚠️ Built-in token tracking in v0.4+; no swarm-level ceiling |
 | Permission gating before sensitive ops | ✅ `AuthGuardian` (built-in) | ⚠️ Possible via custom node logic | ⚠️ Possible via custom tools | ⚠️ Possible via custom middleware |
@@ -404,7 +422,7 @@ npm run test:phase9       # Agent runtime, console, strategy agent
 npm run test:phase10      # Goal decomposer, task DAG, runTeam
 ```
 
-**2,357 passing assertions across 25 test suites** (`npm run test:all`):
+**2,531 passing assertions across 25+ test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -412,7 +430,7 @@ npm run test:phase10      # Goal decomposer, task DAG, runTeam
 | `test-phase5f.ts` | 127 | SSE transport, `McpCombinedBridge`, extended MCP tools |
 | `test-phase5g.ts` | 121 | CRDT backend, vector clocks, bidirectional sync |
 | `test-phase6.ts` | 121 | MCP server, control-plane tools, audit tools |
-| `test-adapters.ts` | 176 | All 17 adapters, registry routing, integration, edge cases |
+| `test-adapters.ts` | 176 | All 26 adapters, registry routing, integration, edge cases |
 | `test-phase5d.ts` | 117 | Pluggable backend (Redis, CRDT, Memory) |
 | `test-standalone.ts` | 88 | Blackboard, auth, integration, persistence, parallelisation, quality gate |
 | `test-phase5e.ts` | 87 | Federated budget tracking |
@@ -440,16 +458,16 @@ npm run test:phase10      # Goal decomposer, task DAG, runTeam
 | Doc | Contents |
 |---|---|
 | [QUICKSTART.md](QUICKSTART.md) | Installation, first run, CLI reference, PowerShell guide, Python scripts CLI |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Race condition problem, FSM design, handoff protocol, project structure |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Race condition problem, FSM design, handoff protocol, module inventory, project structure |
 | [BENCHMARKS.md](BENCHMARKS.md) | Provider performance, rate limits, local GPU, `max_completion_tokens` guide |
-| [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail |
+| [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail, v5.0 security additions |
 | [ENTERPRISE.md](ENTERPRISE.md) | Evaluation checklist, stability policy, security summary, integration entry points |
 | [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md) | Audit log field reference, all event types, scoring formula |
 | [ADOPTERS.md](ADOPTERS.md) | Known adopters — open a PR to add yourself |
-| [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | End-to-end integration walkthrough |
-| [references/adapter-system.md](references/adapter-system.md) | Adapter architecture, writing custom adapters |
-| [references/auth-guardian.md](references/auth-guardian.md) | Permission scoring, resource types |
-| [references/trust-levels.md](references/trust-levels.md) | Trust level configuration |
+| [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | End-to-end integration walkthrough with v5.0 modules |
+| [references/adapter-system.md](references/adapter-system.md) | Adapter architecture, all 26 adapters, writing custom adapters |
+| [references/auth-guardian.md](references/auth-guardian.md) | Permission scoring, resource types, IAuthValidator interface |
+| [references/trust-levels.md](references/trust-levels.md) | Trust level configuration, APS delegation-chain mapping |
 
 ---
 

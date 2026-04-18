@@ -104,7 +104,8 @@ export interface CommitResult {
 
 const CONFIG = {
   lockTimeoutMs: 10000,        // 10 second lock timeout
-  lockRetryIntervalMs: 100,    // Retry every 100ms
+  lockRetryBaseMs: 50,         // Initial backoff interval
+  lockRetryMaxMs: 1000,        // Max backoff interval
   staleLockThresholdMs: 30000, // Consider lock stale after 30s
   maxPendingChanges: 100,      // Prevent memory bloat
 };
@@ -141,6 +142,7 @@ export class FileLock {
    */
   acquire(holderId: string, timeoutMs: number = CONFIG.lockTimeoutMs): boolean {
     const startTime = Date.now();
+    let retryMs = CONFIG.lockRetryBaseMs;
 
     while (Date.now() - startTime < timeoutMs) {
       // Check for stale lock — read directly to avoid existsSync+readFileSync TOCTOU
@@ -153,8 +155,9 @@ export class FileLock {
           log.warn('Stale lock detected, force releasing', { lockAgeMs: lockAge });
           this.forceRelease();
         } else {
-          // Lock is held by someone else, wait and retry
-          this.sleep(CONFIG.lockRetryIntervalMs);
+          // Lock is held by someone else, wait and retry with backoff
+          this.sleep(retryMs);
+          retryMs = Math.min(retryMs * 2, CONFIG.lockRetryMaxMs);
           continue;
         }
       } catch (e: any) {
@@ -184,8 +187,9 @@ export class FileLock {
         return true;
       } catch (error: any) {
         if (error.code === 'EEXIST') {
-          // Lock file already exists, retry
-          this.sleep(CONFIG.lockRetryIntervalMs);
+          // Lock file already exists, retry with backoff
+          this.sleep(retryMs);
+          retryMs = Math.min(retryMs * 2, CONFIG.lockRetryMaxMs);
           continue;
         }
         throw error;
