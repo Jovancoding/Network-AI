@@ -994,10 +994,13 @@
       ['Progress',Math.round((node.progress||0)*100)+'%'],
       ['Created',formatTime(node.createdAt)],['Updated',formatTime(node.updatedAt)]
     ];
-    detailContent.innerHTML = rows.map(function(r) {
-      return '<div class="detail-row"><span class="detail-key">'+escapeHtml(String(r[0]))+
-             '</span><span class="detail-value">'+escapeHtml(String(r[1]))+'</span></div>';
-    }).join('');
+    detailContent.textContent = '';
+    for (var ri = 0; ri < rows.length; ri++) {
+      var dr = document.createElement('div'); dr.className = 'detail-row';
+      var dk = document.createElement('span'); dk.className = 'detail-key'; dk.textContent = String(rows[ri][0]);
+      var dv = document.createElement('span'); dv.className = 'detail-value'; dv.textContent = String(rows[ri][1]);
+      dr.appendChild(dk); dr.appendChild(dv); detailContent.appendChild(dr);
+    }
   }
 
   function updateAgentsPanel() {
@@ -1005,7 +1008,6 @@
     if (!listEl) return;
 
     var names = Array.from(agentMap.keys());
-    var html = '';
 
     // Sort: orchestrator first, then busy, then error, then idle
     names.sort(function(a, b) {
@@ -1017,30 +1019,36 @@
       return sa - sb;
     });
 
-    for (var i = 0; i < names.length; i++) {
-      var agent = agentMap.get(names[i]);
-      var dotColor = agent.status === 'busy' ? 'var(--yellow)' : agent.status === 'error' ? 'var(--red)' : 'var(--green)';
-      var isSelected = selectedAgent === names[i];
-      var tc = countTaskStatuses(agent);
-
-      html += '<div class="agent-card' + (isSelected ? ' selected' : '') + '" data-agent="' + escapeHtml(names[i]) + '">';
-      html += '<div class="agent-card-header">';
-      html += '<div class="agent-card-dot" style="background:' + dotColor + '"></div>';
-      html += '<div class="agent-card-name">' + escapeHtml(agent.name) + '</div>';
-      html += '<div class="agent-card-role">' + (agent.role === 'orchestrator' ? '👑 ORCH' : 'WORKER') + '</div>';
-      html += '</div>';
-      if (agent.currentTask) {
-        html += '<div class="agent-card-task">↳ ' + escapeHtml(agent.currentTask) + '</div>';
-      }
-      html += '<div class="agent-card-meta">' + escapeHtml(tc.total + ' tasks · ' + tc.done + ' done · ' + formatTokens(agent.tokens) + ' tok') + '</div>';
-      html += '</div>';
-    }
-
+    listEl.textContent = '';
     if (names.length === 0) {
-      html = '<div style="color:var(--text-dim);font-size:12px;padding:8px">No agents yet</div>';
+      var empty = document.createElement('div');
+      empty.style.cssText = 'color:var(--text-dim);font-size:12px;padding:8px';
+      empty.textContent = 'No agents yet';
+      listEl.appendChild(empty);
+    } else {
+      for (var i = 0; i < names.length; i++) {
+        var agent = agentMap.get(names[i]);
+        var dotColor = agent.status === 'busy' ? 'var(--yellow)' : agent.status === 'error' ? 'var(--red)' : 'var(--green)';
+        var isSelected = selectedAgent === names[i];
+        var tc = countTaskStatuses(agent);
+        var card = document.createElement('div');
+        card.className = 'agent-card' + (isSelected ? ' selected' : '');
+        card.setAttribute('data-agent', names[i]);
+        var hdr = document.createElement('div'); hdr.className = 'agent-card-header';
+        var dot = document.createElement('div'); dot.className = 'agent-card-dot'; dot.style.background = dotColor;
+        var nm = document.createElement('div'); nm.className = 'agent-card-name'; nm.textContent = agent.name;
+        var rl = document.createElement('div'); rl.className = 'agent-card-role'; rl.textContent = agent.role === 'orchestrator' ? '\uD83D\uDC51 ORCH' : 'WORKER';
+        hdr.appendChild(dot); hdr.appendChild(nm); hdr.appendChild(rl);
+        card.appendChild(hdr);
+        if (agent.currentTask) {
+          var tsk = document.createElement('div'); tsk.className = 'agent-card-task'; tsk.textContent = '\u21B3 ' + agent.currentTask;
+          card.appendChild(tsk);
+        }
+        var meta = document.createElement('div'); meta.className = 'agent-card-meta'; meta.textContent = tc.total + ' tasks \u00B7 ' + tc.done + ' done \u00B7 ' + formatTokens(agent.tokens) + ' tok';
+        card.appendChild(meta);
+        listEl.appendChild(card);
+      }
     }
-
-    listEl.innerHTML = html;
 
     // Attach click handlers
     var cards = listEl.querySelectorAll('.agent-card');
@@ -1061,44 +1069,58 @@
     if (!el) return;
 
     if (!selectedAgent || !agentMap.has(selectedAgent)) {
-      el.innerHTML = '<div style="color:var(--text-dim);font-size:12px">Select an agent to see details</div>';
+      el.textContent = '';
+      var hint = document.createElement('div');
+      hint.style.cssText = 'color:var(--text-dim);font-size:12px';
+      hint.textContent = 'Select an agent to see details';
+      el.appendChild(hint);
       return;
     }
 
+    el.textContent = '';
     var agent = agentMap.get(selectedAgent);
-    var html = '';
 
     // Header
     var bc = agent.status === 'busy' ? 'var(--yellow)' : agent.status === 'error' ? 'var(--red)' : 'var(--green)';
-    html += '<div class="agent-log-header"><span class="agent-name">' + escapeHtml(agent.name) + '</span>';
-    html += '<span class="agent-status-badge" style="background:' + bc + ';color:#000">' + escapeHtml(agent.status) + '</span></div>';
+    var hdr = document.createElement('div'); hdr.className = 'agent-log-header';
+    var nameSpan = document.createElement('span'); nameSpan.className = 'agent-name'; nameSpan.textContent = agent.name;
+    var badge = document.createElement('span'); badge.className = 'agent-status-badge'; badge.style.background = bc; badge.style.color = '#000'; badge.textContent = agent.status;
+    hdr.appendChild(nameSpan); hdr.appendChild(badge);
+    el.appendChild(hdr);
 
     // Tasks
     var tasks = agent.tasks || [];
     if (tasks.length > 0) {
-      html += '<div style="font-size:11px;color:var(--text-dim);margin:8px 0 4px">Tasks (' + escapeHtml(String(tasks.length)) + '):</div>';
+      var taskLabel = document.createElement('div'); taskLabel.style.cssText = 'font-size:11px;color:var(--text-dim);margin:8px 0 4px'; taskLabel.textContent = 'Tasks (' + tasks.length + '):';
+      el.appendChild(taskLabel);
       for (var i = 0; i < tasks.length; i++) {
         var taskColor = tasks[i].status === 'completed' ? 'var(--green)' : tasks[i].status === 'running' ? 'var(--yellow)' : tasks[i].status === 'failed' ? 'var(--red)' : 'var(--text-dim)';
-        html += '<div style="font-size:11px;padding:3px 0;color:' + taskColor + '">';
-        html += (STATUS_ICON[tasks[i].status]||'?') + ' ' + escapeHtml(tasks[i].label) + '</div>';
+        var taskDiv = document.createElement('div'); taskDiv.style.cssText = 'font-size:11px;padding:3px 0;color:' + taskColor;
+        taskDiv.textContent = (STATUS_ICON[tasks[i].status] || '?') + ' ' + tasks[i].label;
+        el.appendChild(taskDiv);
       }
-      html += '<div style="border-bottom:1px solid var(--border);margin:8px 0"></div>';
+      var sep = document.createElement('div'); sep.style.cssText = 'border-bottom:1px solid var(--border);margin:8px 0';
+      el.appendChild(sep);
     }
 
     // Logs
     var logs = agent.logs || [];
-    html += '<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Log' + (logs.length > 0 ? ' (' + escapeHtml(String(logs.length)) + ')' : '') + ':</div>';
+    var logLabel = document.createElement('div'); logLabel.style.cssText = 'font-size:11px;color:var(--text-dim);margin-bottom:4px';
+    logLabel.textContent = 'Log' + (logs.length > 0 ? ' (' + logs.length + ')' : '') + ':';
+    el.appendChild(logLabel);
     if (logs.length > 0) {
       for (var li = logs.length - 1; li >= Math.max(0, logs.length - 30); li--) {
         var log = logs[li];
-        var cls = log.level === 'error' ? ' log-error' : log.level === 'warn' ? ' log-warn' : '';
-        html += '<div class="log-line' + cls + '"><span class="log-t">' + escapeHtml(log.time || '') + '</span><span class="log-m">' + escapeHtml(log.message) + '</span></div>';
+        var logLine = document.createElement('div'); logLine.className = 'log-line' + (log.level === 'error' ? ' log-error' : log.level === 'warn' ? ' log-warn' : '');
+        var logT = document.createElement('span'); logT.className = 'log-t'; logT.textContent = log.time || '';
+        var logM = document.createElement('span'); logM.className = 'log-m'; logM.textContent = log.message;
+        logLine.appendChild(logT); logLine.appendChild(logM);
+        el.appendChild(logLine);
       }
     } else {
-      html += '<div style="font-size:11px;color:var(--text-dim)">No log entries yet</div>';
+      var noLogs = document.createElement('div'); noLogs.style.cssText = 'font-size:11px;color:var(--text-dim)'; noLogs.textContent = 'No log entries yet';
+      el.appendChild(noLogs);
     }
-
-    el.innerHTML = html;
   }
 
   function generateNarrative() {
@@ -1124,52 +1146,63 @@
   function updateSupervisorPanel() {
     var el = document.getElementById('sv-content');
     if (!el) return;
+    el.textContent = '';
 
     var d = diagnostics || { status: 'healthy', diagnostics: [], summary: 'No data yet.' };
     var issues = d.diagnostics || [];
     var statusColors = { healthy: 'var(--green)', warning: 'var(--yellow)', critical: 'var(--red)' };
-    var statusLabels = { healthy: '✔ Healthy', warning: '⚠ Warning', critical: '✘ Critical' };
+    var statusLabels = { healthy: '\u2714 Healthy', warning: '\u26A0 Warning', critical: '\u2718 Critical' };
 
-    var html = '';
+    // DOM helpers — no innerHTML, only textContent + style
+    function ce(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+    function tx(tag, cls, text) { var e = ce(tag, cls); e.textContent = String(text); return e; }
+    function st(e, css) { e.style.cssText = css; return e; }
 
     // ── Health banner
-    html += '<div class="sv-health-banner">';
-    html += '<div class="sv-health-dot ' + d.status + '"></div>';
-    html += '<div style="flex:1"><div class="sv-health-status" style="color:' + (statusColors[d.status] || 'var(--text)') + '">' + (statusLabels[d.status] || d.status) + '</div>';
-    html += '<div class="sv-health-summary">' + escapeHtml(d.summary || '') + '</div></div>';
+    var banner = ce('div', 'sv-health-banner');
+    banner.appendChild(ce('div', 'sv-health-dot ' + String(d.status)));
+    var bannerBody = st(ce('div'), 'flex:1');
+    var statusLine = tx('div', 'sv-health-status', statusLabels[d.status] || d.status);
+    statusLine.style.color = statusColors[d.status] || 'var(--text)';
+    bannerBody.appendChild(statusLine);
+    bannerBody.appendChild(tx('div', 'sv-health-summary', d.summary || ''));
+    banner.appendChild(bannerBody);
     if (stats) {
-      html += '<div style="text-align:right">';
-      html += '<div style="font-size:28px;font-weight:700;font-family:var(--mono)">' + Math.round(stats.progress * 100) + '%</div>';
-      html += '<div style="font-size:10px;color:var(--text-dim)">' + stats.completed + ' / ' + stats.total + ' tasks</div>';
-      html += '</div>';
+      var statsBox = st(ce('div'), 'text-align:right');
+      statsBox.appendChild(st(tx('div', '', Math.round(stats.progress * 100) + '%'), 'font-size:28px;font-weight:700;font-family:var(--mono)'));
+      statsBox.appendChild(st(tx('div', '', stats.completed + ' / ' + stats.total + ' tasks'), 'font-size:10px;color:var(--text-dim)'));
+      banner.appendChild(statsBox);
     }
-    html += '</div>';
+    el.appendChild(banner);
 
     // ── Grid: Issues + Agent Health
-    html += '<div class="sv-grid">';
+    var grid = ce('div', 'sv-grid');
 
     // Issues column
-    html += '<div class="sv-section"><h3>Issues (' + issues.length + ')</h3>';
+    var issuesSec = ce('div', 'sv-section');
+    issuesSec.appendChild(tx('h3', '', 'Issues (' + issues.length + ')'));
     if (issues.length === 0) {
-      html += '<div style="font-size:12px;color:var(--green);padding:8px">No issues detected ✔</div>';
+      issuesSec.appendChild(st(tx('div', '', 'No issues detected \u2714'), 'font-size:12px;color:var(--green);padding:8px'));
     } else {
       for (var i = 0; i < issues.length; i++) {
         var issue = issues[i];
-        var icon = issue.level === 'error' ? '🔴' : issue.level === 'warn' ? '🟡' : '🔵';
-        html += '<div class="sv-issue">';
-        html += '<span class="sv-issue-icon">' + icon + '</span>';
-        html += '<div class="sv-issue-text">' + escapeHtml(issue.message);
-        if (issue.agent) html += '<div class="sv-issue-agent">@' + escapeHtml(issue.agent) + '</div>';
-        html += '</div></div>';
+        var icon = issue.level === 'error' ? '\uD83D\uDD34' : issue.level === 'warn' ? '\uD83D\uDFE1' : '\uD83D\uDD35';
+        var issueRow = ce('div', 'sv-issue');
+        issueRow.appendChild(tx('span', 'sv-issue-icon', icon));
+        var issueText = tx('div', 'sv-issue-text', issue.message);
+        if (issue.agent) issueText.appendChild(tx('div', 'sv-issue-agent', '@' + issue.agent));
+        issueRow.appendChild(issueText);
+        issuesSec.appendChild(issueRow);
       }
     }
-    html += '</div>';
+    grid.appendChild(issuesSec);
 
     // Agent Health column
-    html += '<div class="sv-section"><h3>Agent Health</h3>';
+    var agentSec = ce('div', 'sv-section');
+    agentSec.appendChild(tx('h3', '', 'Agent Health'));
     var names = Array.from(agentMap.keys());
     if (names.length === 0) {
-      html += '<div style="font-size:12px;color:var(--text-dim);padding:8px">No agents registered</div>';
+      agentSec.appendChild(st(tx('div', '', 'No agents registered'), 'font-size:12px;color:var(--text-dim);padding:8px'));
     } else {
       for (var j = 0; j < names.length; j++) {
         var agent = agentMap.get(names[j]);
@@ -1177,31 +1210,36 @@
         var pct = tc.total > 0 ? Math.round(tc.done / tc.total * 100) : 0;
         var dotColor = agent.status === 'busy' ? 'var(--yellow)' : agent.status === 'error' ? 'var(--red)' : 'var(--green)';
         var barColor = agent.status === 'error' ? 'var(--red)' : pct >= 80 ? 'var(--green)' : pct >= 30 ? 'var(--yellow)' : 'var(--text-dim)';
-        html += '<div class="sv-agent-row">';
-        html += '<div class="sv-agent-dot" style="background:' + dotColor + '"></div>';
-        html += '<div class="sv-agent-name">' + escapeHtml(agent.name) + '</div>';
-        html += '<div class="sv-agent-bar"><div class="sv-agent-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>';
-        html += '<div class="sv-agent-meta">' + pct + '% · ' + formatTokens(agent.tokens) + ' tok</div>';
-        html += '</div>';
+        var row = ce('div', 'sv-agent-row');
+        var dot = ce('div', 'sv-agent-dot'); dot.style.background = dotColor;
+        row.appendChild(dot);
+        row.appendChild(tx('div', 'sv-agent-name', agent.name));
+        var bar = ce('div', 'sv-agent-bar');
+        var fill = ce('div', 'sv-agent-bar-fill'); fill.style.width = pct + '%'; fill.style.background = barColor;
+        bar.appendChild(fill);
+        row.appendChild(bar);
+        row.appendChild(tx('div', 'sv-agent-meta', pct + '% \u00B7 ' + formatTokens(agent.tokens) + ' tok'));
+        agentSec.appendChild(row);
       }
     }
-    html += '</div>';
-    html += '</div>'; // close sv-grid
+    grid.appendChild(agentSec);
+    el.appendChild(grid);
 
     // ── Activity narrative
-    html += '<div class="sv-section"><h3>Activity Log</h3>';
+    var logSec = ce('div', 'sv-section');
+    logSec.appendChild(tx('h3', '', 'Activity Log'));
     var narr = orchestratorLogs.length > 0 ? orchestratorLogs : generateNarrative();
     if (narr.length === 0) {
-      html += '<div style="font-size:12px;color:var(--text-dim);padding:8px">Waiting for events…</div>';
+      logSec.appendChild(st(tx('div', '', 'Waiting for events\u2026'), 'font-size:12px;color:var(--text-dim);padding:8px'));
     } else {
       for (var ni = narr.length - 1; ni >= Math.max(0, narr.length - 20); ni--) {
-        html += '<div class="narr-entry"><span class="narr-time">' + escapeHtml(narr[ni].time || '') +
-                '</span><span class="narr-msg">' + escapeHtml(narr[ni].message) + '</span></div>';
+        var entry = ce('div', 'narr-entry');
+        entry.appendChild(tx('span', 'narr-time', narr[ni].time || ''));
+        entry.appendChild(tx('span', 'narr-msg', narr[ni].message));
+        logSec.appendChild(entry);
       }
     }
-    html += '</div>';
-
-    el.innerHTML = html;
+    el.appendChild(logSec);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
