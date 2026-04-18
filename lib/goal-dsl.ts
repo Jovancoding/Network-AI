@@ -255,7 +255,6 @@ export function compileGoal(goal: GoalDefinition): CompiledGoal {
     throw new Error(`Invalid goal: ${validation.errors.map((e) => e.message).join('; ')}`);
   }
 
-  const taskMap = new Map(goal.tasks.map((t) => [t.id, t]));
   const adjacency = new Map<string, string[]>();
 
   // Build adjacency (task → dependents)

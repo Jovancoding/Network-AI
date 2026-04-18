@@ -413,8 +413,9 @@ export class PromptInjectionShield {
     }
 
     // Markdown/XML section breaks that look like prompt boundaries
-    const boundaries = text.match(/(^|\n)\s*#{1,3}\s*(system|instructions|prompt)/gim);
-    if (boundaries && boundaries.length > 0) {
+    const lines = text.split('\n');
+    const hasBoundary = lines.some(line => /^\s{0,10}#{1,3}\s+(system|instructions|prompt)/i.test(line));
+    if (hasBoundary) {
       score += 0.15;
       rules.push('heuristic:section_boundary');
     }

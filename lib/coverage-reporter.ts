@@ -18,7 +18,7 @@
  * @version 1.0.0
  */
 
-import { readdir, readFile, stat } from 'fs/promises';
+import { readdir, readFile } from 'fs/promises';
 import { join, relative, resolve } from 'path';
 
 // ============================================================================

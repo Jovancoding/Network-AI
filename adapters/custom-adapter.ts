@@ -1,5 +1,5 @@
 /**
- * Custom Agent Adapter -- The simplest way to plug in any agent
+ * Custom Agent Adapter — The simplest way to plug in any agent
  * 
  * For agent systems that don't have a dedicated adapter, or for
  * quick prototyping, this adapter lets you register plain async functions

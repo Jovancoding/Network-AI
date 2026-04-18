@@ -182,6 +182,14 @@ export type {
   BrowserAgentConfig,
 } from './browser-agent-adapter';
 
+// Orchestrator adapter (hierarchical multi-orchestrator coordination)
+export { OrchestratorAdapter } from './orchestrator-adapter';
+export type {
+  ChildOrchestratorConfig,
+  OrchestratorLike,
+  ChildOrchestratorState,
+} from './orchestrator-adapter';
+
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from '../types/streaming-adapter';
 

@@ -59,6 +59,11 @@ import type {
 import { DashboardServer } from './lib/dashboard-server';
 import { QuadTree } from './lib/quadtree';
 import type { QTPoint, QTBounds } from './lib/quadtree';
+import { WorkTree } from './lib/work-tree';
+import type { WorkNode } from './lib/work-tree';
+import { WorkTreeUI } from './lib/work-tree-ui';
+import { WorkTreeDashboard } from './lib/work-tree-dashboard';
+import * as http from 'http';
 
 // ============================================================================
 // TopologyTracker — Node Operations
@@ -885,6 +890,627 @@ section('DashboardServer — Start/Stop');
     assertEqual(changedNode.status, 'running', 'changed node has running status');
     assertEqual(changedNode.tokensUsed, 50, 'changed node has 50 tokens');
     assertEqual(changedNode.currentTask, 'processing...', 'changed node has task');
+  }
+
+  // ============================================================================
+  // WORK TREE — BASIC OPERATIONS
+  // ============================================================================
+
+  section('WorkTree — construction');
+  {
+    const tree = new WorkTree('root', 'Build feature');
+    assertEqual(tree.size(), 1, 'new tree has 1 node (root)');
+    assertEqual(tree.getRootId(), 'root', 'getRootId returns root');
+    const root = tree.getRoot();
+    assertEqual(root.id, 'root', 'root node id matches');
+    assertEqual(root.label, 'Build feature', 'root label matches');
+    assertEqual(root.status, 'pending', 'root starts as pending');
+    assertEqual(root.depth, 0, 'root depth is 0');
+    assertEqual(root.children.length, 0, 'root has no children');
+    assertEqual(root.progress, 0, 'root progress starts at 0');
+  }
+
+  section('WorkTree — addChild');
+  {
+    const tree = new WorkTree('root', 'Project');
+    const child1 = tree.addChild('root', { id: 'c1', label: 'Task A' });
+    assertEqual(child1.id, 'c1', 'addChild returns correct id');
+    assertEqual(child1.parentId, 'root', 'addChild sets parentId');
+    assertEqual(child1.depth, 1, 'child depth is 1');
+    assertEqual(tree.size(), 2, 'tree has 2 nodes');
+
+    const child2 = tree.addChild('root', { id: 'c2', label: 'Task B', agent: 'worker-1' });
+    assertEqual(child2.agent, 'worker-1', 'addChild sets agent');
+    assertEqual(tree.getRoot().children.length, 2, 'root has 2 children');
+
+    const grandchild = tree.addChild('c1', { id: 'g1', label: 'Subtask A.1' });
+    assertEqual(grandchild.depth, 2, 'grandchild depth is 2');
+    assertEqual(tree.size(), 4, 'tree has 4 nodes');
+
+    // Errors
+    let caught = false;
+    try { tree.addChild('nonexistent', { id: 'x', label: 'x' }); } catch { caught = true; }
+    assert(caught, 'addChild throws for unknown parent');
+
+    caught = false;
+    try { tree.addChild('root', { id: 'c1', label: 'dup' }); } catch { caught = true; }
+    assert(caught, 'addChild throws for duplicate id');
+  }
+
+  section('WorkTree — removeSubtree');
+  {
+    const tree = new WorkTree('root', 'Project');
+    tree.addChild('root', { id: 'a', label: 'A' });
+    tree.addChild('a', { id: 'a1', label: 'A.1' });
+    tree.addChild('a', { id: 'a2', label: 'A.2' });
+    tree.addChild('root', { id: 'b', label: 'B' });
+
+    assertEqual(tree.size(), 5, 'tree starts with 5 nodes');
+    const removed = tree.removeSubtree('a');
+    assertEqual(removed, 3, 'removeSubtree removes 3 nodes (a, a1, a2)');
+    assertEqual(tree.size(), 2, 'tree has 2 nodes after removal');
+    assertEqual(tree.getRoot().children.length, 1, 'root has 1 child after removal');
+    assertEqual(tree.getNode('a'), undefined, 'removed node is gone');
+
+    let caught = false;
+    try { tree.removeSubtree('root'); } catch { caught = true; }
+    assert(caught, 'removeSubtree throws for root');
+  }
+
+  // ============================================================================
+  // WORK TREE — STATUS & ROLLUP
+  // ============================================================================
+
+  section('WorkTree — setStatus');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 't1', label: 'Task 1' });
+    tree.addChild('root', { id: 't2', label: 'Task 2' });
+
+    tree.setStatus('t1', 'running');
+    assertEqual(tree.getNode('t1')!.status, 'running', 'setStatus updates to running');
+
+    // Duplicate status is no-op
+    const events: string[] = [];
+    tree.on('node:status', (id: string) => events.push(id));
+    tree.setStatus('t1', 'running');
+    assertEqual(events.length, 0, 'setStatus skips duplicate');
+
+    tree.setStatus('t1', 'completed');
+    assertEqual(events.length, 1, 'setStatus emits on change');
+  }
+
+  section('WorkTree — progress rollup');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'A' });
+    tree.addChild('root', { id: 'b', label: 'B' });
+    tree.addChild('root', { id: 'c', label: 'C' });
+
+    tree.setStatus('a', 'completed');
+    const rootAfter1 = tree.getRoot();
+    assert(Math.abs(rootAfter1.progress - 1/3) < 0.01, 'root progress is ~0.33 after 1/3 complete');
+
+    tree.setStatus('b', 'completed');
+    assert(Math.abs(tree.getRoot().progress - 2/3) < 0.01, 'root progress is ~0.67 after 2/3 complete');
+
+    tree.setStatus('c', 'completed');
+    assertEqual(tree.getRoot().progress, 1, 'root progress is 1 when all done');
+  }
+
+  section('WorkTree — autoCompleteParent');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'x', label: 'X' });
+    tree.addChild('root', { id: 'y', label: 'Y' });
+
+    tree.setStatus('x', 'completed');
+    assertEqual(tree.getRoot().status, 'pending', 'root stays pending when not all done');
+
+    tree.setStatus('y', 'completed');
+    assertEqual(tree.getRoot().status, 'completed', 'root auto-completes when all children done');
+  }
+
+  section('WorkTree — autoCompleteParent with skipped');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'x', label: 'X' });
+    tree.addChild('root', { id: 'y', label: 'Y' });
+
+    tree.setStatus('x', 'completed');
+    tree.setStatus('y', 'skipped');
+    assertEqual(tree.getRoot().status, 'completed', 'root auto-completes with completed+skipped children');
+  }
+
+  section('WorkTree — autoFailParent');
+  {
+    const tree = new WorkTree('root', 'Goal', { autoFailParent: true });
+    tree.addChild('root', { id: 'x', label: 'X' });
+    tree.addChild('root', { id: 'y', label: 'Y' });
+
+    tree.setStatus('x', 'failed');
+    assertEqual(tree.getRoot().status, 'failed', 'root auto-fails when child fails (opt-in)');
+  }
+
+  section('WorkTree — autoBlockChildren');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'p', label: 'Parent' });
+    tree.addChild('p', { id: 'c1', label: 'Child 1' });
+    tree.addChild('p', { id: 'c2', label: 'Child 2' });
+
+    tree.setStatus('p', 'failed');
+    assertEqual(tree.getNode('c1')!.status, 'blocked', 'child blocked when parent fails');
+    assertEqual(tree.getNode('c2')!.status, 'blocked', 'child blocked when parent fails');
+  }
+
+  section('WorkTree — deep rollup');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'A' });
+    tree.addChild('a', { id: 'a1', label: 'A1' });
+    tree.addChild('a', { id: 'a2', label: 'A2' });
+
+    tree.setStatus('a1', 'completed');
+    assertEqual(tree.getNode('a')!.progress, 0.5, 'mid-level progress is 0.5');
+    assert(tree.getRoot().progress < 1, 'root progress is less than 1');
+
+    tree.setStatus('a2', 'completed');
+    assertEqual(tree.getNode('a')!.status, 'completed', 'mid-level auto-completes');
+    assertEqual(tree.getRoot().status, 'completed', 'root auto-completes via deep rollup');
+  }
+
+  // ============================================================================
+  // WORK TREE — TOKENS
+  // ============================================================================
+
+  section('WorkTree — token rollup');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'A' });
+    tree.addChild('root', { id: 'b', label: 'B' });
+    tree.addChild('a', { id: 'a1', label: 'A1' });
+
+    tree.addTokens('a1', 100);
+    assertEqual(tree.getNode('a1')!.ownTokens, 100, 'a1 ownTokens is 100');
+    assertEqual(tree.getNode('a1')!.totalTokens, 100, 'a1 totalTokens is 100 (leaf)');
+    assertEqual(tree.getNode('a')!.totalTokens, 100, 'parent totalTokens rolls up');
+    assertEqual(tree.getRoot().totalTokens, 100, 'root totalTokens rolls up');
+
+    tree.addTokens('b', 50);
+    assertEqual(tree.getRoot().totalTokens, 150, 'root totalTokens is 150');
+
+    tree.addTokens('a', 25);
+    assertEqual(tree.getNode('a')!.ownTokens, 25, 'a ownTokens is 25');
+    assertEqual(tree.getNode('a')!.totalTokens, 125, 'a totalTokens = 25 own + 100 child');
+    assertEqual(tree.getRoot().totalTokens, 175, 'root totalTokens is 175');
+  }
+
+  // ============================================================================
+  // WORK TREE — QUERIES
+  // ============================================================================
+
+  section('WorkTree — getChildren, getAncestors, getDescendants');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'A' });
+    tree.addChild('root', { id: 'b', label: 'B' });
+    tree.addChild('a', { id: 'a1', label: 'A1' });
+    tree.addChild('a', { id: 'a2', label: 'A2' });
+
+    const children = tree.getChildren('root');
+    assertEqual(children.length, 2, 'root has 2 children');
+    assertEqual(children[0].id, 'a', 'first child is a');
+
+    const ancestors = tree.getAncestors('a1');
+    assertEqual(ancestors.length, 2, 'a1 has 2 ancestors');
+    assertEqual(ancestors[0].id, 'a', 'first ancestor is a');
+    assertEqual(ancestors[1].id, 'root', 'second ancestor is root');
+
+    const descendants = tree.getDescendants('root');
+    assertEqual(descendants.length, 4, 'root has 4 descendants');
+
+    const leaves = tree.getLeaves();
+    assertEqual(leaves.length, 3, 'tree has 3 leaves (a1, a2, b)');
+  }
+
+  section('WorkTree — stats');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'A' });
+    tree.addChild('root', { id: 'b', label: 'B' });
+    tree.addChild('a', { id: 'a1', label: 'A1' });
+
+    tree.setStatus('a1', 'completed');
+    tree.setStatus('b', 'running');
+    tree.addTokens('a1', 200);
+
+    const s = tree.stats();
+    assertEqual(s.total, 4, 'stats total is 4');
+    assertEqual(s.completed, 2, 'stats completed is 2 (a1 + auto-completed a)');
+    assertEqual(s.running, 1, 'stats running is 1');
+    assertEqual(s.pending, 1, 'stats pending is 1 (root only)');
+    assertEqual(s.totalTokens, 200, 'stats totalTokens is 200');
+    assertEqual(s.maxDepth, 2, 'stats maxDepth is 2');
+  }
+
+  section('WorkTree — flatten');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'A' });
+    tree.addChild('a', { id: 'a1', label: 'A1' });
+    tree.addChild('root', { id: 'b', label: 'B' });
+
+    const flat = tree.flatten();
+    assertEqual(flat.length, 4, 'flatten returns all 4 nodes');
+    assertEqual(flat[0].id, 'root', 'flatten[0] is root');
+    assertEqual(flat[1].id, 'a', 'flatten[1] is a (DFS order)');
+    assertEqual(flat[2].id, 'a1', 'flatten[2] is a1 (DFS order)');
+    assertEqual(flat[3].id, 'b', 'flatten[3] is b');
+  }
+
+  section('WorkTree — snapshot');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 't1', label: 'T1' });
+    tree.setStatus('t1', 'completed');
+
+    const snap = tree.snapshot();
+    assertEqual(snap.rootId, 'root', 'snapshot rootId');
+    assert('root' in snap.nodes, 'snapshot has root node');
+    assert('t1' in snap.nodes, 'snapshot has t1 node');
+    assertEqual(snap.stats.total, 2, 'snapshot stats total is 2');
+    assert(!!snap.timestamp, 'snapshot has timestamp');
+  }
+
+  // ============================================================================
+  // WORK TREE — fromTaskList
+  // ============================================================================
+
+  section('WorkTree — fromTaskList');
+  {
+    const tasks = [
+      { id: 'plan', description: 'Plan architecture', agent: 'planner', dependencies: [] as string[] },
+      { id: 'impl-auth', description: 'Implement auth', agent: 'worker-1', dependencies: ['plan'] },
+      { id: 'impl-db', description: 'Implement DB', agent: 'worker-2', dependencies: ['plan'] },
+      { id: 'test', description: 'Run tests', agent: 'tester', dependencies: ['impl-auth', 'impl-db'] },
+    ];
+
+    const tree = WorkTree.fromTaskList(tasks, 'Build App');
+    assert(tree.size() >= 4, 'fromTaskList creates at least 4 nodes');
+
+    // plan should be the root since it has no deps and is the only top-level task
+    const root = tree.getRoot();
+    assertEqual(root.id, 'plan', 'single top-level task becomes root');
+
+    // impl-auth and impl-db should be children of plan
+    const planChildren = tree.getChildren('plan');
+    assert(planChildren.some(c => c.id === 'impl-auth'), 'impl-auth is child of plan');
+    assert(planChildren.some(c => c.id === 'impl-db'), 'impl-db is child of plan');
+
+    // test depends on impl-auth and impl-db
+    const testNode = tree.getNode('test');
+    assert(testNode !== undefined, 'test node exists');
+  }
+
+  section('WorkTree — fromTaskList with multiple roots');
+  {
+    const tasks = [
+      { id: 'a', description: 'Independent A', dependencies: [] as string[] },
+      { id: 'b', description: 'Independent B', dependencies: [] as string[] },
+      { id: 'c', description: 'Depends on A', dependencies: ['a'] },
+    ];
+
+    const tree = WorkTree.fromTaskList(tasks, 'Multi-root');
+    assertEqual(tree.getRootId(), '__root__', 'virtual root created for multiple top-level tasks');
+    const rootChildren = tree.getChildren('__root__');
+    assert(rootChildren.some(c => c.id === 'a'), 'a is under virtual root');
+    assert(rootChildren.some(c => c.id === 'b'), 'b is under virtual root');
+  }
+
+  // ============================================================================
+  // WORK TREE — EVENTS
+  // ============================================================================
+
+  section('WorkTree — events');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    const addedIds: string[] = [];
+    const statusChanges: Array<{ id: string; status: string; prev: string }> = [];
+    const progressChanges: Array<{ id: string; progress: number }> = [];
+    let treeCompleted = false;
+
+    tree.on('node:added', (node: WorkNode) => addedIds.push(node.id));
+    tree.on('node:status', (id: string, status: string, prev: string) => statusChanges.push({ id, status, prev }));
+    tree.on('node:progress', (id: string, progress: number) => progressChanges.push({ id, progress }));
+    tree.on('tree:complete', () => { treeCompleted = true; });
+
+    tree.addChild('root', { id: 'x', label: 'X' });
+    assert(addedIds.includes('x'), 'node:added fires for addChild');
+
+    tree.setStatus('x', 'running');
+    assert(statusChanges.some(e => e.id === 'x' && e.status === 'running'), 'node:status fires for running');
+
+    tree.setStatus('x', 'completed');
+    assert(statusChanges.some(e => e.id === 'root' && e.status === 'completed'), 'node:status fires for auto-completed root');
+    assert(progressChanges.some(e => e.id === 'root' && e.progress === 1), 'node:progress fires');
+    assert(treeCompleted, 'tree:complete fires when all done');
+  }
+
+  // ============================================================================
+  // WORK TREE UI — RENDERER
+  // ============================================================================
+
+  section('WorkTreeUI — basic render');
+  {
+    const tree = new WorkTree('root', 'My Project');
+    tree.addChild('root', { id: 'a', label: 'Task A', agent: 'worker-1' });
+    tree.addChild('root', { id: 'b', label: 'Task B' });
+    tree.setStatus('a', 'completed');
+    tree.addTokens('a', 100);
+
+    const ui = new WorkTreeUI(tree, { useColor: false });
+    const result = ui.toString();
+
+    assert(result.includes('My Project'), 'render includes title');
+    assert(result.includes('Task A'), 'render includes child label');
+    assert(result.includes('Task B'), 'render includes second child');
+    assert(result.includes('100'), 'render includes token count');
+    assert(result.includes('@worker-1'), 'render includes agent');
+    assert(result.includes('done'), 'render includes stats done count');
+    assert(result.includes('Progress:'), 'render includes progress bar');
+  }
+
+  section('WorkTreeUI — tree connectors');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'First' });
+    tree.addChild('root', { id: 'b', label: 'Last' });
+
+    const ui = new WorkTreeUI(tree, { useColor: false });
+    const text = ui.toString();
+
+    assert(text.includes('├─'), 'render has tee connector for non-last child');
+    assert(text.includes('└─'), 'render has corner connector for last child');
+  }
+
+  section('WorkTreeUI — deep connectors');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'A' });
+    tree.addChild('a', { id: 'a1', label: 'A1' });
+    tree.addChild('root', { id: 'b', label: 'B' });
+
+    const ui = new WorkTreeUI(tree, { useColor: false });
+    const text = ui.toString();
+
+    // A is not last child, so its children should have a pipe continuation
+    assert(text.includes('│'), 'render has pipe connector for ancestor continuation');
+  }
+
+  section('WorkTreeUI — progress bar');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'A' });
+    tree.addChild('root', { id: 'b', label: 'B' });
+    tree.setStatus('a', 'completed');
+
+    const ui = new WorkTreeUI(tree, { useColor: false });
+    const text = ui.toString();
+
+    assert(text.includes('50%'), 'render shows 50% for half-complete parent');
+    assert(text.includes('█'), 'render has filled bar characters');
+    assert(text.includes('░'), 'render has empty bar characters');
+  }
+
+  section('WorkTreeUI — status icons');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'Pending' });
+    tree.addChild('root', { id: 'b', label: 'Running' });
+    tree.addChild('root', { id: 'c', label: 'Done' });
+    tree.addChild('root', { id: 'd', label: 'Failed' });
+    tree.setStatus('b', 'running');
+    tree.setStatus('c', 'completed');
+    tree.setStatus('d', 'failed');
+
+    const ui = new WorkTreeUI(tree, { useColor: false });
+    const text = ui.toString();
+
+    assert(text.includes('○'), 'render shows pending icon');
+    assert(text.includes('◑'), 'render shows running icon');
+    assert(text.includes('✔'), 'render shows completed icon');
+    assert(text.includes('✘'), 'render shows failed icon');
+  }
+
+  section('WorkTreeUI — hide options');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'Task', agent: 'w1' });
+    tree.addTokens('a', 500);
+
+    const ui = new WorkTreeUI(tree, {
+      useColor: false,
+      showTokens: false,
+      showAgents: false,
+      showStats: false,
+      showProgress: false,
+    });
+    const text = ui.toString();
+
+    assert(!text.includes('500'), 'tokens hidden when showTokens=false');
+    assert(!text.includes('@w1'), 'agent hidden when showAgents=false');
+    assert(!text.includes('Progress:'), 'stats hidden when showStats=false');
+  }
+
+  section('WorkTreeUI — maxDepth');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'Level 1' });
+    tree.addChild('a', { id: 'b', label: 'Level 2' });
+    tree.addChild('b', { id: 'c', label: 'Level 3 Hidden' });
+
+    const ui = new WorkTreeUI(tree, { useColor: false, maxDepth: 2 });
+    const text = ui.toString();
+
+    assert(text.includes('Level 1'), 'depth 1 visible');
+    assert(text.includes('Level 2'), 'depth 2 visible');
+    assert(!text.includes('Level 3 Hidden'), 'depth 3 hidden when maxDepth=2');
+  }
+
+  section('WorkTreeUI — title override');
+  {
+    const tree = new WorkTree('root', 'Original');
+    const ui = new WorkTreeUI(tree, { useColor: false, title: 'Custom Title' });
+    const text = ui.toString();
+
+    assert(text.includes('Custom Title'), 'title override works');
+    assert(text.includes('Custom Title'), 'custom title shown in header');
+  }
+
+  section('WorkTreeUI — RenderResult');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'x', label: 'X' });
+    tree.setStatus('x', 'completed');
+
+    const chunks: string[] = [];
+    const mockOutput = { write: (s: string) => { chunks.push(s); return true; } } as unknown as NodeJS.WritableStream;
+    const ui = new WorkTreeUI(tree, { output: mockOutput });
+    const result = ui.render();
+
+    assert(result.lineCount > 0, 'RenderResult has lineCount');
+    assert(result.text.length > 0, 'RenderResult has text');
+    assertEqual(result.stats.total, 2, 'RenderResult stats total is 2');
+    assert(chunks.length > 0, 'render writes to output stream');
+  }
+
+  section('WorkTreeUI — live mode');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    const chunks: string[] = [];
+    const mockOutput = { write: (s: string) => { chunks.push(s); return true; } } as unknown as NodeJS.WritableStream;
+    const ui = new WorkTreeUI(tree, { output: mockOutput, live: true });
+
+    // Initial render happened in constructor
+    const initialCount = chunks.length;
+    assert(initialCount > 0, 'live mode renders initially');
+
+    // Adding a child should trigger re-render
+    tree.addChild('root', { id: 'a', label: 'A' });
+    assert(chunks.length > initialCount, 'live mode re-renders on node:added');
+
+    const afterAdd = chunks.length;
+    tree.setStatus('a', 'completed');
+    assert(chunks.length > afterAdd, 'live mode re-renders on node:status');
+
+    ui.stopLive();
+    const afterStop = chunks.length;
+    tree.addChild('root', { id: 'b', label: 'B' });
+    assertEqual(chunks.length, afterStop, 'stopLive stops re-rendering');
+
+    ui.destroy();
+  }
+
+  section('WorkTreeUI — token formatting');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    tree.addChild('root', { id: 'a', label: 'Big Task' });
+    tree.addTokens('a', 2500);
+
+    const ui = new WorkTreeUI(tree, { useColor: false });
+    const text = ui.toString();
+    assert(text.includes('2.5k'), 'tokens >= 1000 formatted as k');
+  }
+
+  section('WorkTreeUI — render event');
+  {
+    const tree = new WorkTree('root', 'Goal');
+    const mockOutput = { write: () => true } as unknown as NodeJS.WritableStream;
+    const ui = new WorkTreeUI(tree, { output: mockOutput });
+
+    let emitted = false;
+    ui.on('render', () => { emitted = true; });
+    ui.render();
+    assert(emitted, 'render emits render event');
+    ui.destroy();
+  }
+
+  // ============================================================================
+  // WORK TREE DASHBOARD — SERVER
+  // ============================================================================
+
+  section('WorkTreeDashboard — start and stop');
+  {
+    const tree = new WorkTree('root', 'Dashboard Test');
+    tree.addChild('root', { id: 'a', label: 'Task A', agent: 'w1' });
+    tree.setStatus('a', 'completed');
+
+    const dashboard = new WorkTreeDashboard(tree, { port: 0 });
+
+    // Listen on port 0 to get a random available port
+    // We test the class instantiation and API surface
+    assertEqual(dashboard.clientCount(), 0, 'no clients before start');
+    assert(typeof dashboard.url === 'string', 'url getter returns string');
+    assert(dashboard.url.startsWith('http://'), 'url starts with http://');
+  }
+
+  section('WorkTreeDashboard — start/stop lifecycle');
+  {
+    const tree = new WorkTree('root', 'LC Test');
+    const dashboard = new WorkTreeDashboard(tree, { port: 14821 });
+
+    let listening = false;
+    dashboard.on('listening', () => { listening = true; });
+
+    await dashboard.start();
+    assert(listening, 'dashboard emits listening event');
+    assertEqual(dashboard.url, 'http://127.0.0.1:14821', 'url matches config');
+
+    // HTTP health endpoint
+    const health = await new Promise<string>((resolve, reject) => {
+      http.get('http://127.0.0.1:14821/api/health', (res) => {
+        let data = '';
+        res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+        res.on('end', () => resolve(data));
+      }).on('error', reject);
+    });
+
+    const healthObj = JSON.parse(health);
+    assertEqual(healthObj.status, 'ok', 'health returns ok');
+    assertEqual(healthObj.nodes, 1, 'health reports node count');
+
+    // HTTP serves HTML
+    const htmlStatus = await new Promise<number>((resolve, reject) => {
+      http.get('http://127.0.0.1:14821/', (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      }).on('error', reject);
+    });
+    assertEqual(htmlStatus, 200, 'serves HTML on /');
+
+    // HTTP snapshot endpoint
+    const snapResp = await new Promise<string>((resolve, reject) => {
+      http.get('http://127.0.0.1:14821/api/snapshot', (res) => {
+        let data = '';
+        res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+        res.on('end', () => resolve(data));
+      }).on('error', reject);
+    });
+    const snap = JSON.parse(snapResp);
+    assertEqual(snap.rootId, 'root', 'snapshot returns rootId');
+    assert('root' in snap.nodes, 'snapshot has root node');
+
+    // 404 for unknown routes
+    const notFoundStatus = await new Promise<number>((resolve, reject) => {
+      http.get('http://127.0.0.1:14821/unknown', (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      }).on('error', reject);
+    });
+    assertEqual(notFoundStatus, 404, '404 for unknown routes');
+
+    await dashboard.stop();
   }
 
   // ============================================================================

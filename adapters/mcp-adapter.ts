@@ -5,7 +5,7 @@
  * over the Model Context Protocol. This enables cross-network agent discovery
  * and execution via MCP's tool-calling interface.
  * 
- * MCP servers expose "tools" -- this adapter maps each tool to an agent
+ * MCP servers expose "tools" — this adapter maps each tool to an agent
  * that the orchestrator can delegate tasks to.
  * 
  * Usage:
@@ -95,7 +95,7 @@ export class MCPAdapter extends BaseAdapter {
     }
 
     // If a URL is provided, the user needs to set up the connection themselves
-    // (We don't bundle an MCP client library -- keep it dependency-free)
+    // (We don't bundle an MCP client library — keep it dependency-free)
     if (config.connection?.url && !this.serverConnection) {
       console.info(
         `[MCPAdapter] URL configured: ${config.connection.url}. ` +
@@ -267,7 +267,7 @@ export class MCPAdapter extends BaseAdapter {
       return content[0].data ?? content[0].text;
     }
 
-    // Multiple content blocks -- return structured
+    // Multiple content blocks — return structured
     return content.map(c => ({
       type: c.type,
       value: c.type === 'text' ? c.text : c.data,

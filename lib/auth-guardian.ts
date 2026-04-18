@@ -9,7 +9,7 @@
  * @module AuthGuardian
  */
 
-import { existsSync, readFileSync, writeFileSync, appendFileSync, writeFile, appendFile, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFile, appendFile, mkdirSync } from 'fs';
 import { join } from 'path';
 import { randomUUID, generateKeyPairSync, sign as ed25519Sign, verify as ed25519Verify, createHmac, KeyObject } from 'crypto';
 import { InputSanitizer } from '../security';

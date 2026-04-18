@@ -18,7 +18,7 @@ npm install
 npx ts-node setup.ts --check
 ```
 
-**Zero external AI dependencies.** All 26 adapters are self-contained — add framework SDKs only when you need them.
+**Zero external AI dependencies.** All 27 adapters are self-contained — add framework SDKs only when you need them.
 
 ---
 
@@ -251,7 +251,7 @@ export class MyFrameworkAdapter extends BaseAdapter {
 ```bash
 npx ts-node test-standalone.ts    # 88 core tests
 npx ts-node test-security.ts      # 34 security tests
-npx ts-node test-adapters.ts      # 176 adapter tests (all 26 frameworks)
+npx ts-node test-adapters.ts      # 206 adapter tests (all 27 frameworks)
  npx ts-node test-cli.ts           # 65 CLI tests
 npx ts-node test-qa.ts             # 67 QA orchestrator tests
 ```
@@ -262,7 +262,7 @@ npx ts-node test-qa.ts             # 67 QA orchestrator tests
 
 ```bash
 npx ts-node setup.ts --check      # Verify installation
-npx ts-node setup.ts --list       # List all 17 adapters
+npx ts-node setup.ts --list       # List all 27 adapters
 npx ts-node setup.ts --example    # Generate example.ts
 ```
 
@@ -619,7 +619,7 @@ import SwarmOrchestrator, {
 // Factory
 import { createSwarmOrchestrator } from 'network-ai';
 
-// All 26 adapters
+// All 27 adapters
 import {
   AdapterRegistry, BaseAdapter,
   OpenClawAdapter, LangChainAdapter, AutoGenAdapter,

@@ -1,5 +1,5 @@
 /**
- * OpenClaw Adapter -- Preserves all existing OpenClaw functionality
+ * OpenClaw Adapter — Preserves all existing OpenClaw functionality
  * 
  * This adapter wraps the original `callSkill()` / `OpenClawSkill` interface
  * so the SwarmOrchestrator continues to work exactly as before for OpenClaw users.
@@ -79,7 +79,7 @@ export class OpenClawAdapter extends BaseAdapter {
     const startTime = Date.now();
 
     try {
-      // Translate universal payload -> OpenClaw callSkill format
+      // Translate universal payload → OpenClaw callSkill format
       const openclawParams: Record<string, unknown> = {
         action: payload.action,
         ...payload.params,
@@ -113,7 +113,7 @@ export class OpenClawAdapter extends BaseAdapter {
       // Call the OpenClaw skill
       const result = await this.callSkill(agentId, openclawParams);
 
-      // Translate OpenClaw result -> universal AgentResult
+      // Translate OpenClaw result → universal AgentResult
       return {
         success: result.success,
         data: result.data,

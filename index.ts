@@ -1458,6 +1458,32 @@ export type {
 export { DashboardServer } from './lib/dashboard-server';
 export type { DashboardServerOptions } from './lib/dashboard-server';
 
+// WorkTree — Hierarchical task decomposition tree with rollup
+export { WorkTree } from './lib/work-tree';
+export type {
+  WorkNode,
+  WorkNodeStatus,
+  WorkTreeStats,
+  WorkTreeSnapshot,
+  WorkTreeEvents,
+  WorkTreeOptions,
+} from './lib/work-tree';
+
+// WorkTreeUI — Terminal renderer for WorkTree hierarchies
+export { WorkTreeUI } from './lib/work-tree-ui';
+export type {
+  WorkTreeUIOptions,
+  RenderResult,
+} from './lib/work-tree-ui';
+
+// WorkTreeDashboard — Browser-based live WorkTree visualization
+export { WorkTreeDashboard } from './lib/work-tree-dashboard';
+export type { WorkTreeDashboardOptions, AgentLogEntry, DashboardAgentInfo, SystemDiagnostic, SystemHealth } from './lib/work-tree-dashboard';
+
+// ControlPlane — Multi-workspace unified dashboard
+export { ControlPlane } from './lib/control-plane';
+export type { ControlPlaneOptions, WorkspaceConfig, WorkspaceSummary, CPAgentInfo } from './lib/control-plane';
+
 // QuadTree — Barnes-Hut spatial indexing (Tier 1 scalability)
 export { QuadTree } from './lib/quadtree';
 export type { QTPoint, QTBounds, QTMass } from './lib/quadtree';
@@ -1667,6 +1693,10 @@ export type { PydanticAIRunResult, PydanticAIRunner, PydanticAIHttpConfig, Pydan
 // Browser Agent adapter
 export { BrowserAgentAdapter } from './adapters/browser-agent-adapter';
 export type { BrowserMode, BrowserStep, BrowserActionResult, BrowserDriver, BrowserAgentConfig } from './adapters/browser-agent-adapter';
+
+// Orchestrator adapter (hierarchical multi-orchestrator coordination)
+export { OrchestratorAdapter } from './adapters/orchestrator-adapter';
+export type { ChildOrchestratorConfig, OrchestratorLike, ChildOrchestratorState } from './adapters/orchestrator-adapter';
 
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from './types/streaming-adapter';

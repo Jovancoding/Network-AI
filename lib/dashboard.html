@@ -985,10 +985,10 @@
     }
 
     var agents = [];
-    var seen = {};
+    var seen = new Map();
     for (var si = 0; si < timeline.length; si++) {
-      if (!seen[timeline[si].agentId]) {
-        seen[timeline[si].agentId] = true;
+      if (!seen.has(timeline[si].agentId)) {
+        seen.set(timeline[si].agentId, true);
         agents.push({ id: timeline[si].agentId, label: timeline[si].label });
       }
     }

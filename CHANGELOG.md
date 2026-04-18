@@ -5,10 +5,32 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0] - 2026-04-18
+
+### Added
+- **OrchestratorAdapter** — hierarchical multi-orchestrator coordination: wrap child SwarmOrchestrators as agents, query child states, timeout guards
+- **WorkTree Dashboard** — 3-tab layout (Tree, Agents, Supervisor), clickable agent sidebar, supervisor diagnostics panel with health banner and activity log
+- `SystemDiagnostic` / `SystemHealth` types and `computeDiagnostics()` for real-time orchestrator health monitoring
+
+### Fixed
+- **CodeQL #109** — Polynomial ReDoS in `security.ts` prompt-injection heuristic: replaced unbounded `\s*` with line-split + bounded `\s{0,10}` regex
+- **CodeQL #110** — Remote property injection in `lib/dashboard.html`: replaced plain object with `Map` to prevent prototype pollution
+- **CodeQL #111** — Removed unused imports `writeFileSync`, `appendFileSync` from `lib/auth-guardian.ts`
+- **CodeQL #112** — Removed unused import `stat` from `lib/coverage-reporter.ts`
+- **CodeQL #113** — Removed unused variable `taskMap` from `lib/goal-dsl.ts`
+- Restored 8 deleted adapter test suites (LlamaIndex, SemanticKernel, OpenAI Assistants, Haystack, DSPy, Agno, APS, full registry integration)
+- `BaseAdapter.ensureReady()` now throws `AdapterNotInitializedError` instead of plain `Error`
+
+### Changed
+- Adapter count: 26 → 27
+- Test count: 2,531 → 2,691 across 26 suites
+- All documentation updated across 13 files
+
 ## [5.0.0] - 2026-04-18
 
 ### Added
-- **9 new adapters** — CopilotAdapter, LangGraphAdapter, AnthropicComputerUseAdapter, OpenAIAgentsAdapter, VertexAIAdapter, PydanticAIAdapter, BrowserAgentAdapter, LangChainStreamingAdapter, CustomStreamingAdapter (26 total)
+- **10 new adapters** — CopilotAdapter, LangGraphAdapter, AnthropicComputerUseAdapter, OpenAIAgentsAdapter, VertexAIAdapter, PydanticAIAdapter, BrowserAgentAdapter, LangChainStreamingAdapter, CustomStreamingAdapter, OrchestratorAdapter (27 total)
+- **OrchestratorAdapter** — hierarchical multi-orchestrator coordination: wrap child SwarmOrchestrators as agents for parent orchestration
 - **StreamingBaseAdapter** — base class for adapters that yield partial results via `AsyncIterable`
 - **Goal DSL** (`lib/goal-dsl.ts`) — YAML/JSON goal definitions compiled to TaskDAG
 - **Agent VCR** (`lib/agent-vcr.ts`) — record and replay agent interactions for deterministic testing
@@ -23,8 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ConsoleUI dashboard** (`lib/console-ui.ts`) — interactive terminal dashboard with ANSI TUI
 
 ### Changed
-- Adapter count: 17 → 26
-- Test count: 2,357 → 2,531 across 25+ suites
+- Adapter count: 17 → 27
+- Test count: 2,357 → 2,691 across 26 suites
 - All documentation updated for v5.0
 
 ## [4.15.3] - 2026-04-04

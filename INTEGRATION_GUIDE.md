@@ -64,7 +64,7 @@ Answers drive `AuthGuardian` configuration and audit log retention policy.
 
 ## 2. Framework Mapping
 
-Network-AI ships 26 adapters. Map your existing agents to the right one:
+Network-AI ships 27 adapters. Map your existing agents to the right one:
 
 | Your Stack | Network-AI Adapter | Notes |
 |-----------|-------------------|-------|
@@ -412,11 +412,11 @@ Run these before declaring the integration production-ready:
 - [ ] All agents execute via the adapter registry without errors
 - [ ] `npx ts-node test-standalone.ts` — 88 core tests pass
 - [ ] `npx ts-node test-security.ts` — 34 security tests pass
-- [ ] `npx ts-node test-adapters.ts` — 176 adapter tests pass
+- [ ] `npx ts-node test-adapters.ts` — 206 adapter tests pass
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
 - [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
 - [ ] `npx ts-node test-phase7.ts` — 94 Phase 7 tests pass (hooks, flow control, composer, semantic search)
-- [ ] `npm run test:all` — all 2,531 tests pass across 25+ suites
+- [ ] `npm run test:all` — all 2,691 tests pass across 26 suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety
@@ -474,7 +474,7 @@ Run these before declaring the integration production-ready:
 |----------|---------------|
 | [QUICKSTART.md](QUICKSTART.md) | Get running in 5 minutes |
 | [QUICKSTART.md § CLI](QUICKSTART.md) | CLI reference — bb, auth, budget, audit commands |
-| [references/adapter-system.md](references/adapter-system.md) | All 26 adapters with code examples |
+| [references/adapter-system.md](references/adapter-system.md) | All 27 adapters with code examples |
 | [references/trust-levels.md](references/trust-levels.md) | Trust scoring formula and agent roles |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission system, justification scoring, token lifecycle |
 | [references/blackboard-schema.md](references/blackboard-schema.md) | Blackboard key conventions and namespacing |

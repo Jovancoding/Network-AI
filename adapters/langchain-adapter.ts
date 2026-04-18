@@ -172,7 +172,7 @@ export class LangChainAdapter extends BaseAdapter {
         return this.successResult(obj.result, Date.now() - startTime);
       }
 
-      // LangGraph returns state objects -- pass through  
+      // LangGraph returns state objects — pass through  
       return this.successResult(result, Date.now() - startTime);
     }
 

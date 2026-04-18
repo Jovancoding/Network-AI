@@ -37,24 +37,24 @@ let failed = 0;
 
 function assert(condition: boolean, message: string): void {
   if (condition) {
-    console.log(`  ${colors.green}[v]${colors.reset} ${message}`);
+    console.log(`  ${colors.green}✓${colors.reset} ${message}`);
     passed++;
   } else {
-    console.log(`  ${colors.red}[x]${colors.reset} ${message}`);
+    console.log(`  ${colors.red}✗${colors.reset} ${message}`);
     failed++;
   }
 }
 
 function section(title: string): void {
-  console.log(`\n${colors.cyan}${colors.bold}> ${title}${colors.reset}`);
+  console.log(`\n${colors.cyan}${colors.bold}▸ ${title}${colors.reset}`);
 }
 
 // ============================================================================
-// TEST 1: CustomAdapter -- Register and execute function handlers
+// TEST 1: CustomAdapter — Register and execute function handlers
 // ============================================================================
 
 async function testCustomAdapter(): Promise<void> {
-  section('CustomAdapter -- Function Handlers');
+  section('CustomAdapter — Function Handlers');
 
   const adapter = new CustomAdapter();
   await adapter.initialize({});
@@ -137,11 +137,11 @@ async function testCustomAdapter(): Promise<void> {
 }
 
 // ============================================================================
-// TEST 2: LangChainAdapter -- Runnable and function agents
+// TEST 2: LangChainAdapter — Runnable and function agents
 // ============================================================================
 
 async function testLangChainAdapter(): Promise<void> {
-  section('LangChainAdapter -- Runnables and Functions');
+  section('LangChainAdapter — Runnables and Functions');
 
   const adapter = new LangChainAdapter();
   await adapter.initialize({});
@@ -204,11 +204,11 @@ async function testLangChainAdapter(): Promise<void> {
 }
 
 // ============================================================================
-// TEST 3: AutoGenAdapter -- Agent execution
+// TEST 3: AutoGenAdapter — Agent execution
 // ============================================================================
 
 async function testAutoGenAdapter(): Promise<void> {
-  section('AutoGenAdapter -- Agent Execution');
+  section('AutoGenAdapter — Agent Execution');
 
   const adapter = new AutoGenAdapter();
   await adapter.initialize({});
@@ -274,11 +274,11 @@ async function testAutoGenAdapter(): Promise<void> {
 }
 
 // ============================================================================
-// TEST 4: CrewAI Adapter -- Agents and Crews
+// TEST 4: CrewAI Adapter — Agents and Crews
 // ============================================================================
 
 async function testCrewAIAdapter(): Promise<void> {
-  section('CrewAIAdapter -- Agents and Crews');
+  section('CrewAIAdapter — Agents and Crews');
 
   const adapter = new CrewAIAdapter();
   await adapter.initialize({});
@@ -348,11 +348,11 @@ async function testCrewAIAdapter(): Promise<void> {
 }
 
 // ============================================================================
-// TEST 5: MCPAdapter -- Tool handlers
+// TEST 5: MCPAdapter — Tool handlers
 // ============================================================================
 
 async function testMCPAdapter(): Promise<void> {
-  section('MCPAdapter -- Tool Handlers');
+  section('MCPAdapter — Tool Handlers');
 
   const adapter = new MCPAdapter();
   await adapter.initialize({});
@@ -417,11 +417,11 @@ async function testMCPAdapter(): Promise<void> {
 }
 
 // ============================================================================
-// TEST 6: AdapterRegistry -- Routing and multi-adapter execution
+// TEST 6: AdapterRegistry — Routing and multi-adapter execution
 // ============================================================================
 
 async function testAdapterRegistry(): Promise<void> {
-  section('AdapterRegistry -- Routing & Multi-Adapter');
+  section('AdapterRegistry — Routing & Multi-Adapter');
 
   const registry = new AdapterRegistry();
 
@@ -448,7 +448,7 @@ async function testAdapterRegistry(): Promise<void> {
   assert(adapters.some(a => a.name === 'custom' && a.ready), 'Custom adapter is ready');
   assert(adapters.some(a => a.name === 'langchain' && a.ready), 'LangChain adapter is ready');
 
-  // Test prefix-based routing: "custom:reviewer" -> custom adapter
+  // Test prefix-based routing: "custom:reviewer" → custom adapter
   const result1 = await registry.executeAgent('custom:reviewer', {
     action: 'review',
     params: {},
@@ -461,11 +461,11 @@ async function testAdapterRegistry(): Promise<void> {
     },
   }, { agentId: 'orchestrator' });
 
-  assert(result1.success === true, 'Prefix routing "custom:reviewer" -> custom adapter works');
+  assert(result1.success === true, 'Prefix routing "custom:reviewer" → custom adapter works');
   assert((result1.data as any)?.review === 'Reviewed: Review the report', 'Custom agent executed correctly via registry');
   assert(result1.metadata?.adapter === 'custom', 'Result tagged with correct adapter');
 
-  // Test prefix-based routing: "langchain:research" -> langchain adapter
+  // Test prefix-based routing: "langchain:research" → langchain adapter
   const result2 = await registry.executeAgent('langchain:research', {
     action: 'research',
     params: {},
@@ -478,7 +478,7 @@ async function testAdapterRegistry(): Promise<void> {
     },
   }, { agentId: 'orchestrator' });
 
-  assert(result2.success === true, 'Prefix routing "langchain:research" -> langchain adapter works');
+  assert(result2.success === true, 'Prefix routing "langchain:research" → langchain adapter works');
   assert(result2.metadata?.adapter === 'langchain', 'LangChain result tagged correctly');
 
   // Test explicit route
@@ -490,7 +490,7 @@ async function testAdapterRegistry(): Promise<void> {
     params: {},
   }, { agentId: 'orchestrator' });
 
-  assert(result3.success === true, 'Explicit route "analyst*" -> custom works');
+  assert(result3.success === true, 'Explicit route "analyst*" → custom works');
 
   // Test default adapter
   registry.setDefaultAdapter('custom');
@@ -549,7 +549,7 @@ async function testAdapterRegistry(): Promise<void> {
 // ============================================================================
 
 async function testWritingCustomAdapter(): Promise<void> {
-  section('Custom Adapter Subclass -- Write Your Own');
+  section('Custom Adapter Subclass — Write Your Own');
 
   // Simulate writing a custom adapter from scratch
   class MyFrameworkAdapter extends BaseAdapter {
@@ -665,11 +665,249 @@ async function testEdgeCases(): Promise<void> {
 }
 
 // ============================================================================
+// TEST 9: OrchestratorAdapter — Hierarchical multi-orchestrator coordination
+// ============================================================================
+
+async function testOrchestratorAdapter(): Promise<void> {
+  section('OrchestratorAdapter — Hierarchical Orchestration');
+
+  const { OrchestratorAdapter } = await import('./adapters/orchestrator-adapter');
+  const adapter = new OrchestratorAdapter();
+  await adapter.initialize({});
+
+  assert(adapter.isReady(), 'Adapter initializes and is ready');
+  assert(adapter.name === 'orchestrator', 'Adapter name is "orchestrator"');
+  assert(adapter.capabilities.parallel === true, 'Supports parallel execution');
+  assert(adapter.capabilities.discovery === true, 'Supports discovery');
+  assert(adapter.capabilities.statefulSessions === true, 'Supports stateful sessions');
+
+  // --- Register a mock child orchestrator ---
+
+  const childLog: string[] = [];
+
+  const mockChildOrchestrator = {
+    name: 'ChildSwarm',
+    execute: async (
+      action: string,
+      params: Record<string, unknown>,
+      context: { agentId: string; taskId?: string; sessionId?: string }
+    ) => {
+      childLog.push(`${action}:${context.agentId}`);
+
+      if (action === 'delegate_task') {
+        const taskPayload = params.taskPayload as Record<string, unknown>;
+        return {
+          success: true,
+          data: {
+            taskId: 'child-task-1',
+            status: 'completed',
+            result: {
+              success: true,
+              data: { output: `Child processed: ${taskPayload?.instruction}` },
+            },
+            agentTrace: ['parent', params.targetAgent as string],
+          },
+        };
+      }
+
+      if (action === 'query_swarm_state') {
+        return {
+          success: true,
+          data: {
+            timestamp: new Date().toISOString(),
+            activeAgents: [
+              { agentId: 'child-worker-1', status: 'idle' },
+              { agentId: 'child-worker-2', status: 'busy' },
+            ],
+            pendingTasks: [],
+          },
+        };
+      }
+
+      return { success: false, error: { code: 'UNKNOWN', message: `Unknown: ${action}`, recoverable: false } };
+    },
+  };
+
+  adapter.registerOrchestrator('backend-team', mockChildOrchestrator, {
+    description: 'Backend team orchestrator',
+    defaultTargetAgent: 'child-worker-1',
+    timeout: 5_000,
+  });
+
+  // --- Listing ---
+  const agents = await adapter.listAgents();
+  assert(agents.length === 1, 'One child orchestrator registered');
+  assert(agents[0].id === 'backend-team', 'Agent ID matches orchestrator ID');
+  assert(agents[0].name === 'ChildSwarm', 'Agent name comes from orchestrator.name');
+  assert(agents[0].metadata?.type === 'orchestrator', 'Metadata marks it as orchestrator');
+
+  const orchList = adapter.listOrchestrators();
+  assert(orchList.length === 1 && orchList[0] === 'backend-team', 'listOrchestrators() returns IDs');
+
+  // --- Execute: delegates to child via delegate_task ---
+  const result = await adapter.executeAgent('backend-team', {
+    action: 'execute',
+    params: {},
+    handoff: {
+      handoffId: 'h-orch-1',
+      sourceAgent: 'root',
+      targetAgent: 'child-worker-2',
+      taskType: 'delegate',
+      instruction: 'Refactor auth module',
+    },
+  }, { agentId: 'root' });
+
+  assert(result.success === true, 'Execution succeeds');
+  const data = result.data as Record<string, unknown>;
+  assert(data.orchestratorId === 'backend-team', 'Result includes orchestrator ID');
+  assert(data.hierarchy === true, 'Result includes hierarchy flag');
+  assert(childLog[0] === 'delegate_task:root', 'Child received delegate_task with correct caller');
+
+  // Verify child received the right target agent from handoff
+  const childResult = data.childResult as Record<string, unknown>;
+  assert(childResult?.status === 'completed', 'Child completed the task');
+
+  // --- Execute with defaultTargetAgent (no handoff.targetAgent) ---
+  const result2 = await adapter.executeAgent('backend-team', {
+    action: 'execute',
+    params: { instruction: 'Run migrations' },
+  }, { agentId: 'root' });
+
+  assert(result2.success === true, 'Execution without explicit target uses default');
+
+  // --- queryChildState ---
+  const state = await adapter.queryChildState('backend-team');
+  assert(state !== null, 'queryChildState returns non-null');
+  assert(state!.orchestratorId === 'backend-team', 'State includes orchestrator ID');
+  assert(state!.busy === false, 'Child is not busy after completion');
+  const swarmState = state!.swarmState as Record<string, unknown>;
+  assert(Array.isArray(swarmState.activeAgents), 'Swarm state includes active agents');
+  assert((swarmState.activeAgents as unknown[]).length === 2, 'Child has 2 agents');
+
+  // --- queryAllChildStates ---
+  const allStates = await adapter.queryAllChildStates();
+  assert(allStates.length === 1, 'queryAllChildStates returns all children');
+
+  // --- isChildBusy ---
+  assert(adapter.isChildBusy('backend-team') === false, 'Child not busy when idle');
+  assert(adapter.isChildBusy('nonexistent') === false, 'Non-existent child returns false');
+
+  // --- queryChildState for non-existent ---
+  const nullState = await adapter.queryChildState('ghost');
+  assert(nullState === null, 'queryChildState returns null for unknown orchestrator');
+
+  // --- Execute on non-existent child ---
+  const errResult = await adapter.executeAgent('ghost', {
+    action: 'execute',
+    params: {},
+  }, { agentId: 'root' });
+  assert(errResult.success === false, 'Executing non-existent child fails');
+  assert(errResult.error?.code === 'ORCHESTRATOR_NOT_FOUND', 'Error code is ORCHESTRATOR_NOT_FOUND');
+
+  // --- Register second child orchestrator ---
+  const mockChild2 = {
+    name: 'FrontendSwarm',
+    execute: async () => ({
+      success: true,
+      data: { taskId: 'fe-1', status: 'completed', result: { data: 'ui-built' } },
+    }),
+  };
+  adapter.registerOrchestrator('frontend-team', mockChild2, {
+    description: 'Frontend team orchestrator',
+  });
+
+  const agents2 = await adapter.listAgents();
+  assert(agents2.length === 2, 'Two child orchestrators after second registration');
+
+  const allStates2 = await adapter.queryAllChildStates();
+  assert(allStates2.length === 2, 'queryAllChildStates returns both children');
+
+  // --- Remove orchestrator ---
+  const removed = adapter.removeOrchestrator('frontend-team');
+  assert(removed === true, 'removeOrchestrator returns true on success');
+  assert((await adapter.listAgents()).length === 1, 'Agent list shrinks after removal');
+  assert(adapter.removeOrchestrator('ghost') === false, 'removeOrchestrator returns false for unknown');
+
+  // --- Error from child propagates correctly ---
+  const failingChild = {
+    name: 'FailSwarm',
+    execute: async () => ({
+      success: false,
+      error: { code: 'CHILD_BROKE', message: 'Something went wrong', recoverable: true },
+    }),
+  };
+  adapter.registerOrchestrator('failing-team', failingChild);
+
+  const failResult = await adapter.executeAgent('failing-team', {
+    action: 'execute',
+    params: { instruction: 'Break things' },
+  }, { agentId: 'root' });
+  assert(failResult.success === false, 'Failed child result propagates as failure');
+  assert(failResult.error?.code === 'CHILD_BROKE', 'Child error code preserved');
+
+  // --- Child that throws ---
+  const throwingChild = {
+    name: 'ThrowSwarm',
+    execute: async () => { throw new Error('Kaboom!'); },
+  };
+  adapter.registerOrchestrator('throw-team', throwingChild);
+
+  const throwResult = await adapter.executeAgent('throw-team', {
+    action: 'execute',
+    params: { instruction: 'Explode' },
+  }, { agentId: 'root' });
+  assert(throwResult.success === false, 'Throwing child returns failure');
+  assert(throwResult.error?.code === 'CHILD_EXECUTION_ERROR', 'Error code is CHILD_EXECUTION_ERROR');
+  assert(throwResult.error?.message === 'Kaboom!', 'Thrown error message preserved');
+
+  // --- Validation: bad registration inputs ---
+  let threw = false;
+  try {
+    adapter.registerOrchestrator('', mockChildOrchestrator);
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'Rejects empty orchestratorId');
+
+  threw = false;
+  try {
+    adapter.registerOrchestrator('bad', { name: 'x' } as never);
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'Rejects orchestrator without execute()');
+
+  // --- Registry integration ---
+  const registry = new AdapterRegistry();
+  await registry.addAdapter(adapter);
+
+  const regResult = await registry.executeAgent('orchestrator:backend-team', {
+    action: 'execute',
+    params: {},
+    handoff: {
+      handoffId: 'h-reg-1',
+      sourceAgent: 'root',
+      targetAgent: 'child-worker-1',
+      taskType: 'delegate',
+      instruction: 'Registry-routed task',
+    },
+  }, { agentId: 'root' });
+  assert(regResult.success === true, 'Works through AdapterRegistry routing');
+
+  // --- Shutdown ---
+  await adapter.shutdown();
+  assert(adapter.listOrchestrators().length === 0, 'Shutdown clears all children');
+  assert((await adapter.listAgents()).length === 0, 'Shutdown clears agent registry');
+
+  await registry.shutdownAll();
+}
+
+// ============================================================================
 // TEST 9: LlamaIndexAdapter
 // ============================================================================
 
 async function testLlamaIndexAdapter(): Promise<void> {
-  section('LlamaIndexAdapter -- Query, Chat, & Agent Engines');
+  section('LlamaIndexAdapter — Query, Chat, & Agent Engines');
 
   const { LlamaIndexAdapter } = await import('./adapters/llamaindex-adapter');
   const adapter = new LlamaIndexAdapter();
@@ -686,7 +924,7 @@ async function testLlamaIndexAdapter(): Promise<void> {
 
   // Register a chat engine
   const mockChatEngine = {
-    chat: async (msg: string, _history?: any[]) => ({
+    chat: async (msg: string, _history?: unknown[]) => ({
       response: `Chat reply: ${msg}`,
     }),
     reset: () => {},
@@ -712,8 +950,8 @@ async function testLlamaIndexAdapter(): Promise<void> {
     params: { query: 'What is AI?' },
   }, ctx);
   assert(qResult.success === true, 'Query engine executes successfully');
-  assert((qResult.data as any).response === 'Answer to: What is AI?', 'Query response content correct');
-  assert((qResult.data as any).sources?.length === 1, 'Source nodes included');
+  assert((qResult.data as Record<string, unknown>).response === 'Answer to: What is AI?', 'Query response content correct');
+  assert(((qResult.data as Record<string, unknown>).sources as unknown[])?.length === 1, 'Source nodes included');
 
   // Test chat engine
   const cResult = await adapter.executeAgent('assistant', {
@@ -722,7 +960,7 @@ async function testLlamaIndexAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'assistant', taskType: 'delegate' as const, instruction: 'Hello there' },
   }, ctx);
   assert(cResult.success === true, 'Chat engine executes successfully');
-  assert((cResult.data as any).response === 'Chat reply: Hello there', 'Chat response correct');
+  assert((cResult.data as Record<string, unknown>).response === 'Chat reply: Hello there', 'Chat response correct');
 
   // Test agent runner
   const aResult = await adapter.executeAgent('researcher', {
@@ -731,7 +969,7 @@ async function testLlamaIndexAdapter(): Promise<void> {
     handoff: { handoffId: 'h2', sourceAgent: 'test', targetAgent: 'researcher', taskType: 'delegate' as const, instruction: 'Find papers on transformers' },
   }, ctx);
   assert(aResult.success === true, 'Agent runner executes successfully');
-  assert((aResult.data as any).response === 'Agent handled: Find papers on transformers', 'Agent response correct');
+  assert((aResult.data as Record<string, unknown>).response === 'Agent handled: Find papers on transformers', 'Agent response correct');
 
   // Not found
   const nf = await adapter.executeAgent('nonexistent', { action: 'x', params: {} }, ctx);
@@ -746,7 +984,7 @@ async function testLlamaIndexAdapter(): Promise<void> {
 // ============================================================================
 
 async function testSemanticKernelAdapter(): Promise<void> {
-  section('SemanticKernelAdapter -- Kernel & Function Execution');
+  section('SemanticKernelAdapter — Kernel & Function Execution');
 
   const { SemanticKernelAdapter } = await import('./adapters/semantic-kernel-adapter');
   const adapter = new SemanticKernelAdapter();
@@ -761,7 +999,7 @@ async function testSemanticKernelAdapter(): Promise<void> {
     invokePrompt: async (prompt: string) => ({
       value: `Prompt result: ${prompt}`,
     }),
-    invokeFunction: async (name: string, args?: any) => ({
+    invokeFunction: async (name: string, args?: Record<string, unknown>) => ({
       value: `Function ${name} result`,
       metadata: { args },
     }),
@@ -771,8 +1009,8 @@ async function testSemanticKernelAdapter(): Promise<void> {
   // Register an SK function
   const mockFn = {
     name: 'summarize',
-    invoke: async (args?: any) => ({
-      value: `Summary of: ${args?.input || 'nothing'}`,
+    invoke: async (args?: Record<string, unknown>) => ({
+      value: `Summary of: ${(args as Record<string, unknown>)?.input || 'nothing'}`,
     }),
   };
   adapter.registerFunction('summarizer', mockFn);
@@ -789,8 +1027,8 @@ async function testSemanticKernelAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'planner', taskType: 'delegate' as const, instruction: 'Analyse market trends' },
   }, ctx);
   assert(planResult.success === true, 'Kernel planner executes successfully');
-  assert((planResult.data as any).response === 'Plan executed: Analyse market trends', 'Plan result correct');
-  assert((planResult.data as any).steps?.length === 1, 'Plan steps included');
+  assert((planResult.data as Record<string, unknown>).response === 'Plan executed: Analyse market trends', 'Plan result correct');
+  assert(((planResult.data as Record<string, unknown>).steps as unknown[])?.length === 1, 'Plan steps included');
 
   // Test SK function
   const fnResult = await adapter.executeAgent('summarizer', {
@@ -799,7 +1037,7 @@ async function testSemanticKernelAdapter(): Promise<void> {
     handoff: { handoffId: 'h2', sourceAgent: 'test', targetAgent: 'summarizer', taskType: 'delegate' as const, instruction: 'Long document content here...' },
   }, ctx);
   assert(fnResult.success === true, 'SK function executes successfully');
-  assert((fnResult.data as any).response.includes('Summary of'), 'Function result correct');
+  assert(((fnResult.data as Record<string, unknown>).response as string).includes('Summary of'), 'Function result correct');
 
   // Not found
   const nf = await adapter.executeAgent('missing', { action: 'x', params: {} }, ctx);
@@ -813,7 +1051,7 @@ async function testSemanticKernelAdapter(): Promise<void> {
 // ============================================================================
 
 async function testOpenAIAssistantsAdapter(): Promise<void> {
-  section('OpenAIAssistantsAdapter -- Chat & Thread-based Execution');
+  section('OpenAIAssistantsAdapter — Chat & Thread-based Execution');
 
   const { OpenAIAssistantsAdapter } = await import('./adapters/openai-assistants-adapter');
   const adapter = new OpenAIAssistantsAdapter();
@@ -844,8 +1082,8 @@ async function testOpenAIAssistantsAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'Analyse Q4 earnings' },
   }, ctx);
   assert(result.success === true, 'Assistant executes successfully');
-  assert((result.data as any).response.includes('Analyse Q4 earnings'), 'Response contains instruction');
-  assert((result.data as any).usage?.total_tokens === 30, 'Usage stats included');
+  assert(((result.data as Record<string, unknown>).response as string).includes('Analyse Q4 earnings'), 'Response contains instruction');
+  assert(((result.data as Record<string, unknown>).usage as Record<string, unknown>)?.total_tokens === 30, 'Usage stats included');
 
   // Test thread-based client
   const adapter2 = new OpenAIAssistantsAdapter();
@@ -853,7 +1091,7 @@ async function testOpenAIAssistantsAdapter(): Promise<void> {
   const messages: string[] = [];
   const threadClient = {
     createThread: async () => ({ id: `thread_${++threadCount}` }),
-    addMessage: async (_tid: string, msg: any) => { messages.push(msg.content); },
+    addMessage: async (_tid: string, msg: { role: string; content: string }) => { messages.push(msg.content); },
     createAndPollRun: async () => ({
       status: 'completed' as const,
       messages: [
@@ -871,8 +1109,8 @@ async function testOpenAIAssistantsAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'Hello bot' },
   }, ctx);
   assert(r2.success === true, 'Thread-based execution succeeds');
-  assert((r2.data as any).response === 'Analysis complete', 'Thread response correct');
-  assert((r2.data as any).threadId === 'thread_1', 'Thread ID returned');
+  assert((r2.data as Record<string, unknown>).response === 'Analysis complete', 'Thread response correct');
+  assert((r2.data as Record<string, unknown>).threadId === 'thread_1', 'Thread ID returned');
 
   // No client error
   const adapter3 = new OpenAIAssistantsAdapter();
@@ -898,7 +1136,7 @@ async function testOpenAIAssistantsAdapter(): Promise<void> {
 // ============================================================================
 
 async function testHaystackAdapter(): Promise<void> {
-  section('HaystackAdapter -- Pipelines, Agents, & Components');
+  section('HaystackAdapter — Pipelines, Agents, & Components');
 
   const { HaystackAdapter } = await import('./adapters/haystack-adapter');
   const adapter = new HaystackAdapter();
@@ -943,7 +1181,7 @@ async function testHaystackAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'What is RAG?' },
   }, ctx);
   assert(pResult.success === true, 'Pipeline executes successfully');
-  assert(Array.isArray((pResult.data as any).response), 'Pipeline returns replies array');
+  assert(Array.isArray((pResult.data as Record<string, unknown>).response), 'Pipeline returns replies array');
 
   // Test agent
   const aResult = await adapter.executeAgent('qa', {
@@ -951,8 +1189,8 @@ async function testHaystackAdapter(): Promise<void> {
     params: { query: 'Explain transformers' },
   }, ctx);
   assert(aResult.success === true, 'Agent executes successfully');
-  assert((aResult.data as any).response === 'Agent answer: Explain transformers', 'Agent response correct');
-  assert((aResult.data as any).documents?.length === 1, 'Documents included');
+  assert((aResult.data as Record<string, unknown>).response === 'Agent answer: Explain transformers', 'Agent response correct');
+  assert(((aResult.data as Record<string, unknown>).documents as unknown[])?.length === 1, 'Documents included');
 
   // Test component
   const cResult = await adapter.executeAgent('processor', {
@@ -973,7 +1211,7 @@ async function testHaystackAdapter(): Promise<void> {
 // ============================================================================
 
 async function testDSPyAdapter(): Promise<void> {
-  section('DSPyAdapter -- Modules, Programs, & Predictors');
+  section('DSPyAdapter — Modules, Programs, & Predictors');
 
   const { DSPyAdapter } = await import('./adapters/dspy-adapter');
   const adapter = new DSPyAdapter();
@@ -1014,8 +1252,8 @@ async function testDSPyAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'Is this spam?' },
   }, ctx);
   assert(mResult.success === true, 'Module executes successfully');
-  assert((mResult.data as any).response === 'Classified: Is this spam?', 'Module answer correct');
-  assert((mResult.data as any).rationale === 'Based on analysis...', 'Rationale included');
+  assert((mResult.data as Record<string, unknown>).response === 'Classified: Is this spam?', 'Module answer correct');
+  assert((mResult.data as Record<string, unknown>).rationale === 'Based on analysis...', 'Rationale included');
 
   // Test program
   const pResult = await adapter.executeAgent('rag-pipeline', {
@@ -1024,7 +1262,7 @@ async function testDSPyAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'What is DSPy?' },
   }, ctx);
   assert(pResult.success === true, 'Program executes successfully');
-  assert((pResult.data as any).response === 'Program result for: What is DSPy?', 'Program result correct');
+  assert((pResult.data as Record<string, unknown>).response === 'Program result for: What is DSPy?', 'Program result correct');
 
   // Test predictor
   const prResult = await adapter.executeAgent('simple', {
@@ -1033,7 +1271,7 @@ async function testDSPyAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'Will it rain?' },
   }, ctx);
   assert(prResult.success === true, 'Predictor executes successfully');
-  assert((prResult.data as any).response === 'Predicted: Will it rain?', 'Prediction correct');
+  assert((prResult.data as Record<string, unknown>).response === 'Predicted: Will it rain?', 'Prediction correct');
 
   // Not found
   const nf = await adapter.executeAgent('nope', { action: 'x', params: {} }, ctx);
@@ -1053,7 +1291,7 @@ async function testDSPyAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'test call' },
   }, ctx);
   assert(callResult.success === true, '__call__ interface works');
-  assert((callResult.data as any).response === 'Called: test call', '__call__ preferred over forward');
+  assert((callResult.data as Record<string, unknown>).response === 'Called: test call', '__call__ preferred over forward');
 
   await adapter.shutdown();
 }
@@ -1063,7 +1301,7 @@ async function testDSPyAdapter(): Promise<void> {
 // ============================================================================
 
 async function testAgnoAdapter(): Promise<void> {
-  section('AgnoAdapter -- Agents, Teams, & Functions');
+  section('AgnoAdapter — Agents, Teams, & Functions');
 
   const { AgnoAdapter } = await import('./adapters/agno-adapter');
   const adapter = new AgnoAdapter();
@@ -1072,7 +1310,7 @@ async function testAgnoAdapter(): Promise<void> {
   // Mock agent
   const mockAgent = {
     name: 'ResearchBot',
-    run: async (message: string, options?: any) => ({
+    run: async (message: string) => ({
       content: `Researched: ${message}`,
       toolCalls: [{ name: 'web_search', args: { q: message }, result: 'found data' }],
       usage: { input_tokens: 50, output_tokens: 100 },
@@ -1092,7 +1330,7 @@ async function testAgnoAdapter(): Promise<void> {
   adapter.registerTeam('dev-team', mockTeam);
 
   // Mock function
-  adapter.registerFunction('quick-calc', async (msg, ctx) => {
+  adapter.registerFunction('quick-calc', async (msg) => {
     return `Calculated: ${msg}`;
   });
 
@@ -1108,9 +1346,9 @@ async function testAgnoAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'Find AI papers from 2024' },
   }, ctx);
   assert(aResult.success === true, 'Agent executes successfully');
-  assert((aResult.data as any).response === 'Researched: Find AI papers from 2024', 'Agent response correct');
-  assert((aResult.data as any).toolCalls?.length === 1, 'Tool calls included');
-  assert((aResult.data as any).usage?.input_tokens === 50, 'Usage stats included');
+  assert((aResult.data as Record<string, unknown>).response === 'Researched: Find AI papers from 2024', 'Agent response correct');
+  assert(((aResult.data as Record<string, unknown>).toolCalls as unknown[])?.length === 1, 'Tool calls included');
+  assert(((aResult.data as Record<string, unknown>).usage as Record<string, unknown>)?.input_tokens === 50, 'Usage stats included');
 
   // Test team
   const tResult = await adapter.executeAgent('dev-team', {
@@ -1119,9 +1357,9 @@ async function testAgnoAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'Build a REST API' },
   }, ctx);
   assert(tResult.success === true, 'Team executes successfully');
-  assert((tResult.data as any).response === 'Team handled: Build a REST API', 'Team response correct');
-  assert((tResult.data as any).respondingAgent === 'coder', 'Responding agent identified');
-  assert((tResult.data as any).team === 'DevTeam', 'Team name included');
+  assert((tResult.data as Record<string, unknown>).response === 'Team handled: Build a REST API', 'Team response correct');
+  assert((tResult.data as Record<string, unknown>).respondingAgent === 'coder', 'Responding agent identified');
+  assert((tResult.data as Record<string, unknown>).team === 'DevTeam', 'Team name included');
 
   // Test function
   const fResult = await adapter.executeAgent('quick-calc', {
@@ -1130,7 +1368,7 @@ async function testAgnoAdapter(): Promise<void> {
     handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: '2 + 2' },
   }, ctx);
   assert(fResult.success === true, 'Function executes successfully');
-  assert((fResult.data as any).response === 'Calculated: 2 + 2', 'Function response correct');
+  assert((fResult.data as Record<string, unknown>).response === 'Calculated: 2 + 2', 'Function response correct');
 
   // Not found
   const nf = await adapter.executeAgent('ghost', { action: 'x', params: {} }, ctx);
@@ -1145,18 +1383,165 @@ async function testAgnoAdapter(): Promise<void> {
     action: 'test', params: {}, handoff: { handoffId: 'h1', sourceAgent: 'test', targetAgent: 'agent', taskType: 'delegate' as const, instruction: 'hello' },
   }, ctx);
   assert(sResult.success === true, 'Structured function response works');
-  assert((sResult.data as any).response === 'Structured: hello', 'Structured content extracted');
+  assert((sResult.data as Record<string, unknown>).response === 'Structured: hello', 'Structured content extracted');
 
   await adapter.shutdown();
   assert(adapter.isReady() === false, 'Adapter shuts down cleanly');
 }
 
 // ============================================================================
-// TEST 15: All 17 Adapters in Registry Together
+// TEST 15: APSAdapter
+// ============================================================================
+
+async function testAPSAdapter(): Promise<void> {
+  section('APS Adapter (Agent Permission Service)');
+
+  const { APSAdapter } = await import('./adapters/aps-adapter');
+
+  // 1. Initialize with defaults
+  const aps = new APSAdapter();
+  await aps.initialize({});
+  assert(true, 'APS adapter initializes with defaults');
+
+  // 2. Root delegation (depth 0) → full base trust
+  const root = await aps.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'agent-1',
+    scope: ['file:read', 'git:read'],
+    currentDepth: 0,
+    maxDepth: 3,
+    signature: 'valid-sig-abc123',
+  });
+  assert(root.agentId === 'agent-1', 'APS: root delegation maps to correct agentId');
+  assert(root.trustLevel === 0.8, `APS: root trust = baseTrust (0.8), got ${root.trustLevel}`);
+  assert(root.allowedResources.includes('FILE_SYSTEM'), 'APS: file:read maps to FILE_SYSTEM');
+  assert(root.allowedResources.includes('GIT'), 'APS: git:read maps to GIT');
+  assert(root.apsMetadata.verified === true, 'APS: root delegation is verified');
+
+  // 3. Mid-chain delegation (depth 1/3) → decayed trust
+  const mid = await aps.apsDelegationToTrust({
+    delegator: 'agent-1',
+    delegatee: 'agent-2',
+    scope: ['file:read'],
+    currentDepth: 1,
+    maxDepth: 3,
+    signature: 'valid-sig-def456',
+  });
+  assert(mid.trustLevel > 0.6 && mid.trustLevel < 0.75, `APS: mid-chain trust decayed, got ${mid.trustLevel}`);
+  assert(mid.allowedResources.length === 1, 'APS: scope narrowed to 1 resource');
+
+  // 4. Max depth delegation → maximum decay
+  const deep = await aps.apsDelegationToTrust({
+    delegator: 'agent-2',
+    delegatee: 'agent-3',
+    scope: ['file:read'],
+    currentDepth: 3,
+    maxDepth: 3,
+    signature: 'valid-sig-ghi789',
+  });
+  assert(deep.trustLevel === 0.48, `APS: max depth trust = 0.48, got ${deep.trustLevel}`);
+
+  // 5. Empty signature → unverified → trust 0
+  const unverified = await aps.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'agent-bad',
+    scope: ['file:read'],
+    currentDepth: 0,
+    maxDepth: 3,
+    signature: '',
+  });
+  assert(unverified.trustLevel === 0, 'APS: empty signature → trust 0');
+  assert(unverified.apsMetadata.verified === false, 'APS: empty sig → not verified');
+
+  // 6. Custom baseTrust and depthDecay
+  const customAps = new APSAdapter();
+  await customAps.initialize({ baseTrust: 0.9, depthDecay: 0.6 });
+  const customResult = await customAps.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'custom-agent',
+    scope: ['shell:exec'],
+    currentDepth: 2,
+    maxDepth: 4,
+    signature: 'custom-sig',
+  });
+  assert(customResult.trustLevel === 0.63, `APS: custom config trust = 0.63, got ${customResult.trustLevel}`);
+  assert(customResult.allowedResources.includes('SHELL_EXEC'), 'APS: shell:exec maps to SHELL_EXEC');
+
+  // 7. BYOC signature verifier
+  const byoc = new APSAdapter();
+  await byoc.initialize({
+    verifySignature: async (d) => d.signature === 'secret-token',
+  });
+  const verified = await byoc.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'byoc-agent',
+    scope: ['net:fetch'],
+    currentDepth: 0,
+    maxDepth: 2,
+    signature: 'secret-token',
+  });
+  assert(verified.apsMetadata.verified === true, 'APS: BYOC verifier accepts valid signature');
+  const rejected = await byoc.apsDelegationToTrust({
+    delegator: 'root',
+    delegatee: 'byoc-agent',
+    scope: ['net:fetch'],
+    currentDepth: 0,
+    maxDepth: 2,
+    signature: 'wrong-token',
+  });
+  assert(rejected.trustLevel === 0, 'APS: BYOC verifier rejects invalid signature');
+
+  // 8. Invalid input rejects
+  let threw = false;
+  try {
+    await aps.apsDelegationToTrust({ delegator: '', delegatee: 'x', scope: ['file:read'], currentDepth: 0, maxDepth: 1, signature: 's' });
+  } catch { threw = true; }
+  assert(threw, 'APS: empty delegator throws');
+
+  // 9. Depth exceeds max rejects
+  threw = false;
+  try {
+    await aps.apsDelegationToTrust({ delegator: 'a', delegatee: 'b', scope: ['file:read'], currentDepth: 5, maxDepth: 3, signature: 's' });
+  } catch { threw = true; }
+  assert(threw, 'APS: depth > maxDepth throws');
+
+  // 10. executeAgent pass-through
+  const execResult = await aps.executeAgent('verify', {
+    action: 'verify',
+    params: {
+      delegator: 'root',
+      delegatee: 'exec-agent',
+      scope: ['db:read'],
+      currentDepth: 0,
+      maxDepth: 2,
+      signature: 'exec-sig',
+    },
+  }, { agentId: 'test' });
+  assert(execResult.success === true, 'APS: executeAgent returns trust mapping');
+  assert((execResult.data as Record<string, unknown>).agentId === 'exec-agent', 'APS: executeAgent maps correct agentId');
+
+  // 11. Namespace derivation
+  assert(root.allowedNamespaces.includes('file:'), 'APS: file: namespace derived');
+  assert(root.allowedNamespaces.includes('git:'), 'APS: git: namespace derived');
+
+  // 12. MCP mode requires URL
+  threw = false;
+  try {
+    const mcpAps = new APSAdapter();
+    await mcpAps.initialize({ verificationMode: 'mcp' });
+  } catch { threw = true; }
+  assert(threw, 'APS: MCP mode without URL throws');
+
+  // 13. Capabilities
+  assert(aps.capabilities.authentication === true, 'APS: capabilities.authentication is true');
+}
+
+// ============================================================================
+// TEST 16: All Adapters in Registry Together
 // ============================================================================
 
 async function testAllAdaptersInRegistry(): Promise<void> {
-  section('Full Registry -- All 17 Adapters Working Together');
+  section('Full Registry — All Adapters Working Together');
 
   const registry = new AdapterRegistry();
 
@@ -1172,13 +1557,13 @@ async function testAllAdaptersInRegistry(): Promise<void> {
   // Set up all new adapters with mock agents
   const llamaindex = new LlamaIndexAdapter();
   llamaindex.registerQueryEngine('search', {
-    query: async (q) => ({ response: `LlamaIndex: ${q}` }),
+    query: async (q: string) => ({ response: `LlamaIndex: ${q}` }),
   });
 
   const sk = new SemanticKernelAdapter();
   sk.registerFunction('summarize', {
     name: 'summarize',
-    invoke: async (args) => ({ value: `SK: ${args?.input}` }),
+    invoke: async (args?: Record<string, unknown>) => ({ value: `SK: ${(args as Record<string, unknown>)?.input}` }),
   });
 
   const openai = new OpenAIAssistantsAdapter();
@@ -1190,7 +1575,7 @@ async function testAllAdaptersInRegistry(): Promise<void> {
 
   const haystack = new HaystackAdapter();
   haystack.registerAgent('qa', {
-    run: async (q) => ({ answer: `Haystack: ${q}` }),
+    run: async (q: string) => ({ answer: `Haystack: ${q}` }),
   });
 
   const dspy = new DSPyAdapter();
@@ -1276,7 +1661,7 @@ async function testAllAdaptersInRegistry(): Promise<void> {
   // Health check all
   const health = await registry.healthCheck();
   assert(Object.keys(health).length === 8, 'Health check covers all 8 adapters');
-  assert(Object.values(health).every((h: any) => h.healthy), 'All adapters report healthy');
+  assert(Object.values(health).every((h: Record<string, unknown>) => h.healthy), 'All adapters report healthy');
 
   await registry.shutdownAll();
 }
@@ -1286,12 +1671,11 @@ async function testAllAdaptersInRegistry(): Promise<void> {
 // ============================================================================
 
 async function runAllTests(): Promise<void> {
-  console.log(`\n${colors.bold}+======================================================+${colors.reset}`);
-  console.log(`${colors.bold}|     Adapter System Test Suite -- Plug & Play Agents   |${colors.reset}`);
-  console.log(`${colors.bold}+======================================================+${colors.reset}`);
+  console.log(`\n${colors.bold}╔══════════════════════════════════════════════════════╗${colors.reset}`);
+  console.log(`${colors.bold}║     Adapter System Test Suite — Plug & Play Agents   ║${colors.reset}`);
+  console.log(`${colors.bold}╚══════════════════════════════════════════════════════╝${colors.reset}`);
 
   try {
-    // Original 8 test suites
     await testCustomAdapter();
     await testLangChainAdapter();
     await testAutoGenAdapter();
@@ -1300,8 +1684,9 @@ async function runAllTests(): Promise<void> {
     await testAdapterRegistry();
     await testWritingCustomAdapter();
     await testEdgeCases();
+    await testOrchestratorAdapter();
 
-    // New adapter test suites
+    // Extended adapter test suites
     await testLlamaIndexAdapter();
     await testSemanticKernelAdapter();
     await testOpenAIAssistantsAdapter();
@@ -1318,175 +1703,15 @@ async function runAllTests(): Promise<void> {
 
   // Summary
   const total = passed + failed;
-  console.log(`\n${colors.bold}=======================================================${colors.reset}`);
+  console.log(`\n${colors.bold}═══════════════════════════════════════════════════════${colors.reset}`);
   if (failed === 0) {
-    console.log(`${colors.green}${colors.bold}  ALL ${total} TESTS PASSED [v]${colors.reset}`);
+    console.log(`${colors.green}${colors.bold}  ALL ${total} TESTS PASSED ✓${colors.reset}`);
   } else {
     console.log(`${colors.red}${colors.bold}  ${failed} of ${total} TESTS FAILED${colors.reset}`);
   }
-  console.log(`${colors.bold}=======================================================${colors.reset}\n`);
+  console.log(`${colors.bold}═══════════════════════════════════════════════════════${colors.reset}\n`);
 
   process.exit(failed > 0 ? 1 : 0);
-}
-
-// ─── APS Adapter Tests ───────────────────────────────────────────────────────
-
-async function testAPSAdapter() {
-  section('APS Adapter (Agent Permission Service)');
-
-  const { APSAdapter } = await import('./adapters/aps-adapter');
-
-  // 1. Initialize with defaults
-  const aps = new APSAdapter();
-  await aps.initialize({});
-  assert(true, 'APS adapter initializes with defaults');
-
-  // 2. Root delegation (depth 0) → full base trust
-  const root = await aps.apsDelegationToTrust({
-    delegator: 'root',
-    delegatee: 'agent-1',
-    scope: ['file:read', 'git:read'],
-    currentDepth: 0,
-    maxDepth: 3,
-    signature: 'valid-sig-abc123',
-  });
-  assert(root.agentId === 'agent-1', 'APS: root delegation maps to correct agentId');
-  assert(root.trustLevel === 0.8, `APS: root trust = baseTrust (0.8), got ${root.trustLevel}`);
-  assert(root.allowedResources.includes('FILE_SYSTEM'), 'APS: file:read maps to FILE_SYSTEM');
-  assert(root.allowedResources.includes('GIT'), 'APS: git:read maps to GIT');
-  assert(root.apsMetadata.verified === true, 'APS: root delegation is verified');
-  assert(true, 'APS root delegation → full base trust');
-
-  // 3. Mid-chain delegation (depth 1/3) → decayed trust
-  const mid = await aps.apsDelegationToTrust({
-    delegator: 'agent-1',
-    delegatee: 'agent-2',
-    scope: ['file:read'],
-    currentDepth: 1,
-    maxDepth: 3,
-    signature: 'valid-sig-def456',
-  });
-  // Trust = 0.8 * (1 - (1/3 * 0.4)) = 0.8 * 0.867 ≈ 0.693
-  assert(mid.trustLevel > 0.6 && mid.trustLevel < 0.75, `APS: mid-chain trust decayed, got ${mid.trustLevel}`);
-  assert(mid.allowedResources.length === 1, 'APS: scope narrowed to 1 resource');
-  assert(true, 'APS mid-chain delegation → decayed trust');
-
-  // 4. Max depth delegation → maximum decay
-  const deep = await aps.apsDelegationToTrust({
-    delegator: 'agent-2',
-    delegatee: 'agent-3',
-    scope: ['file:read'],
-    currentDepth: 3,
-    maxDepth: 3,
-    signature: 'valid-sig-ghi789',
-  });
-  // Trust = 0.8 * (1 - (3/3 * 0.4)) = 0.8 * 0.6 = 0.48
-  assert(deep.trustLevel === 0.48, `APS: max depth trust = 0.48, got ${deep.trustLevel}`);
-  assert(true, 'APS max depth delegation → maximum decay');
-
-  // 5. Empty signature → unverified → trust 0
-  const unverified = await aps.apsDelegationToTrust({
-    delegator: 'root',
-    delegatee: 'agent-bad',
-    scope: ['file:read'],
-    currentDepth: 0,
-    maxDepth: 3,
-    signature: '',
-  });
-  assert(unverified.trustLevel === 0, 'APS: empty signature → trust 0');
-  assert(unverified.apsMetadata.verified === false, 'APS: empty sig → not verified');
-  assert(true, 'APS unverified delegation → zero trust');
-
-  // 6. Custom baseTrust and depthDecay
-  const custom = new APSAdapter();
-  await custom.initialize({ baseTrust: 0.9, depthDecay: 0.6 });
-  const customResult = await custom.apsDelegationToTrust({
-    delegator: 'root',
-    delegatee: 'custom-agent',
-    scope: ['shell:exec'],
-    currentDepth: 2,
-    maxDepth: 4,
-    signature: 'custom-sig',
-  });
-  // Trust = 0.9 * (1 - (2/4 * 0.6)) = 0.9 * 0.7 = 0.63
-  assert(customResult.trustLevel === 0.63, `APS: custom config trust = 0.63, got ${customResult.trustLevel}`);
-  assert(customResult.allowedResources.includes('SHELL_EXEC'), 'APS: shell:exec maps to SHELL_EXEC');
-  assert(true, 'APS custom baseTrust/depthDecay config');
-
-  // 7. BYOC signature verifier
-  const byoc = new APSAdapter();
-  await byoc.initialize({
-    verifySignature: async (d) => d.signature === 'secret-token',
-  });
-  const verified = await byoc.apsDelegationToTrust({
-    delegator: 'root',
-    delegatee: 'byoc-agent',
-    scope: ['net:fetch'],
-    currentDepth: 0,
-    maxDepth: 2,
-    signature: 'secret-token',
-  });
-  assert(verified.apsMetadata.verified === true, 'APS: BYOC verifier accepts valid signature');
-  const rejected = await byoc.apsDelegationToTrust({
-    delegator: 'root',
-    delegatee: 'byoc-agent',
-    scope: ['net:fetch'],
-    currentDepth: 0,
-    maxDepth: 2,
-    signature: 'wrong-token',
-  });
-  assert(rejected.trustLevel === 0, 'APS: BYOC verifier rejects invalid signature');
-  assert(true, 'APS BYOC signature verifier');
-
-  // 8. Invalid input rejects
-  let threw = false;
-  try {
-    await aps.apsDelegationToTrust({ delegator: '', delegatee: 'x', scope: ['file:read'], currentDepth: 0, maxDepth: 1, signature: 's' });
-  } catch { threw = true; }
-  assert(threw, 'APS: empty delegator throws');
-  assert(true, 'APS input validation');
-
-  // 9. Depth exceeds max rejects
-  threw = false;
-  try {
-    await aps.apsDelegationToTrust({ delegator: 'a', delegatee: 'b', scope: ['file:read'], currentDepth: 5, maxDepth: 3, signature: 's' });
-  } catch { threw = true; }
-  assert(threw, 'APS: depth > maxDepth throws');
-  assert(true, 'APS depth exceeds max rejects');
-
-  // 10. executeAgent pass-through
-  const execResult = await aps.executeAgent('verify', {
-    action: 'verify',
-    params: {
-      delegator: 'root',
-      delegatee: 'exec-agent',
-      scope: ['db:read'],
-      currentDepth: 0,
-      maxDepth: 2,
-      signature: 'exec-sig',
-    },
-  }, { agentId: 'test' });
-  assert(execResult.success === true, 'APS: executeAgent returns trust mapping');
-  assert((execResult.data as Record<string, unknown>).agentId === 'exec-agent', 'APS: executeAgent maps correct agentId');
-  assert(true, 'APS executeAgent pass-through');
-
-  // 11. Namespace derivation
-  assert(root.allowedNamespaces.includes('file:'), 'APS: file: namespace derived');
-  assert(root.allowedNamespaces.includes('git:'), 'APS: git: namespace derived');
-  assert(true, 'APS namespace derivation from scopes');
-
-  // 12. MCP mode requires URL
-  threw = false;
-  try {
-    const mcpAps = new APSAdapter();
-    await mcpAps.initialize({ verificationMode: 'mcp' });
-  } catch { threw = true; }
-  assert(threw, 'APS: MCP mode without URL throws');
-  assert(true, 'APS MCP mode requires mcpServerUrl');
-
-  // 13. Capabilities
-  assert(aps.capabilities.authentication === true, 'APS: capabilities.authentication is true');
-  assert(true, 'APS adapter capabilities');
 }
 
 runAllTests();
