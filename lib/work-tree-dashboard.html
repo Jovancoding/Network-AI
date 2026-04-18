@@ -416,7 +416,7 @@
       var prevNodes = nodes;
       rootId = msg.rootId;
       nodes = safeObj(msg.nodes);
-      stats = msg.stats;
+      stats = msg.stats ? JSON.parse(JSON.stringify(msg.stats)) : null;
       for (var id in msg.nodes) {
         if (prevNodes[id] && prevNodes[id].status !== msg.nodes[id].status) {
           var n = msg.nodes[id];
@@ -424,8 +424,8 @@
         }
       }
       if (msg.agents) { agentMap = safeObjToMap(msg.agents); hasServerAgents = true; }
-      if (msg.orchestratorLogs) { orchestratorLogs = msg.orchestratorLogs; }
-      if (msg.diagnostics) { diagnostics = msg.diagnostics; }
+      if (msg.orchestratorLogs) { orchestratorLogs = JSON.parse(JSON.stringify(msg.orchestratorLogs)); }
+      if (msg.diagnostics) { diagnostics = JSON.parse(JSON.stringify(msg.diagnostics)); }
       if (!msg.agents) { deriveAgentsFromTree(); }
 
       if (activeTab === 'tree') {
@@ -1201,7 +1201,7 @@
     }
     html += '</div>';
 
-    safeSetHTML(el, html);
+    el.innerHTML = html;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1234,7 +1234,6 @@
   }
   function safeObj(src){if(!src||typeof src!=='object')return Object.create(null);var o=Object.create(null);return Object.assign(o,JSON.parse(JSON.stringify(src)));}
   function safeObjToMap(src){var m=new Map();if(!src||typeof src!=='object')return m;var clean=JSON.parse(JSON.stringify(src));var keys=Object.keys(clean);for(var i=0;i<keys.length;i++)m.set(keys[i],clean[keys[i]]);return m;}
-  function safeSetHTML(el,html){var doc=new DOMParser().parseFromString(html,'text/html');el.textContent='';while(doc.body.firstChild)el.appendChild(doc.body.firstChild);}
 
   // ═══════════════════════════════════════════════════════════════════════════
   // INIT
