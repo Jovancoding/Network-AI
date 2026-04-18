@@ -284,7 +284,7 @@
   var ws = null;
   var activeTab = 'tree';
 
-  var agentMap = Object.create(null);
+  var agentMap = new Map();
   var orchestratorLogs = [];
   var hasServerAgents = false;
   var diagnostics = null;
@@ -385,7 +385,7 @@
         agentsComputeLayout();
         updateAgentsPanel();
         agentsDraw();
-        if (Object.keys(agentMap).length > 0) {
+        if (agentMap.size > 0) {
           setTimeout(agentsFit, 80);
         }
       }
@@ -423,7 +423,7 @@
           addFeed(STATUS_ICON[n.status], n.label + ' → ' + n.status + (n.agent ? ' (@' + n.agent + ')' : ''));
         }
       }
-      if (msg.agents) { agentMap = safeObj(msg.agents); hasServerAgents = true; }
+      if (msg.agents) { agentMap = safeObjToMap(msg.agents); hasServerAgents = true; }
       if (msg.orchestratorLogs) { orchestratorLogs = msg.orchestratorLogs; }
       if (msg.diagnostics) { diagnostics = msg.diagnostics; }
       if (!msg.agents) { deriveAgentsFromTree(); }
@@ -443,15 +443,15 @@
   }
 
   function deriveAgentsFromTree() {
-    agentMap = Object.create(null);
+    agentMap = new Map();
     for (var id in nodes) {
       var node = nodes[id];
       if (!node.agent) continue;
-      var name = node.agent;
-      if (!agentMap[name]) {
-        agentMap[name] = { name: name, role: 'worker', status: 'idle', tasks: [], currentTask: null, logs: [], tokens: 0 };
+      var name = String(node.agent);
+      if (!agentMap.has(name)) {
+        agentMap.set(name, { name: name, role: 'worker', status: 'idle', tasks: [], currentTask: null, logs: [], tokens: 0 });
       }
-      var a = agentMap[name];
+      var a = agentMap.get(name);
       a.tasks.push({ id: node.id, label: node.label, status: node.status });
       a.tokens += (node.ownTokens || 0);
       if (node.status === 'running') { a.status = 'busy'; a.currentTask = node.label; }
@@ -626,16 +626,16 @@
 
   function agentsComputeLayout() {
     agentsLayout = new Map();
-    var names = Object.keys(agentMap);
+    var names = Array.from(agentMap.keys());
     if (names.length === 0) return;
 
     var orchName = null;
     for (var i = 0; i < names.length; i++) {
-      if (agentMap[names[i]].role === 'orchestrator') { orchName = names[i]; break; }
+      if (agentMap.get(names[i]).role === 'orchestrator') { orchName = names[i]; break; }
     }
     if (!orchName && rootId && nodes[rootId] && nodes[rootId].agent) {
       orchName = nodes[rootId].agent;
-      if (agentMap[orchName]) agentMap[orchName].role = 'orchestrator';
+      if (agentMap.has(orchName)) agentMap.get(orchName).role = 'orchestrator';
     }
 
     var workers = names.filter(function(n) { return n !== orchName; });
@@ -652,7 +652,7 @@
     }
 
     var orchW = ORCH_BOX_W;
-    var orchH = orchName ? Math.max(ORCH_BOX_H, boxH(agentMap[orchName])) : ORCH_BOX_H;
+    var orchH = orchName ? Math.max(ORCH_BOX_H, boxH(agentMap.get(orchName))) : ORCH_BOX_H;
     var totalW = Math.max(orchW, totalWorkerW);
     var centerX = totalW / 2;
 
@@ -663,7 +663,7 @@
     var workerTop = (orchName ? orchH + AGENT_V_GAP : 0);
     var workerLeft = centerX - totalWorkerW / 2;
     for (var wi = 0; wi < workers.length; wi++) {
-      var wh = boxH(agentMap[workers[wi]]);
+      var wh = boxH(agentMap.get(workers[wi]));
       agentsLayout.set(workers[wi], { x: workerLeft + AGENT_BOX_W / 2, y: workerTop + wh / 2, w: AGENT_BOX_W, h: wh, role: 'worker' });
       workerLeft += AGENT_BOX_W + AGENT_H_GAP;
     }
@@ -716,7 +716,7 @@
       for (var j = 0; j < names.length; j++) {
         if (names[j] === orchName) continue;
         var wR = agentsLayout.get(names[j]);
-        var agent = agentMap[names[j]];
+        var agent = agentMap.get(names[j]);
         var color = agent.status === 'busy' ? '#d29922' : agent.status === 'error' ? '#f85149' : '#3fb950';
 
         agentsCtx.save();
@@ -745,13 +745,13 @@
     }
 
     for (var k = 0; k < names.length; k++) {
-      drawAgentBox(agentsCtx, names[k], agentsLayout.get(names[k]), agentMap[names[k]], selectedAgent === names[k], pulse);
+      drawAgentBox(agentsCtx, names[k], agentsLayout.get(names[k]), agentMap.get(names[k]), selectedAgent === names[k], pulse);
     }
 
     agentsCtx.restore();
 
     var hasBusy = false;
-    for (var n in agentMap) { if (agentMap[n].status === 'busy') { hasBusy = true; break; } }
+    agentMap.forEach(function(v) { if (v.status === 'busy') hasBusy = true; });
     if (hasBusy) agentsDraw();
   }
 
@@ -1004,21 +1004,21 @@
     var listEl = document.getElementById('agent-card-list');
     if (!listEl) return;
 
-    var names = Object.keys(agentMap);
+    var names = Array.from(agentMap.keys());
     var html = '';
 
     // Sort: orchestrator first, then busy, then error, then idle
     names.sort(function(a, b) {
-      var ra = agentMap[a].role === 'orchestrator' ? 0 : 1;
-      var rb = agentMap[b].role === 'orchestrator' ? 0 : 1;
+      var ra = agentMap.get(a).role === 'orchestrator' ? 0 : 1;
+      var rb = agentMap.get(b).role === 'orchestrator' ? 0 : 1;
       if (ra !== rb) return ra - rb;
-      var sa = agentMap[a].status === 'busy' ? 0 : agentMap[a].status === 'error' ? 1 : 2;
-      var sb = agentMap[b].status === 'busy' ? 0 : agentMap[b].status === 'error' ? 1 : 2;
+      var sa = agentMap.get(a).status === 'busy' ? 0 : agentMap.get(a).status === 'error' ? 1 : 2;
+      var sb = agentMap.get(b).status === 'busy' ? 0 : agentMap.get(b).status === 'error' ? 1 : 2;
       return sa - sb;
     });
 
     for (var i = 0; i < names.length; i++) {
-      var agent = agentMap[names[i]];
+      var agent = agentMap.get(names[i]);
       var dotColor = agent.status === 'busy' ? 'var(--yellow)' : agent.status === 'error' ? 'var(--red)' : 'var(--green)';
       var isSelected = selectedAgent === names[i];
       var tc = countTaskStatuses(agent);
@@ -1060,12 +1060,12 @@
     var el = document.getElementById('agent-detail-content');
     if (!el) return;
 
-    if (!selectedAgent || !agentMap[selectedAgent]) {
+    if (!selectedAgent || !agentMap.has(selectedAgent)) {
       el.innerHTML = '<div style="color:var(--text-dim);font-size:12px">Select an agent to see details</div>';
       return;
     }
 
-    var agent = agentMap[selectedAgent];
+    var agent = agentMap.get(selectedAgent);
     var html = '';
 
     // Header
@@ -1102,12 +1102,12 @@
   }
 
   function generateNarrative() {
-    var entries = [], names = Object.keys(agentMap);
+    var entries = [], names = Array.from(agentMap.keys());
     if (names.length === 0) return entries;
     var now = new Date().toLocaleTimeString();
     var busyA = [], errorA = [], idleA = [];
     for (var i = 0; i < names.length; i++) {
-      var a = agentMap[names[i]];
+      var a = agentMap.get(names[i]);
       if (a.status === 'busy') busyA.push(a); else if (a.status === 'error') errorA.push(a); else idleA.push(a);
     }
     if (stats) entries.push({ time: now, message: 'Overall: ' + Math.round(stats.progress * 100) + '% (' + stats.completed + '/' + stats.total + ' tasks done)' });
@@ -1167,12 +1167,12 @@
 
     // Agent Health column
     html += '<div class="sv-section"><h3>Agent Health</h3>';
-    var names = Object.keys(agentMap);
+    var names = Array.from(agentMap.keys());
     if (names.length === 0) {
       html += '<div style="font-size:12px;color:var(--text-dim);padding:8px">No agents registered</div>';
     } else {
       for (var j = 0; j < names.length; j++) {
-        var agent = agentMap[names[j]];
+        var agent = agentMap.get(names[j]);
         var tc = countTaskStatuses(agent);
         var pct = tc.total > 0 ? Math.round(tc.done / tc.total * 100) : 0;
         var dotColor = agent.status === 'busy' ? 'var(--yellow)' : agent.status === 'error' ? 'var(--red)' : 'var(--green)';
@@ -1233,7 +1233,8 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
   function safeObj(src){if(!src||typeof src!=='object')return Object.create(null);var o=Object.create(null);return Object.assign(o,JSON.parse(JSON.stringify(src)));}
-  function safeSetHTML(el,html){el.textContent='';el.innerHTML=JSON.parse(JSON.stringify(html));}
+  function safeObjToMap(src){var m=new Map();if(!src||typeof src!=='object')return m;var clean=JSON.parse(JSON.stringify(src));var keys=Object.keys(clean);for(var i=0;i<keys.length;i++)m.set(keys[i],clean[keys[i]]);return m;}
+  function safeSetHTML(el,html){var doc=new DOMParser().parseFromString(html,'text/html');el.textContent='';while(doc.body.firstChild)el.appendChild(doc.body.firstChild);}
 
   // ═══════════════════════════════════════════════════════════════════════════
   // INIT
