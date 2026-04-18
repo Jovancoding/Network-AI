@@ -270,12 +270,12 @@ var activeTab = 'home';
 
 // Tree state
 var nodes = Object.create(null), rootId = null, stats = null;
-var treeLayout = {}, treeCam = {x:0,y:0,zoom:1}, treeDragging=false, treeDragStart={x:0,y:0}, treeCamStart={x:0,y:0};
+var treeLayout = new Map(), treeCam = {x:0,y:0,zoom:1}, treeDragging=false, treeDragStart={x:0,y:0}, treeCamStart={x:0,y:0};
 var treeSelectedId = null;
 
 // Agents state
 var agentMap = Object.create(null), orchestratorLogs = [];
-var agentsLayout = {}, agentsCam = {x:0,y:0,zoom:1}, agentsDragging=false, agentsDragStart={x:0,y:0}, agentsCamStart={x:0,y:0};
+var agentsLayout = new Map(), agentsCam = {x:0,y:0,zoom:1}, agentsDragging=false, agentsDragStart={x:0,y:0}, agentsCamStart={x:0,y:0};
 var selectedAgent = null;
 
 // Blackboard state
@@ -497,13 +497,13 @@ function handleMsg(msg) {
 // ═══════════════════════════════════════════════════════════════════
 function treeResize() { var r=treeView.getBoundingClientRect(); if(!r.width)return; treeCanvas.width=r.width*dpr; treeCanvas.height=r.height*dpr; treeCanvas.style.width=r.width+'px'; treeCanvas.style.height=r.height+'px'; treeCtx.setTransform(dpr,0,0,dpr,0,0); }
 function treeComputeLayout() {
-  if (!rootId||!nodes[rootId]) return; treeLayout={};
-  var w={}; function sw(id){var n=nodes[id]; if(!n||!n.children||!n.children.length){w[id]=BOX_W;return BOX_W;} var t=0; for(var i=0;i<n.children.length;i++){if(i>0)t+=H_GAP;t+=sw(n.children[i]);}w[id]=Math.max(t,BOX_W);return w[id];}
+  if (!rootId||!nodes[rootId]) return; treeLayout=new Map();
+  var w=new Map(); function sw(id){var n=nodes[id]; if(!n||!n.children||!n.children.length){w.set(id,BOX_W);return BOX_W;} var t=0; for(var i=0;i<n.children.length;i++){if(i>0)t+=H_GAP;t+=sw(n.children[i]);}w.set(id,Math.max(t,BOX_W));return w.get(id);}
   sw(rootId);
-  function assign(id,l,t){var n=nodes[id];if(!n)return;treeLayout[id]={x:l+w[id]/2,y:t+BOX_H/2,w:BOX_W,h:BOX_H};if(n.children&&n.children.length){var ct=t+BOX_H+V_GAP,cl=l;for(var i=0;i<n.children.length;i++){assign(n.children[i],cl,ct);cl+=w[n.children[i]]+H_GAP;}}}
+  function assign(id,l,t){var n=nodes[id];if(!n)return;treeLayout.set(id,{x:l+w.get(id)/2,y:t+BOX_H/2,w:BOX_W,h:BOX_H});if(n.children&&n.children.length){var ct=t+BOX_H+V_GAP,cl=l;for(var i=0;i<n.children.length;i++){assign(n.children[i],cl,ct);cl+=w.get(n.children[i])+H_GAP;}}}
   assign(rootId,0,0);
 }
-function treeFit(){ if(!rootId)return; var ids=Object.keys(treeLayout);if(!ids.length)return; var mn=Infinity,mx=-Infinity,my=-Infinity,my2=Infinity; for(var i=0;i<ids.length;i++){var r=treeLayout[ids[i]];mn=Math.min(mn,r.x-r.w/2);my2=Math.min(my2,r.y-r.h/2);mx=Math.max(mx,r.x+r.w/2);my=Math.max(my,r.y+r.h/2);} var p=50,cw=treeCanvas.width/dpr,ch=treeCanvas.height/dpr;if(!cw||!ch)return; var tw=mx-mn+p*2,th=my-my2+p*2; treeCam.zoom=Math.min(cw/tw,ch/th,1.5); treeCam.x=(mn-p)-(cw/treeCam.zoom-tw)/2; treeCam.y=(my2-p)-(ch/treeCam.zoom-th)/2; treeDraw(); }
+function treeFit(){ if(!rootId)return; var ids=Array.from(treeLayout.keys());if(!ids.length)return; var mn=Infinity,mx=-Infinity,my=-Infinity,my2=Infinity; for(var i=0;i<ids.length;i++){var r=treeLayout.get(ids[i]);mn=Math.min(mn,r.x-r.w/2);my2=Math.min(my2,r.y-r.h/2);mx=Math.max(mx,r.x+r.w/2);my=Math.max(my,r.y+r.h/2);} var p=50,cw=treeCanvas.width/dpr,ch=treeCanvas.height/dpr;if(!cw||!ch)return; var tw=mx-mn+p*2,th=my-my2+p*2; treeCam.zoom=Math.min(cw/tw,ch/th,1.5); treeCam.x=(mn-p)-(cw/treeCam.zoom-tw)/2; treeCam.y=(my2-p)-(ch/treeCam.zoom-th)/2; treeDraw(); }
 var treeAF=null; function treeDraw(){ if(treeAF)return; treeAF=requestAnimationFrame(function(){treeAF=null;_treeDraw();}); }
 function _treeDraw(){
   var cw=treeCanvas.width/dpr,ch=treeCanvas.height/dpr; treeCtx.clearRect(0,0,cw,ch); drawGrid(treeCtx,cw,ch,treeCam);
@@ -511,8 +511,8 @@ function _treeDraw(){
   var pulse=(Date.now()%2000)/2000; drawTreeArrows(rootId); drawTreeBoxes(rootId,pulse); treeCtx.restore();
   var hasR=false; for(var id in nodes) if(nodes[id].status==='running'){hasR=true;break;} if(hasR)treeDraw();
 }
-function drawTreeArrows(nid){ var n=nodes[nid],pr=treeLayout[nid]; if(!n||!pr||!n.children)return; for(var i=0;i<n.children.length;i++){var cid=n.children[i],cr=treeLayout[cid]; if(!cr)continue; var cn=nodes[cid],st=STATUS_FILL[cn?cn.status:'pending']; var x1=pr.x,y1=pr.y+pr.h/2,x2=cr.x,y2=cr.y-cr.h/2,mid=(y1+y2)/2; treeCtx.save();treeCtx.strokeStyle=st.border;treeCtx.lineWidth=2;treeCtx.globalAlpha=0.7;treeCtx.beginPath();treeCtx.moveTo(x1,y1);treeCtx.lineTo(x1,mid);treeCtx.lineTo(x2,mid);treeCtx.lineTo(x2,y2);treeCtx.stroke(); treeCtx.fillStyle=st.border;treeCtx.globalAlpha=0.9;treeCtx.beginPath();treeCtx.moveTo(x2,y2);treeCtx.lineTo(x2-ARROW_SIZE/2,y2-ARROW_SIZE);treeCtx.lineTo(x2+ARROW_SIZE/2,y2-ARROW_SIZE);treeCtx.closePath();treeCtx.fill();treeCtx.restore(); drawTreeArrows(cid);} }
-function drawTreeBoxes(nid,pulse){ var n=nodes[nid],r=treeLayout[nid]; if(!n||!r)return; drawNodeBox(treeCtx,n,r,treeSelectedId===nid,pulse); if(n.children) for(var i=0;i<n.children.length;i++) drawTreeBoxes(n.children[i],pulse); }
+function drawTreeArrows(nid){ var n=nodes[nid],pr=treeLayout.get(nid); if(!n||!pr||!n.children)return; for(var i=0;i<n.children.length;i++){var cid=n.children[i],cr=treeLayout.get(cid); if(!cr)continue; var cn=nodes[cid],st=STATUS_FILL[cn?cn.status:'pending']; var x1=pr.x,y1=pr.y+pr.h/2,x2=cr.x,y2=cr.y-cr.h/2,mid=(y1+y2)/2; treeCtx.save();treeCtx.strokeStyle=st.border;treeCtx.lineWidth=2;treeCtx.globalAlpha=0.7;treeCtx.beginPath();treeCtx.moveTo(x1,y1);treeCtx.lineTo(x1,mid);treeCtx.lineTo(x2,mid);treeCtx.lineTo(x2,y2);treeCtx.stroke(); treeCtx.fillStyle=st.border;treeCtx.globalAlpha=0.9;treeCtx.beginPath();treeCtx.moveTo(x2,y2);treeCtx.lineTo(x2-ARROW_SIZE/2,y2-ARROW_SIZE);treeCtx.lineTo(x2+ARROW_SIZE/2,y2-ARROW_SIZE);treeCtx.closePath();treeCtx.fill();treeCtx.restore(); drawTreeArrows(cid);} }
+function drawTreeBoxes(nid,pulse){ var n=nodes[nid],r=treeLayout.get(nid); if(!n||!r)return; drawNodeBox(treeCtx,n,r,treeSelectedId===nid,pulse); if(n.children) for(var i=0;i<n.children.length;i++) drawTreeBoxes(n.children[i],pulse); }
 
 setupCanvasInteraction(treeView,treeCanvas,treeCam,function(){return treeDragging;},function(v){treeDragging=v;},treeDragStart,treeCamStart,treeDraw);
 treeCanvas.addEventListener('click',function(e){var r=treeView.getBoundingClientRect();var mx=treeCam.x+(e.clientX-r.left)/treeCam.zoom,my=treeCam.y+(e.clientY-r.top)/treeCam.zoom; var h=hitTest(mx,my,treeLayout); treeSelectedId=(h===treeSelectedId)?null:h; if(treeSelectedId&&nodes[treeSelectedId])showTreeDetail(treeSelectedId); else detailSection.classList.remove('visible'); treeDraw();});
@@ -525,7 +525,7 @@ document.getElementById('tree-zf').addEventListener('click',treeFit);
 // ═══════════════════════════════════════════════════════════════════
 function agentsResize(){ var r=agentsView.getBoundingClientRect(); if(!r.width)return; agentsCanvas.width=r.width*dpr; agentsCanvas.height=r.height*dpr; agentsCanvas.style.width=r.width+'px'; agentsCanvas.style.height=r.height+'px'; agentsCtx.setTransform(dpr,0,0,dpr,0,0); }
 function agentsComputeLayout(){
-  agentsLayout={}; var names=Object.keys(agentMap); if(!names.length)return;
+  agentsLayout=new Map(); var names=Object.keys(agentMap); if(!names.length)return;
   var orchName=null; for(var i=0;i<names.length;i++) if(agentMap[names[i]].role==='orchestrator'){orchName=names[i];break;}
   if(!orchName&&rootId&&nodes[rootId]&&nodes[rootId].agent){orchName=nodes[rootId].agent;if(agentMap[orchName])agentMap[orchName].role='orchestrator';}
   var workers=names.filter(function(n){return n!==orchName;});
@@ -533,22 +533,22 @@ function agentsComputeLayout(){
   var tww=0; for(var w=0;w<workers.length;w++){if(w>0)tww+=AGENT_H_GAP;tww+=AGENT_BOX_W;}
   var ow=ORCH_BOX_W,oh=orchName?Math.max(ORCH_BOX_H,boxH(agentMap[orchName])):ORCH_BOX_H;
   var totalW=Math.max(ow,tww),cx=totalW/2;
-  if(orchName) agentsLayout[orchName]={x:cx,y:oh/2,w:ow,h:oh,role:'orchestrator'};
+  if(orchName) agentsLayout.set(orchName,{x:cx,y:oh/2,w:ow,h:oh,role:'orchestrator'});
   var wt=(orchName?oh+AGENT_V_GAP:0),wl=cx-tww/2;
-  for(var wi=0;wi<workers.length;wi++){var wh=boxH(agentMap[workers[wi]]);agentsLayout[workers[wi]]={x:wl+AGENT_BOX_W/2,y:wt+wh/2,w:AGENT_BOX_W,h:wh,role:'worker'};wl+=AGENT_BOX_W+AGENT_H_GAP;}
+  for(var wi=0;wi<workers.length;wi++){var wh=boxH(agentMap[workers[wi]]);agentsLayout.set(workers[wi],{x:wl+AGENT_BOX_W/2,y:wt+wh/2,w:AGENT_BOX_W,h:wh,role:'worker'});wl+=AGENT_BOX_W+AGENT_H_GAP;}
 }
-function agentsFit(){ var ids=Object.keys(agentsLayout);if(!ids.length)return; var mn=Infinity,mn2=Infinity,mx=-Infinity,mx2=-Infinity; for(var i=0;i<ids.length;i++){var r=agentsLayout[ids[i]];mn=Math.min(mn,r.x-r.w/2);mn2=Math.min(mn2,r.y-r.h/2);mx=Math.max(mx,r.x+r.w/2);mx2=Math.max(mx2,r.y+r.h/2);} var p=50,cw=agentsCanvas.width/dpr,ch=agentsCanvas.height/dpr;if(!cw||!ch)return; var tw=mx-mn+p*2,th=mx2-mn2+p*2; agentsCam.zoom=Math.min(cw/tw,ch/th,1.5); agentsCam.x=(mn-p)-(cw/agentsCam.zoom-tw)/2; agentsCam.y=(mn2-p)-(ch/agentsCam.zoom-th)/2; agentsDraw(); }
+function agentsFit(){ var ids=Array.from(agentsLayout.keys());if(!ids.length)return; var mn=Infinity,mn2=Infinity,mx=-Infinity,mx2=-Infinity; for(var i=0;i<ids.length;i++){var r=agentsLayout.get(ids[i]);mn=Math.min(mn,r.x-r.w/2);mn2=Math.min(mn2,r.y-r.h/2);mx=Math.max(mx,r.x+r.w/2);mx2=Math.max(mx2,r.y+r.h/2);} var p=50,cw=agentsCanvas.width/dpr,ch=agentsCanvas.height/dpr;if(!cw||!ch)return; var tw=mx-mn+p*2,th=mx2-mn2+p*2; agentsCam.zoom=Math.min(cw/tw,ch/th,1.5); agentsCam.x=(mn-p)-(cw/agentsCam.zoom-tw)/2; agentsCam.y=(mn2-p)-(ch/agentsCam.zoom-th)/2; agentsDraw(); }
 var agAF=null; function agentsDraw(){if(agAF)return;agAF=requestAnimationFrame(function(){agAF=null;_agentsDraw();});}
 function _agentsDraw(){
   var cw=agentsCanvas.width/dpr,ch=agentsCanvas.height/dpr; agentsCtx.clearRect(0,0,cw,ch); drawGrid(agentsCtx,cw,ch,agentsCam);
-  var names=Object.keys(agentsLayout); if(!names.length)return;
+  var names=Array.from(agentsLayout.keys()); if(!names.length)return;
   agentsCtx.save(); agentsCtx.translate(-agentsCam.x*agentsCam.zoom,-agentsCam.y*agentsCam.zoom); agentsCtx.scale(agentsCam.zoom,agentsCam.zoom);
   var pulse=(Date.now()%2000)/2000, orchName=null;
-  for(var i=0;i<names.length;i++) if(agentsLayout[names[i]].role==='orchestrator'){orchName=names[i];break;}
-  if(orchName){var oR=agentsLayout[orchName]; for(var j=0;j<names.length;j++){if(names[j]===orchName)continue; var wR=agentsLayout[names[j]],ag=agentMap[names[j]],col=ag.status==='busy'?'#d29922':ag.status==='error'?'#f85149':'#3fb950'; agentsCtx.save();agentsCtx.strokeStyle=col;agentsCtx.lineWidth=2;agentsCtx.globalAlpha=0.6; var x1=oR.x,y1=oR.y+oR.h/2,x2=wR.x,y2=wR.y-wR.h/2,mid=(y1+y2)/2; agentsCtx.beginPath();agentsCtx.moveTo(x1,y1);agentsCtx.lineTo(x1,mid);agentsCtx.lineTo(x2,mid);agentsCtx.lineTo(x2,y2);agentsCtx.stroke();
+  for(var i=0;i<names.length;i++) if(agentsLayout.get(names[i]).role==='orchestrator'){orchName=names[i];break;}
+  if(orchName){var oR=agentsLayout.get(orchName); for(var j=0;j<names.length;j++){if(names[j]===orchName)continue; var wR=agentsLayout.get(names[j]),ag=agentMap[names[j]],col=ag.status==='busy'?'#d29922':ag.status==='error'?'#f85149':'#3fb950'; agentsCtx.save();agentsCtx.strokeStyle=col;agentsCtx.lineWidth=2;agentsCtx.globalAlpha=0.6; var x1=oR.x,y1=oR.y+oR.h/2,x2=wR.x,y2=wR.y-wR.h/2,mid=(y1+y2)/2; agentsCtx.beginPath();agentsCtx.moveTo(x1,y1);agentsCtx.lineTo(x1,mid);agentsCtx.lineTo(x2,mid);agentsCtx.lineTo(x2,y2);agentsCtx.stroke();
     if(ag.status==='busy'){var t=(Date.now()%1500)/1500,s1=Math.abs(mid-y1),s2=Math.abs(x2-x1),s3=Math.abs(y2-mid),tl=s1+s2+s3,pos=t*tl,dx,dy; if(pos<=s1){dx=x1;dy=y1+pos;}else if(pos<=s1+s2){var p2=pos-s1;dx=x1+(x2>x1?1:-1)*p2;dy=mid;}else{dx=x2;dy=mid+(pos-s1-s2);} agentsCtx.globalAlpha=0.9;agentsCtx.fillStyle=col;agentsCtx.beginPath();agentsCtx.arc(dx,dy,4,0,Math.PI*2);agentsCtx.fill();}
     agentsCtx.fillStyle=col;agentsCtx.globalAlpha=0.9;agentsCtx.beginPath();agentsCtx.moveTo(x2,y2);agentsCtx.lineTo(x2-ARROW_SIZE/2,y2-ARROW_SIZE);agentsCtx.lineTo(x2+ARROW_SIZE/2,y2-ARROW_SIZE);agentsCtx.closePath();agentsCtx.fill();agentsCtx.restore();}}
-  for(var k=0;k<names.length;k++) drawAgentBox(agentsCtx,names[k],agentsLayout[names[k]],agentMap[names[k]],selectedAgent===names[k],pulse);
+  for(var k=0;k<names.length;k++) drawAgentBox(agentsCtx,names[k],agentsLayout.get(names[k]),agentMap[names[k]],selectedAgent===names[k],pulse);
   agentsCtx.restore();
   var hasB=false; for(var n in agentMap) if(agentMap[n].status==='busy'){hasB=true;break;} if(hasB)agentsDraw();
 }
@@ -636,7 +636,7 @@ function drawAgentBox(ctx,name,rect,agent,isSel,pulse){
 function cntTasks(a){var c={total:0,done:0,running:0,failed:0};var t=a.tasks||[];for(var i=0;i<t.length;i++){c.total++;if(t[i].status==='completed')c.done++;else if(t[i].status==='running')c.running++;else if(t[i].status==='failed')c.failed++;}return c;}
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
 function trunc(t,mw,ctx){if(!t)return'';if(ctx.measureText(t).width<=mw)return t;while(t.length>0&&ctx.measureText(t+'…').width>mw)t=t.slice(0,-1);return t+'…';}
-function hitTest(mx,my,lm){for(var id in lm){var r=lm[id];if(mx>=r.x-r.w/2&&mx<=r.x+r.w/2&&my>=r.y-r.h/2&&my<=r.y+r.h/2)return id;}return null;}
+function hitTest(mx,my,lm){var ids=Array.from(lm.keys());for(var i=0;i<ids.length;i++){var r=lm.get(ids[i]);if(mx>=r.x-r.w/2&&mx<=r.x+r.w/2&&my>=r.y-r.h/2&&my<=r.y+r.h/2)return ids[i];}return null;}
 function setupCanvasInteraction(wrap,canvas,cam,gD,sD,ds,cs,dfn){
   wrap.addEventListener('mousedown',function(e){if(e.button!==0)return;sD(true);ds.x=e.clientX;ds.y=e.clientY;cs.x=cam.x;cs.y=cam.y;wrap.classList.add('dragging');});
   window.addEventListener('mousemove',function(e){if(!gD())return;cam.x=cs.x-(e.clientX-ds.x)/cam.zoom;cam.y=cs.y-(e.clientY-ds.y)/cam.zoom;dfn();});
@@ -676,8 +676,7 @@ function addFeed(icon,msg){var e=document.createElement('div');e.className='feed
 function fmtTok(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return String(n);}
 function fmtTime(iso){if(!iso)return'—';try{return new Date(iso).toLocaleTimeString();}catch(e){return iso;}}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function safeObj(src){var o=Object.create(null);if(src&&typeof src==='object'){for(var k in src){if(Object.prototype.hasOwnProperty.call(src,k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype'){o[k]=src[k];}}}return o;}
-function safeObj(src){var o=Object.create(null);if(src&&typeof src==='object'){for(var k in src){if(Object.prototype.hasOwnProperty.call(src,k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype'){o[k]=src[k];}}}return o;}
+function safeObj(src){var o=Object.create(null);if(!src||typeof src!=='object')return o;var keys=Object.keys(src);for(var i=0;i<keys.length;i++){var k=keys[i];if(k==='__proto__'||k==='constructor'||k==='prototype')continue;Object.defineProperty(o,k,{value:src[k],writable:true,enumerable:true,configurable:true});}return o;}
 
 // ═══════════════════════════════════════════════════════════════════
 // INIT

@@ -468,7 +468,7 @@
   var treeCtx = treeCanvas.getContext('2d');
   var dpr = window.devicePixelRatio || 1;
 
-  var treeLayout = {};
+  var treeLayout = new Map();
   var treeCam = { x: 0, y: 0, zoom: 1 };
   var treeDragging = false;
   var treeDragStart = { x: 0, y: 0 };
@@ -489,22 +489,22 @@
 
   function treeComputeLayout() {
     if (!rootId || !nodes[rootId]) return;
-    treeLayout = {};
-    var widths = {};
+    treeLayout = new Map();
+    var widths = new Map();
     function sw(id) {
       var node = nodes[id];
-      if (!node || !node.children || node.children.length === 0) { widths[id] = BOX_W; return BOX_W; }
+      if (!node || !node.children || node.children.length === 0) { widths.set(id, BOX_W); return BOX_W; }
       var total = 0;
       for (var i = 0; i < node.children.length; i++) { if (i > 0) total += H_GAP; total += sw(node.children[i]); }
-      widths[id] = Math.max(total, BOX_W); return widths[id];
+      widths.set(id, Math.max(total, BOX_W)); return widths.get(id);
     }
     sw(rootId);
     function assign(id, left, top) {
       var node = nodes[id]; if (!node) return;
-      treeLayout[id] = { x: left + widths[id] / 2, y: top + BOX_H / 2, w: BOX_W, h: BOX_H };
+      treeLayout.set(id, { x: left + widths.get(id) / 2, y: top + BOX_H / 2, w: BOX_W, h: BOX_H });
       if (node.children && node.children.length > 0) {
         var ct = top + BOX_H + V_GAP, cl = left;
-        for (var i = 0; i < node.children.length; i++) { assign(node.children[i], cl, ct); cl += widths[node.children[i]] + H_GAP; }
+        for (var i = 0; i < node.children.length; i++) { assign(node.children[i], cl, ct); cl += widths.get(node.children[i]) + H_GAP; }
       }
     }
     assign(rootId, 0, 0);
@@ -512,10 +512,10 @@
 
   function treeFit() {
     if (!rootId) return;
-    var ids = Object.keys(treeLayout); if (ids.length === 0) return;
+    var ids = Array.from(treeLayout.keys()); if (ids.length === 0) return;
     var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (var i = 0; i < ids.length; i++) {
-      var r = treeLayout[ids[i]];
+      var r = treeLayout.get(ids[i]);
       minX = Math.min(minX, r.x - r.w/2); minY = Math.min(minY, r.y - r.h/2);
       maxX = Math.max(maxX, r.x + r.w/2); maxY = Math.max(maxY, r.y + r.h/2);
     }
@@ -552,10 +552,10 @@
   }
 
   function treeDrawArrows(nodeId) {
-    var node = nodes[nodeId], pr = treeLayout[nodeId];
+    var node = nodes[nodeId], pr = treeLayout.get(nodeId);
     if (!node || !pr || !node.children) return;
     for (var i = 0; i < node.children.length; i++) {
-      var cid = node.children[i], cr = treeLayout[cid];
+      var cid = node.children[i], cr = treeLayout.get(cid);
       if (!cr) continue;
       var cn = nodes[cid], style = STATUS_FILL[cn ? cn.status : 'pending'];
       var x1 = pr.x, y1 = pr.y + pr.h/2, x2 = cr.x, y2 = cr.y - cr.h/2, midY = (y1+y2)/2;
@@ -570,7 +570,7 @@
   }
 
   function treeDrawBoxes(nodeId, pulse) {
-    var node = nodes[nodeId], rect = treeLayout[nodeId];
+    var node = nodes[nodeId], rect = treeLayout.get(nodeId);
     if (!node || !rect) return;
     drawNodeBox(treeCtx, node, rect, treeSelectedId === nodeId, pulse);
     if (node.children) { for (var i = 0; i < node.children.length; i++) treeDrawBoxes(node.children[i], pulse); }
@@ -599,7 +599,7 @@
   var agentsCanvas = document.getElementById('agents-canvas');
   var agentsCtx = agentsCanvas.getContext('2d');
 
-  var agentsLayout = {};
+  var agentsLayout = new Map();
   var agentsCam = { x: 0, y: 0, zoom: 1 };
   var agentsDragging = false;
   var agentsDragStart = { x: 0, y: 0 };
@@ -625,7 +625,7 @@
   }
 
   function agentsComputeLayout() {
-    agentsLayout = {};
+    agentsLayout = new Map();
     var names = Object.keys(agentMap);
     if (names.length === 0) return;
 
@@ -657,23 +657,23 @@
     var centerX = totalW / 2;
 
     if (orchName) {
-      agentsLayout[orchName] = { x: centerX, y: orchH / 2, w: orchW, h: orchH, role: 'orchestrator' };
+      agentsLayout.set(orchName, { x: centerX, y: orchH / 2, w: orchW, h: orchH, role: 'orchestrator' });
     }
 
     var workerTop = (orchName ? orchH + AGENT_V_GAP : 0);
     var workerLeft = centerX - totalWorkerW / 2;
     for (var wi = 0; wi < workers.length; wi++) {
       var wh = boxH(agentMap[workers[wi]]);
-      agentsLayout[workers[wi]] = { x: workerLeft + AGENT_BOX_W / 2, y: workerTop + wh / 2, w: AGENT_BOX_W, h: wh, role: 'worker' };
+      agentsLayout.set(workers[wi], { x: workerLeft + AGENT_BOX_W / 2, y: workerTop + wh / 2, w: AGENT_BOX_W, h: wh, role: 'worker' });
       workerLeft += AGENT_BOX_W + AGENT_H_GAP;
     }
   }
 
   function agentsFit() {
-    var ids = Object.keys(agentsLayout); if (ids.length === 0) return;
+    var ids = Array.from(agentsLayout.keys()); if (ids.length === 0) return;
     var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (var i = 0; i < ids.length; i++) {
-      var r = agentsLayout[ids[i]];
+      var r = agentsLayout.get(ids[i]);
       minX = Math.min(minX, r.x - r.w/2); minY = Math.min(minY, r.y - r.h/2);
       maxX = Math.max(maxX, r.x + r.w/2); maxY = Math.max(maxY, r.y + r.h/2);
     }
@@ -697,7 +697,7 @@
     agentsCtx.clearRect(0, 0, cw, ch);
     drawGrid(agentsCtx, cw, ch, agentsCam);
 
-    var names = Object.keys(agentsLayout);
+    var names = Array.from(agentsLayout.keys());
     if (names.length === 0) return;
 
     agentsCtx.save();
@@ -708,14 +708,14 @@
 
     var orchName = null;
     for (var i = 0; i < names.length; i++) {
-      if (agentsLayout[names[i]].role === 'orchestrator') { orchName = names[i]; break; }
+      if (agentsLayout.get(names[i]).role === 'orchestrator') { orchName = names[i]; break; }
     }
 
     if (orchName) {
-      var orchR = agentsLayout[orchName];
+      var orchR = agentsLayout.get(orchName);
       for (var j = 0; j < names.length; j++) {
         if (names[j] === orchName) continue;
-        var wR = agentsLayout[names[j]];
+        var wR = agentsLayout.get(names[j]);
         var agent = agentMap[names[j]];
         var color = agent.status === 'busy' ? '#d29922' : agent.status === 'error' ? '#f85149' : '#3fb950';
 
@@ -745,7 +745,7 @@
     }
 
     for (var k = 0; k < names.length; k++) {
-      drawAgentBox(agentsCtx, names[k], agentsLayout[names[k]], agentMap[names[k]], selectedAgent === names[k], pulse);
+      drawAgentBox(agentsCtx, names[k], agentsLayout.get(names[k]), agentMap[names[k]], selectedAgent === names[k], pulse);
     }
 
     agentsCtx.restore();
@@ -931,7 +931,7 @@
   }
 
   function hitTest(mx,my,layoutMap) {
-    for (var id in layoutMap) { var r=layoutMap[id]; if (mx>=r.x-r.w/2&&mx<=r.x+r.w/2&&my>=r.y-r.h/2&&my<=r.y+r.h/2) return id; }
+    var ids=Array.from(layoutMap.keys()); for (var i=0;i<ids.length;i++) { var r=layoutMap.get(ids[i]); if (mx>=r.x-r.w/2&&mx<=r.x+r.w/2&&my>=r.y-r.h/2&&my<=r.y+r.h/2) return ids[i]; }
     return null;
   }
 
@@ -1201,7 +1201,7 @@
     }
     html += '</div>';
 
-    el.innerHTML = html;
+    safeSetHTML(el, html);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1232,7 +1232,8 @@
   function escapeHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
-  function safeObj(src){var o=Object.create(null);if(src&&typeof src==='object'){for(var k in src){if(Object.prototype.hasOwnProperty.call(src,k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype'){o[k]=src[k];}}}return o;}
+  function safeObj(src){var o=Object.create(null);if(!src||typeof src!=='object')return o;var keys=Object.keys(src);for(var i=0;i<keys.length;i++){var k=keys[i];if(k==='__proto__'||k==='constructor'||k==='prototype')continue;Object.defineProperty(o,k,{value:src[k],writable:true,enumerable:true,configurable:true});}return o;}
+  function safeSetHTML(el,html){var t=document.createElement('template');t.innerHTML=html;el.textContent='';el.appendChild(t.content.cloneNode(true));}
 
   // ═══════════════════════════════════════════════════════════════════════════
   // INIT
