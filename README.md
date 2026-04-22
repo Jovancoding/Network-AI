@@ -522,3 +522,7 @@ MIT License — [LICENSE](LICENSE) &nbsp;·&nbsp; [CHANGELOG](CHANGELOG.md) &nbs
 multi-agent · agent orchestration · AI agents · agentic AI · agentic workflow · TypeScript · Node.js · LangGraph · CrewAI · AutoGen · MCP · model-context-protocol · LlamaIndex · Semantic Kernel · OpenAI Assistants · Haystack · DSPy · Agno · OpenClaw · ClawHub · shared state · blackboard pattern · atomic commits · guardrails · token budgets · permission gating · audit trail · agent coordination · agent handoffs · governance · cost-awareness
 
 </details>
+
+## Download History
+
+[![Download History](https://skill-history.com/chart/jovancoding/network-ai.svg)](https://skill-history.com/jovancoding/network-ai)
