@@ -235,6 +235,22 @@ export class ControlMcpTools implements McpToolProvider {
     if (!key) return { ok: false, tool: 'config_set', error: 'key is required' };
     if (!rawValue && rawValue !== '0') return { ok: false, tool: 'config_set', error: 'value is required' };
 
+    // Defense-in-depth: only permit known, safe config keys
+    const ALLOWED_KEYS: ReadonlySet<string> = new Set([
+      'maxParallelAgents',
+      'defaultTimeout',
+      'enableTracing',
+      'grantTokenTTL',
+      'maxBlackboardValueSize',
+    ]);
+    if (!ALLOWED_KEYS.has(key)) {
+      return {
+        ok: false,
+        tool: 'config_set',
+        error: `Unknown or immutable config key: "${key}". Allowed keys: ${[...ALLOWED_KEYS].join(', ')}`,
+      };
+    }
+
     let parsed: unknown;
     try {
       parsed = JSON.parse(rawValue);

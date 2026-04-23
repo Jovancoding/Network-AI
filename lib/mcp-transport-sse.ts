@@ -229,10 +229,21 @@ export class McpBlackboardBridgeAdapter implements McpToolProvider {
 export interface McpSseServerOptions {
   /** TCP port to listen on. Defaults to `3001`. */
   port?: number;
-  /** Hostname to bind to. Defaults to `'0.0.0.0'` (all interfaces). */
+  /**
+   * Hostname to bind to. Defaults to `'127.0.0.1'` (loopback only).
+   * Set to `'0.0.0.0'` to bind all interfaces, but you MUST also supply
+   * a `secret` to gate unauthenticated access.
+   */
   host?: string;
   /** Heartbeat interval in ms. Defaults to `15000`. Set to `0` to disable. */
   heartbeatMs?: number;
+  /**
+   * Shared secret for bearer-token authentication.
+   * When set, every POST /mcp and GET /sse request must supply
+   * `Authorization: Bearer <secret>` or receive a 401 response.
+   * Load from the `NETWORK_AI_MCP_SECRET` environment variable in production.
+   */
+  secret?: string;
 }
 
 /**
@@ -259,14 +270,25 @@ export class McpSseServer {
     this._bridge = bridge;
     this._opts = {
       port: options.port ?? 3001,
-      host: options.host ?? '0.0.0.0',
+      host: options.host ?? '127.0.0.1',
       heartbeatMs: options.heartbeatMs ?? 15000,
+      secret: options.secret ?? '',
     };
   }
 
   /** Start listening. Resolves when the server is ready. */
   listen(): Promise<void> {
     this._server = requireHttp().createServer((req, res) => this._handleRequest(req, res));
+    // Warn when binding to a non-loopback address without authentication
+    const isLoopback = this._opts.host === '127.0.0.1' || this._opts.host === 'localhost' || this._opts.host === '::1';
+    if (!isLoopback && !this._opts.secret) {
+      process.stderr.write(
+        '[network-ai] WARNING: MCP server is binding to ' + this._opts.host +
+        ' with no authentication secret. Set McpSseServerOptions.secret (or' +
+        ' NETWORK_AI_MCP_SECRET env var) to gate access. Unauthenticated' +
+        ' callers can read and mutate live orchestrator state.\n'
+      );
+    }
     return new Promise(resolve => {
       this._server.listen(this._opts.port, this._opts.host, () => resolve());
     });
@@ -298,6 +320,27 @@ export class McpSseServer {
     for (const client of this._sseClients) {
       try { client.write(msg); } catch { /* client disconnected */ }
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // AUTH
+  // --------------------------------------------------------------------------
+
+  /**
+   * Returns true when the request carries a valid `Authorization: Bearer <secret>`
+   * header, or when no secret is configured (open access).
+   */
+  private _isAuthorized(req: http.IncomingMessage): boolean {
+    if (!this._opts.secret) return true;
+    const authHeader = req.headers['authorization'];
+    if (typeof authHeader !== 'string') return false;
+    const parts = authHeader.split(' ');
+    return parts[0]?.toLowerCase() === 'bearer' && parts[1] === this._opts.secret;
+  }
+
+  private _unauthorized(res: http.ServerResponse): void {
+    res.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="network-ai"' });
+    res.end(JSON.stringify({ error: 'Unauthorized', message: 'Provide Authorization: Bearer <secret>' }));
   }
 
   // --------------------------------------------------------------------------
@@ -339,8 +382,10 @@ export class McpSseServer {
     }
 
     if (req.method === 'GET' && (path === '/sse' || path === '/')) {
+      if (!this._isAuthorized(req)) { this._unauthorized(res); return; }
       this._handleSse(req, res);
     } else if (req.method === 'POST' && (path === '/mcp' || path === '/')) {
+      if (!this._isAuthorized(req)) { this._unauthorized(res); return; }
       this._handlePost(req, res);
     } else if (req.method === 'GET' && path === '/health') {
       this._handleHealth(res);

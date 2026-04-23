@@ -66,13 +66,14 @@ interface ServerArgs {
   auditLog: string;
   heartbeat: number;
   stdio: boolean;
+  secret: string;
   help: boolean;
 }
 
 function parseArgs(argv: string[]): ServerArgs {
   const args: ServerArgs = {
     port: 3001,
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     board: 'main',
     ceiling: 1_000_000,
     noBudget: false,
@@ -83,6 +84,8 @@ function parseArgs(argv: string[]): ServerArgs {
     auditLog: './data/audit_log.jsonl',
     heartbeat: 15000,
     stdio: false,
+    // Load from env var first; CLI flag overrides
+    secret: process.env['NETWORK_AI_MCP_SECRET'] ?? '',
     help: false,
   };
 
@@ -91,11 +94,12 @@ function parseArgs(argv: string[]): ServerArgs {
     const next = argv[i + 1];
     switch (arg) {
       case '--port':       args.port = parseInt(next ?? '3001', 10); i++; break;
-      case '--host':       args.host = next ?? '0.0.0.0'; i++; break;
+      case '--host':       args.host = next ?? '127.0.0.1'; i++; break;
       case '--board':      args.board = next ?? 'main'; i++; break;
       case '--ceiling':    args.ceiling = parseFloat(next ?? '1000000'); i++; break;
       case '--audit-log':  args.auditLog = next ?? './data/audit_log.jsonl'; i++; break;
       case '--heartbeat':  args.heartbeat = parseInt(next ?? '15000', 10); i++; break;
+      case '--secret':     args.secret = next ?? ''; i++; break;
       case '--no-budget':    args.noBudget = true; break;
       case '--no-token':     args.noToken = true; break;
       case '--no-extended':  args.noExtended = true; break;
@@ -117,7 +121,8 @@ Usage: npx ts-node bin/mcp-server.ts [options]
 Options:
   --stdio              Run in stdio mode (JSON-RPC over stdin/stdout)
   --port <n>           TCP port (default: 3001)
-  --host <h>           Bind host (default: 0.0.0.0)
+  --host <h>           Bind host (default: 127.0.0.1)
+  --secret <token>     Bearer token required on all HTTP requests (env: NETWORK_AI_MCP_SECRET)
   --board <name>       Named blackboard to expose (default: main)
   --ceiling <n>        Budget token ceiling (default: 1000000)
   --audit-log <path>   Audit log path (default: ./data/audit_log.jsonl)
@@ -294,10 +299,21 @@ async function main(): Promise<void> {
   }
 
   // SSE/HTTP mode
+  const isLoopback = args.host === '127.0.0.1' || args.host === 'localhost' || args.host === '::1';
+  if (!isLoopback && !args.secret) {
+    console.warn(
+      '\n[network-ai-server] WARNING: Binding to ' + args.host +
+      ' with no --secret set. Any network-reachable client can access all' +
+      ' 22 MCP tools, including config_set and agent_spawn. Pass' +
+      ' --secret <token> or set NETWORK_AI_MCP_SECRET to require authentication.\n'
+    );
+  }
+
   const server = new McpSseServer(combined, {
     port: args.port,
     host: args.host,
     heartbeatMs: args.heartbeat,
+    secret: args.secret,
   });
 
   await server.listen();

@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.3] - 2026-04-19
+
+### Security
+- **CWE-306 (Missing Authentication) — HIGH** — MCP HTTP transport (`lib/mcp-transport-sse.ts`) now requires bearer token authentication on all `POST /mcp` and `GET /sse` requests when a `secret` is configured. Unauthenticated callers receive HTTP 401 with `WWW-Authenticate: Bearer` challenge.
+- **Default bind address changed** — `McpSseServer` and `bin/mcp-server.ts` now bind to `127.0.0.1` (loopback) by default instead of `0.0.0.0`. Use `--host 0.0.0.0` explicitly to bind all interfaces.
+- **Startup warning** — Starting the server bound to a non-loopback address without a secret now emits a prominent `WARNING` to stderr, listing the specific risk.
+- **`config_set` key allowlist** — `ControlMcpTools._configSet()` now rejects writes to unknown config keys. Only `maxParallelAgents`, `defaultTimeout`, `enableTracing`, `grantTokenTTL`, and `maxBlackboardValueSize` are mutable via MCP.
+- **New CLI flag `--secret <token>`** — Pass an authentication secret at server startup. Can also be set via the `NETWORK_AI_MCP_SECRET` environment variable (env var takes lower precedence than CLI flag).
+
+### Tests
+- 8 new auth tests in `test-phase6.ts`: unauthenticated POST → 401, wrong token → 401, correct token → 200, public endpoints (`/health`, `/tools`) remain open. Total: **2699 tests, 0 failures**.
+
 ## [5.1.2] - 2026-04-18
 
 ### Fixed

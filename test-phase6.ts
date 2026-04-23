@@ -92,6 +92,14 @@ function httpPostRaw(url: string, rawBody: string): Promise<{ status: number; bo
 }
 
 function httpPost(url: string, body: unknown): Promise<{ status: number; body: string }> {
+  return httpPostWithHeaders(url, body, {});
+}
+
+function httpPostWithAuth(url: string, body: unknown, secret: string): Promise<{ status: number; body: string }> {
+  return httpPostWithHeaders(url, body, { Authorization: `Bearer ${secret}` });
+}
+
+function httpPostWithHeaders(url: string, body: unknown, extraHeaders: Record<string, string>): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(body);
     const parsed = new URL(url);
@@ -100,7 +108,7 @@ function httpPost(url: string, body: unknown): Promise<{ status: number; body: s
       port: parseInt(parsed.port, 10),
       path: parsed.pathname,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), ...extraHeaders },
     };
     const req = http.request(options, res => {
       let data = '';
@@ -577,6 +585,71 @@ async function testSseServer(): Promise<void> {
 }
 
 // ============================================================================
+// SECTION 7b: McpSseServer — bearer token authentication
+// ============================================================================
+
+const AUTH_TEST_PORT = 3098;
+const TEST_SECRET = 'test-secret-abc123';
+
+async function testSseServerAuth(): Promise<void> {
+  suite('McpSseServer — bearer token authentication (port 3098)');
+
+  const bb = makeBlackboard();
+  const bridge = new McpBlackboardBridge(bb, { name: 'auth-test' });
+  const combined = new McpCombinedBridge('auth-test-network-ai');
+  combined.register(new McpBlackboardBridgeAdapter(bridge));
+
+  const server = new McpSseServer(combined, {
+    port: AUTH_TEST_PORT,
+    host: '127.0.0.1',
+    heartbeatMs: 0,
+    secret: TEST_SECRET,
+  });
+  await server.listen();
+
+  try {
+    // /health and /tools are not gated — always accessible
+    const health = await httpGet(`http://127.0.0.1:${AUTH_TEST_PORT}/health`);
+    assert(health.status === 200, `Auth: GET /health is public (got ${health.status})`);
+
+    const tools = await httpGet(`http://127.0.0.1:${AUTH_TEST_PORT}/tools`);
+    assert(tools.status === 200, `Auth: GET /tools is public (got ${tools.status})`);
+
+    // POST /mcp without Authorization header → 401
+    const unauthPost = await httpPost(`http://127.0.0.1:${AUTH_TEST_PORT}/mcp`, {
+      jsonrpc: '2.0', id: 1, method: 'tools/list',
+    });
+    assert(unauthPost.status === 401, `Auth: POST /mcp without token → 401 (got ${unauthPost.status})`);
+
+    // POST /mcp with wrong token → 401
+    const wrongTokenPost = await httpPostWithAuth(`http://127.0.0.1:${AUTH_TEST_PORT}/mcp`, {
+      jsonrpc: '2.0', id: 2, method: 'tools/list',
+    }, 'wrong-secret');
+    assert(wrongTokenPost.status === 401, `Auth: POST /mcp with wrong token → 401 (got ${wrongTokenPost.status})`);
+
+    // POST /mcp with correct token → 200
+    const authPost = await httpPostWithAuth(`http://127.0.0.1:${AUTH_TEST_PORT}/mcp`, {
+      jsonrpc: '2.0', id: 3, method: 'tools/list',
+    }, TEST_SECRET);
+    assert(authPost.status === 200, `Auth: POST /mcp with valid token → 200 (got ${authPost.status})`);
+    const authBody = JSON.parse(authPost.body) as { result: { tools: unknown[] } };
+    assert(Array.isArray(authBody.result?.tools), 'Auth: authenticated tools/list returns tools array');
+
+    // POST /mcp with correct token — blackboard_write
+    const authWrite = await httpPostWithAuth(`http://127.0.0.1:${AUTH_TEST_PORT}/mcp`, {
+      jsonrpc: '2.0', id: 4, method: 'tools/call',
+      params: { name: 'blackboard_write', arguments: { key: 'auth:test', value: '"secure"', agent_id: 'auth-test' } },
+    }, TEST_SECRET);
+    assert(authWrite.status === 200, `Auth: authenticated blackboard_write → 200`);
+    const writeResult = JSON.parse(authWrite.body) as { result: { isError: boolean } };
+    assert(writeResult.result?.isError === false, 'Auth: authenticated blackboard_write isError === false');
+
+  } finally {
+    await server.close();
+  }
+}
+
+// ============================================================================
 // SECTION 8: Integration — full combined bridge end-to-end
 // ============================================================================
 
@@ -668,6 +741,7 @@ async function main(): Promise<void> {
   await testExtendedAudit();
   await testControlTools();
   await testSseServer();
+  await testSseServerAuth();
   await testFullIntegration();
 
   console.log('\n' + '='.repeat(60));
