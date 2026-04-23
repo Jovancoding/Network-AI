@@ -106,7 +106,7 @@
     "dotenv": "^17.4.2",
     "openai": "^6.34.0",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   },
   "files": [
     "dist/",
