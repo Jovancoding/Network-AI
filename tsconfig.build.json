@@ -5,6 +5,7 @@
     "dist",
     "test*.ts",
     "setup.ts",
-    "run-tests.ts"
+    "run-tests.ts",
+    "examples/output"
   ]
 }
