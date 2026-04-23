@@ -11,10 +11,10 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, gu
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 2,691 tests across 26 suites
+npm run test:all              # Run all 2,711 tests across 26 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
-npm run test:adapters         # All 27 adapter tests
+npm run test:adapters         # All 28 adapter tests
 npm run test:priority         # Priority & preemption tests
 npm run test:cli              # CLI layer tests
 ```
@@ -38,7 +38,7 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/console-ui.ts` — ConsoleUI: interactive terminal dashboard with ANSI TUI
 - `lib/strategy-agent.ts` — StrategyAgent: meta-orchestrator with AgentPool, WorkloadPartitioner, adaptive scaling
 - `lib/goal-decomposer.ts` — GoalDecomposer, TeamRunner, runTeam: LLM-powered goal → task DAG → parallel execution
-- `adapters/` — 27 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, Orchestrator, etc.)
+- `adapters/` — 28 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)
 - `bin/console.ts` — Interactive console with pipe mode (`npx network-ai-console`)

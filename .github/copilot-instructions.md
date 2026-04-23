@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.0.0). 2,691 tests across 26 suites.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.1.4). 2,711 tests across 26 suites.
 
 ## Architecture
 
 - **Blackboard pattern**: All coordination via `LockedBlackboard` — `propose()` → `validate()` → `commit()` with filesystem mutex. Never write to shared state directly.
 - **Permission gating**: `AuthGuardian` uses weighted scoring (justification 40%, trust 30%, risk 30%). Require permission before sensitive resource access.
-- **Adapter system**: All 27 adapters extend `BaseAdapter`. Each is dependency-free (BYOC — bring your own client). No cross-adapter imports.
+- **Adapter system**: All 28 adapters extend `BaseAdapter`. Each is dependency-free (BYOC — bring your own client). No cross-adapter imports.
 - **Audit trail**: Every write, permission grant, and state transition is logged to `data/audit_log.jsonl` via `SecureAuditLogger`.
 
 ## Code Conventions
@@ -37,15 +37,15 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, gu
 - `lib/console-ui.ts` — ConsoleUI interactive terminal dashboard
 - `lib/strategy-agent.ts` — StrategyAgent meta-orchestrator with AgentPool, WorkloadPartitioner, adaptive scaling
 - `lib/goal-decomposer.ts` — GoalDecomposer, TeamRunner, runTeam: LLM-powered goal → task DAG → parallel execution
-- `adapters/` — 27 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, Orchestrator, etc.)
+- `adapters/` — 28 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 
 ## Build & Test
 
 ```bash
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # All 2,691 tests across 26 suites
+npm run test:all              # All 2,711 tests across 26 suites
 npm test                      # Core orchestrator tests
-npm run test:adapters         # All 27 adapters
+npm run test:adapters         # All 28 adapters
 ```
 
 All tests must pass before any commit. No test should be skipped or marked `.only`.

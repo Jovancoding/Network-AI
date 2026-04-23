@@ -1390,6 +1390,85 @@ async function testAgnoAdapter(): Promise<void> {
 }
 
 // ============================================================================
+// TEST 15b: HermesAdapter
+// ============================================================================
+
+async function testHermesAdapter(): Promise<void> {
+  section('HermesAdapter — NousResearch Hermes (BYOC / OpenAI-compatible)');
+
+  const { HermesAdapter } = await import('./adapters/hermes-adapter');
+  const adapter = new HermesAdapter();
+  await adapter.initialize({});
+
+  // --- Registration ---
+  adapter.registerAgent('assistant', {
+    model: 'hermes3',
+    systemPrompt: 'You are a helpful assistant.',
+  });
+  adapter.registerAgent('reasoner', {
+    model: 'hermes3:70b',
+    baseUrl: 'http://localhost:11434/v1',
+    maxTokens: 512,
+    temperature: 0.4,
+  });
+
+  const agents = await adapter.listAgents();
+  assert(agents.length === 2, 'Two Hermes agents registered');
+  assert(agents.some((a) => a.id === 'assistant'), 'assistant agent registered');
+  assert(agents.some((a) => a.id === 'reasoner'), 'reasoner agent registered');
+
+  // --- BYOC client path ---
+  const mockClient = {
+    create: async (params: {
+      model: string;
+      messages: Array<{ role: string; content: string }>;
+    }) => ({
+      choices: [{ message: { content: `Echo: ${params.messages[params.messages.length - 1].content}` } }],
+      usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+    }),
+  };
+  adapter.registerAgent('byoc', { model: 'hermes3', client: mockClient });
+
+  const ctx: AgentContext = { agentId: 'test', taskId: 't1' };
+  const result = await adapter.executeAgent('byoc', {
+    action: 'greet',
+    params: {},
+    handoff: {
+      handoffId: 'h1',
+      sourceAgent: 'test',
+      targetAgent: 'byoc',
+      taskType: 'delegate' as const,
+      instruction: 'Say hello',
+    },
+  }, ctx);
+
+  assert(result.success === true, 'BYOC agent executes successfully');
+  const data = result.data as Record<string, unknown>;
+  assert(typeof data.response === 'string', 'Response is a string');
+  assert((data.response as string).includes('Say hello'), 'Response contains prompt content');
+  assert(data.model === 'hermes3', 'Model name preserved in result');
+  assert((data.usage as Record<string, number>).total_tokens === 30, 'Usage stats returned');
+
+  // --- Error: unknown agent ---
+  const errResult = await adapter.executeAgent('no-such-agent', { action: 'x', params: {} }, ctx);
+  assert(errResult.success === false, 'Missing agent returns failure');
+  assert(typeof (errResult.error as Record<string, unknown>)?.message === 'string', 'Error message provided');
+
+  // --- Error: invalid agentId registration ---
+  let threw = false;
+  try {
+    adapter.registerAgent('', { model: 'hermes3' });
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'Empty agentId throws on registration');
+
+  // --- Shutdown clears agents ---
+  await adapter.shutdown();
+  assert(!(await adapter.isAgentAvailable('byoc')), 'Agents cleared after shutdown');
+}
+
+// ============================================================================
 // TEST 15: APSAdapter
 // ============================================================================
 
@@ -1693,6 +1772,7 @@ async function runAllTests(): Promise<void> {
     await testHaystackAdapter();
     await testDSPyAdapter();
     await testAgnoAdapter();
+    await testHermesAdapter();
     await testAPSAdapter();
     await testAllAdaptersInRegistry();
   } catch (error) {

@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.4] - 2026-04-23
+
+### Added
+- **HermesAdapter** (`adapters/hermes-adapter.ts`) — adapter #28 wrapping NousResearch Hermes and any OpenAI-compatible endpoint (Ollama, Together AI, Fireworks, llama.cpp). BYOC client path (`HermesChatClient`) or built-in `fetch`; API key from `HERMES_API_KEY` env var; per-request `AbortController` timeout.
+- 12 new tests in `test-adapters.ts` covering registration, BYOC path, response shape, model name, usage stats, unknown-agent error, and empty-agentId guard. Total: **2711 tests, 0 failures**.
+
+### Removed
+- **`scripts/postinstall.js`** — patched `node_modules/openai/src/tsconfig.json` on install to suppress a TypeScript 6.x `moduleResolution` deprecation warning. The patch is no longer needed (TypeScript compiles cleanly without it) and the script triggered a Socket.dev install-scripts alert. Removed from `package.json` `scripts.postinstall`.
+
 ## [5.1.3] - 2026-04-19
 
 ### Security

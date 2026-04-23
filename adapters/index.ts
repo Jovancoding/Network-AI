@@ -128,6 +128,10 @@ export type {
 export { CopilotAdapter } from './copilot-adapter';
 export type { CopilotTaskType, CopilotOptions, CopilotConnection } from './copilot-adapter';
 
+// Hermes adapter (NousResearch Hermes — Ollama / OpenAI-compatible endpoint, BYOC)
+export { HermesAdapter } from './hermes-adapter';
+export type { HermesAgentConfig, HermesChatClient } from './hermes-adapter';
+
 // LangGraph adapter (LangChain stateful graph execution)
 export { LangGraphAdapter } from './langgraph-adapter';
 export type { LangGraphRunnable, LangGraphStreamable, LangGraphAgentConfig } from './langgraph-adapter';

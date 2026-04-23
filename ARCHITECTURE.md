@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.1.3 — TypeScript/Node.js multi-agent orchestrator with 27 adapters, 2,699 tests, 65+ modules.
+Network-AI v5.1.4 — TypeScript/Node.js multi-agent orchestrator with 28 adapters, 2,711 tests, 65+ modules.
 
 ## The Multi-Agent Race Condition Problem
 
@@ -55,7 +55,7 @@ flowchart TD
         QG["QualityGateAgent\n(validate blackboard writes)"]:::quality
         QA["QAOrchestratorAgent\n(scenario replay, regression tracking)"]:::quality
         BB["SharedBlackboard\n(shared agent state)\npropose → validate → commit\nfilesystem mutex"]:::blackboard
-        AD["Adapters — plug any framework in, swap freely\n27 adapters: LangChain · AutoGen · CrewAI · MCP · Copilot · LangGraph · Vertex AI · …"]:::adapters
+        AD["Adapters — plug any framework in, swap freely\n28 adapters: LangChain · AutoGen · CrewAI · MCP · Copilot · LangGraph · Hermes · …"]:::adapters
         RT["AgentRuntime\n(sandbox policy, approval gates)"]:::security
         CUI["ConsoleUI\n(TUI dashboard + pipe mode)"]:::app
         SA["StrategyAgent\n(AgentPool, WorkloadPartitioner,\nadaptive scaling)"]:::routing
