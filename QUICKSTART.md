@@ -50,6 +50,9 @@ npx ts-node setup.ts --check
 | `vertex-ai` | Vertex AI / Gemini | `@google-cloud/vertexai` | Function calling, multi-modal |
 | `pydantic-ai` | Pydantic AI | none | Structured output with validation |
 | `browser-agent` | Browser Automation | none | Playwright/Puppeteer/CDP browser control |
+| `hermes` | NousResearch Hermes / OpenAI-compatible | none | Ollama, Together AI, Fireworks, llama.cpp |
+| `orchestrator` | Hierarchical multi-orchestrator | none | Nested orchestrator coordination |
+| `rlm` | RLM-compatible HTTP endpoint | none | Recursive Language Model servers (BYOC client) |
 
 ---
 

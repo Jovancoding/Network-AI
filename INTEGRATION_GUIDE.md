@@ -64,7 +64,7 @@ Answers drive `AuthGuardian` configuration and audit log retention policy.
 
 ## 2. Framework Mapping
 
-Network-AI ships 28 adapters. Map your existing agents to the right one:
+Network-AI ships 29 adapters. Map your existing agents to the right one:
 
 | Your Stack | Network-AI Adapter | Notes |
 |-----------|-------------------|-------|
@@ -91,6 +91,9 @@ Network-AI ships 28 adapters. Map your existing agents to the right one:
 | Google Vertex AI / Gemini | `VertexAIAdapter` | Function calling, multi-modal (text+image) |
 | Pydantic AI | `PydanticAIAdapter` | Structured output with validation, deps injection |
 | Browser automation | `BrowserAgentAdapter` | Playwright/Puppeteer/CDP browser control |
+| NousResearch Hermes / OpenAI-compatible | `HermesAdapter` | Ollama, Together AI, Fireworks, llama.cpp |
+| Hierarchical multi-orchestrator | `OrchestratorAdapter` | Nested orchestrator coordination |
+| RLM-compatible HTTP endpoint | `RLMAdapter` | Recursive Language Model servers (arxiv 2512.24601); BYOC client |
 | **Anything else** | `CustomAdapter` | Wrap any async function or HTTP endpoint |
 
 ### No matching framework?

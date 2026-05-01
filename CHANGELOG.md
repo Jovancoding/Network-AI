@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.0] - 2026-05-01
+
+### Added
+- **RLMAdapter** (`adapters/rlm-adapter.ts`) — adapter #29 connecting the SwarmOrchestrator to any RLM-compatible HTTP endpoint ([arxiv 2512.24601](https://arxiv.org/abs/2512.24601) / alexzhang13/rlm). BYOC — bring your own HTTP client (`RLMHttpClient`); serialises each `AgentPayload` into a prompt and POSTs to `<endpoint>/completion`; surfaces `RLM_REQUEST_FAILED` / `AGENT_NOT_FOUND` error codes; `executionTimeMs` in result metadata.
+- **`FederatedBudget.spawnChild()`** — create named child budgets with an absolute ceiling capped to the parent's remaining balance; `commit()` now propagates spend up the tree so the parent ceiling is always respected across nested budget hierarchies.
+- **`LockedBlackboard.readMetadata()` / `listMetadata()`** — read per-key metadata (`key`, `type`, `sizeBytes`, `version`, `timestamp`, `ttl`) without exposing the stored value; `listMetadata()` returns an array of metadata objects for all live keys.
+- **`QualityGateAgent.getBestPartialResult()`** — returns the highest-scoring partial result seen across all agents since the last reset; useful for fallback when no agent meets the acceptance threshold.
+- **`HookContext.depth`** — integer field on `HookContext` indicating the hook invocation nesting depth (0 = top-level call); propagated through all hook pipeline stages.
+- **GoalDecomposer sub-goal recursion** — `TeamRunner` now recursively decomposes sub-goals up to a configurable `maxDepth`; each recursive call invokes the planner and merges result stats into the parent; `maxDepth: 0` skips recursion and falls back to the executor directly.
+- **FanOutFanIn semaphore queue** — `FanOutFanIn.run()` now accepts a `concurrency` option; a token semaphore gates how many agent steps execute in parallel; `continueOnError: false` surfaces the first failure as `FANOUT_SKIPPED` for queued steps.
+- **PhasePipeline compaction** — `PhasePipeline` now accepts a `compactionThreshold` and `summarize()` callback; when the history length exceeds the threshold the pipeline calls `summarize()`, replaces history with the returned summary string, and increments `compactionCount`; `reset()` clears compaction state.
+- **`test-rlm-phases.ts`** — 123 new tests covering all 8 features above; 27 suites, **2,834 passing assertions total**.
+
 ## [5.1.4] - 2026-04-23
 
 ### Added

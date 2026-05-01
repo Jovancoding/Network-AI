@@ -16,7 +16,7 @@ Unsolicited PRs without a linked, approved issue will be closed.
 
 ### Code Quality
 
-- All 2,711 existing tests must pass (`npm run test:all`)
+- All 2,834 existing tests must pass (`npm run test:all`)
 - Zero TypeScript compile errors (`npx tsc --noEmit`)
 - New features must include tests with >90% branch coverage
 - Follow existing code style and patterns

@@ -1,8 +1,8 @@
-# Adapter System — 28 Plug-and-Play Agent Framework Adapters
+# Adapter System — 29 Plug-and-Play Agent Framework Adapters
 
 ## Overview
 
-The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.1.4, 28 adapters are included.
+The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.1.4, 29 adapters are included.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -745,6 +745,34 @@ const result = await browser.executeAgent('scraper', {
   url: 'https://example.com',
 });
 ```
+
+### RLMAdapter (v5.1.4)
+
+Connects to any RLM-compatible HTTP endpoint (see [arxiv 2512.24601](https://arxiv.org/abs/2512.24601) / alexzhang13/rlm). BYOC — bring your own HTTP client.
+
+```typescript
+import { RLMAdapter } from 'network-ai';
+
+const rlm = new RLMAdapter();
+rlm.registerAgent('rlm-planner', {
+  endpoint: 'http://localhost:8080',
+  model: 'rlm-7b',
+  maxDepth: 3,
+  systemPrompt: 'You are a planning agent.',
+  // client: myHttpClient,  // optional BYOC HTTP client
+});
+await rlm.initialize({});
+
+const result = await rlm.executeAgent(
+  'rlm-planner',
+  { action: 'run', params: { input: 'Plan a deployment pipeline' } },
+  { agentId: 'orchestrator' },
+);
+// result.data → text / content from the RLM server
+// result.metadata.executionTimeMs → wall-clock latency
+```
+
+Capabilities: `streaming: false`, `parallel: true`.
 
 ### Streaming Variants (v5.0)
 

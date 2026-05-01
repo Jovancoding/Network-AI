@@ -36,6 +36,7 @@ const SUITES = [
   'test-phase9.ts',
   'test-phase10.ts',
   'test-topology.ts',
+  'test-rlm-phases.ts',
 ];
 
 const WIDTH = 60;

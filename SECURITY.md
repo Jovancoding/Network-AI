@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------||
-| 5.1.x   | ✅ Yes — full support (current) |
+| 5.2.x   | ✅ Yes — full support (current) |
+| 5.1.x   | ✅ Security fixes only |
 | 5.0.x   | ✅ Security fixes only |
 | 4.15.x  | ✅ Security fixes only |
 | 4.14.x  | ✅ Security fixes only |
@@ -63,6 +64,7 @@ Network-AI includes built-in security features:
 - **Transport Layer HMAC Auth** (v5.0.0) -- `SwarmTransportServer` implements JSON-RPC 2.0 over HTTP with HMAC-SHA256 request signing, per-request TTL enforcement, request size limits, and node allowlisting
 - **Job Queue Crash Recovery** (v5.0.0) -- `JobQueue` with `FileJobStore` detects stale in-progress jobs on restart and re-queues them; priority FIFO with exponential backoff retries
 - **Agent VCR** (v5.0.0) -- `AgentVCR` records and replays agent execution calls with cassette files; request fingerprinting via SHA-256; prevents accidental LLM calls in CI
+- **RLMAdapter BYOC Transport** (v5.1.4) -- `RLMAdapter` delegates all HTTP to a bring-your-own client (`RLMHttpClient`); no built-in network code runs without an explicit client; endpoint validation rejects empty strings before any request is attempted; error paths surface structured `RLM_REQUEST_FAILED` / `AGENT_NOT_FOUND` codes rather than raw stack traces
 
 ## Security Scan Results
 
