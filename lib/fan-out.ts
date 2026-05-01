@@ -133,68 +133,92 @@ export class FanOutFanIn {
   /**
    * Execute agents in parallel (fan-out phase).
    *
+   * Uses a true semaphore queue — as soon as one slot frees up the next
+   * step starts, rather than waiting for an entire chunk to drain.
+   *
    * @param steps Steps to execute
    * @param options Concurrency and timeout settings
    */
   async fanOut(steps: FanOutStep[], options: FanOutOptions = {}): Promise<TaggedResult[]> {
-    const concurrency = options.concurrency ?? steps.length;
+    if (steps.length === 0) return [];
+
+    const maxConcurrency = Math.max(1, options.concurrency ?? steps.length);
     const continueOnError = options.continueOnError ?? true;
-    const results: TaggedResult[] = new Array(steps.length);
+    const results: (TaggedResult | undefined)[] = new Array(steps.length);
 
-    // Process in chunks of `concurrency`
-    for (let i = 0; i < steps.length; i += concurrency) {
-      const chunk = steps.slice(i, i + concurrency);
-      const chunkPromises = chunk.map((step, cIdx) => {
-        const idx = i + cIdx;
-        return this.executeStep(step, idx, options.timeoutMs);
-      });
+    return new Promise<TaggedResult[]>((resolve) => {
+      let activeCount = 0;
+      let nextToStart = 0;
+      let completedCount = 0;
+      let shouldAbort = false;
 
-      const settled = await Promise.allSettled(chunkPromises);
+      const checkDone = () => {
+        if (completedCount === steps.length) {
+          resolve(results as TaggedResult[]);
+        }
+      };
 
-      for (let j = 0; j < settled.length; j++) {
-        const outcome = settled[j];
-        if (outcome.status === 'fulfilled') {
-          results[i + j] = outcome.value;
-          // Check for logical failure (agent returned success: false)
-          if (!continueOnError && !outcome.value.result.success) {
-            for (let k = i + j + 1; k < steps.length; k++) {
-              results[k] = {
-                agentId: steps[k].agentId,
-                label: steps[k].label,
-                index: k,
-                result: { success: false, error: { code: 'FANOUT_SKIPPED', message: 'Skipped due to earlier failure', recoverable: false } },
-                durationMs: 0,
-              };
-            }
-            return results.filter(Boolean);
-          }
-        } else {
-          const step = chunk[j];
-          results[i + j] = {
-            agentId: step.agentId,
-            label: step.label,
-            index: i + j,
-            result: { success: false, error: { code: 'FANOUT_ERROR', message: String(outcome.reason), recoverable: false } },
-            durationMs: 0,
-          };
-          if (!continueOnError) {
-            // Fill remaining with skipped results
-            for (let k = i + j + 1; k < steps.length; k++) {
-              results[k] = {
-                agentId: steps[k].agentId,
-                label: steps[k].label,
-                index: k,
-                result: { success: false, error: { code: 'FANOUT_SKIPPED', message: 'Skipped due to earlier failure', recoverable: false } },
-                durationMs: 0,
-              };
-            }
-            return results.filter(Boolean);
+      /** Mark all not-yet-started (and not-yet-filled) slots as SKIPPED. */
+      const markRemainingSkipped = (fromIdx: number) => {
+        for (let k = fromIdx; k < steps.length; k++) {
+          if (results[k] === undefined) {
+            results[k] = {
+              agentId: steps[k].agentId,
+              label: steps[k].label,
+              index: k,
+              result: {
+                success: false,
+                error: { code: 'FANOUT_SKIPPED', message: 'Skipped due to earlier failure', recoverable: false },
+              },
+              durationMs: 0,
+            };
+            completedCount++;
           }
         }
-      }
-    }
+      };
 
-    return results;
+      const onTaskDone = (tagged: TaggedResult, isFailure: boolean) => {
+        results[tagged.index] = tagged;
+        activeCount--;
+        completedCount++;
+
+        if (!continueOnError && isFailure && !shouldAbort) {
+          shouldAbort = true;
+          // Skip all tasks that haven't been picked up yet
+          markRemainingSkipped(nextToStart);
+        }
+
+        checkDone();
+        if (!shouldAbort) {
+          scheduleNext();
+        }
+      };
+
+      const scheduleNext = () => {
+        while (activeCount < maxConcurrency && nextToStart < steps.length && !shouldAbort) {
+          const idx = nextToStart++;
+          activeCount++;
+          this.executeStep(steps[idx], idx, options.timeoutMs).then(
+            (tagged) => onTaskDone(tagged, !tagged.result.success),
+            (reason) => {
+              const tagged: TaggedResult = {
+                agentId: steps[idx].agentId,
+                label: steps[idx].label,
+                index: idx,
+                result: {
+                  success: false,
+                  error: { code: 'FANOUT_ERROR', message: String(reason), recoverable: false },
+                },
+                durationMs: 0,
+              };
+              onTaskDone(tagged, true);
+            },
+          );
+        }
+      };
+
+      scheduleNext();
+    });
   }
 
   /**

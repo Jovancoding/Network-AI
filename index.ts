@@ -1197,7 +1197,7 @@ export type {
 export type { OpenClawSkill, SkillContext, SkillResult } from './lib/orchestrator-types';
 
 // Phase 3: Priority & Preemption types
-export type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions } from './lib/locked-blackboard';
+export type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions, BlackboardEntryMetadata } from './lib/locked-blackboard';
 
 // Phase 5 Part 2: Pluggable Backend API
 export { FileBackend, MemoryBackend } from './lib/blackboard-backend';
@@ -1337,6 +1337,7 @@ export type {
   PipelineExecutionContext,
   ApprovalCallback,
   PhasePipelineOptions,
+  CompactionOptions,
 } from './lib/phase-pipeline';
 
 // Confidence Filter — Multi-agent result scoring & filtering (Phase 8b)

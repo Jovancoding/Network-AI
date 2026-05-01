@@ -962,6 +962,13 @@ export class QualityGateAgent {
     aiReviewed: 0,
   };
 
+  /** Best (highest quality score) partial result seen across all `gate()` calls so far. */
+  private _bestPartialResult: {
+    key: string;
+    value: unknown;
+    result: QualityGateResult;
+  } | null = null;
+
   /** Quality score threshold: entries below this go to AI review or quarantine */
   private qualityThreshold: number;
   /** Score below which entries are auto-rejected (no AI review) */
@@ -992,6 +999,18 @@ export class QualityGateAgent {
    * - 'needs_review': requires AI review (only if callback is set)
    */
   async gate(
+    key: string,
+    value: unknown,
+    sourceAgent: string,
+    metadata?: Record<string, unknown>
+  ): Promise<QualityGateResult> {
+    const result = await this._gateCore(key, value, sourceAgent, metadata);
+    this._updateBestPartial(key, value, result);
+    return result;
+  }
+
+  /** @internal — core gate logic, called by `gate()` which wraps it for partial-result tracking. */
+  private async _gateCore(
     key: string,
     value: unknown,
     sourceAgent: string,
@@ -1148,7 +1167,52 @@ export class QualityGateAgent {
     this.aiReviewEnabled = true;
   }
 
+  /**
+   * Return the best (highest quality-score) partial result seen across all
+   * `gate()` calls since construction or the last `resetBestPartialResult()`.
+   *
+   * Useful for graceful degradation: when a pipeline exhausts its budget or
+   * time before finding a fully-approved result, callers can fall back to the
+   * best candidate seen so far rather than returning nothing.
+   *
+   * @returns The best partial result, or `null` if `gate()` has never been called.
+   */
+  getBestPartialResult(): { key: string; value: unknown; result: QualityGateResult } | null {
+    return this._bestPartialResult;
+  }
+
+  /**
+   * Reset the best partial result tracker (e.g. before starting a new gating session).
+   */
+  resetBestPartialResult(): void {
+    this._bestPartialResult = null;
+  }
+
   // ---------- Private helpers ----------
+
+  /** @internal — decision rank for tie-breaking in `_updateBestPartial`. */
+  private static readonly _DECISION_RANK: Record<GateDecision, number> = {
+    approve: 3,
+    quarantine: 2,
+    needs_review: 1,
+    reject: 0,
+  };
+
+  /** @internal */
+  private _updateBestPartial(key: string, value: unknown, result: QualityGateResult): void {
+    const current = this._bestPartialResult;
+    if (!current) {
+      this._bestPartialResult = { key, value, result };
+      return;
+    }
+    const newScore = result.validation.score;
+    const curScore = current.result.validation.score;
+    const newRank = QualityGateAgent._DECISION_RANK[result.decision];
+    const curRank = QualityGateAgent._DECISION_RANK[current.result.decision];
+    if (newScore > curScore || (newScore === curScore && newRank > curRank)) {
+      this._bestPartialResult = { key, value, result };
+    }
+  }
 
   private addToQuarantine(key: string, value: unknown, issues: ValidationIssue[], submittedBy: string): string {
     const id = `quarantine_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

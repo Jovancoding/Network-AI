@@ -194,6 +194,10 @@ export type {
   ChildOrchestratorState,
 } from './orchestrator-adapter';
 
+// RLM adapter (Recursive Language Model — arxiv 2512.24601)
+export { RLMAdapter } from './rlm-adapter';
+export type { RLMAgentConfig, RLMHttpClient } from './rlm-adapter';
+
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from '../types/streaming-adapter';
 

@@ -39,6 +39,12 @@ export interface HookContext {
   metadata: Record<string, unknown>;
   /** If set to true by a beforeExecute hook, execution is skipped and result is returned as-is */
   aborted: boolean;
+  /**
+   * Recursion depth of the current agent call (0 = root, 1 = first sub-agent, etc.).
+   * Hooks can use this to distinguish top-level calls from recursive sub-calls
+   * and apply different policies (e.g. stricter budgets or logging at depth 0 only).
+   */
+  depth: number;
 }
 
 /**
@@ -156,14 +162,20 @@ export class AdapterHookManager {
 
   /**
    * Create a fresh HookContext for a new execution.
+   *
+   * @param agentId  The agent being executed.
+   * @param payload  Execution payload (shallow-copied so hooks don't mutate the caller's object).
+   * @param context  Execution context (shallow-copied).
+   * @param depth    Recursion depth — 0 for root calls, incremented by sub-agent spawners (default: 0).
    */
-  createContext(agentId: string, payload: AgentPayload, context: AgentContext): HookContext {
+  createContext(agentId: string, payload: AgentPayload, context: AgentContext, depth = 0): HookContext {
     return {
       agentId,
       payload: { ...payload },
       context: { ...context },
       metadata: {},
       aborted: false,
+      depth,
     };
   }
 

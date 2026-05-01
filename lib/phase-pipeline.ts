@@ -82,6 +82,34 @@ export type ApprovalCallback = (
 ) => Promise<{ approved: boolean; approvedBy?: string; reason?: string }>;
 
 /**
+ * Options for trajectory compaction in long-running pipelines.
+ *
+ * When the cumulative serialised output of completed phases exceeds
+ * `thresholdChars`, `summarize()` is called and the full history is replaced
+ * with a single compact stub. This prevents the context window from growing
+ * unboundedly during multi-hundred-phase pipelines.
+ */
+export interface CompactionOptions {
+  /**
+   * Cumulative serialised char count above which compaction triggers.
+   * Default: 50 000 characters.
+   */
+  thresholdChars?: number;
+  /**
+   * Async function that distils all completed phases into a single summary string.
+   * The pipeline calls this every time the threshold is breached and replaces the
+   * full phase history with the returned string.
+   */
+  summarize: (completedPhases: PhaseResult[]) => Promise<string>;
+  /**
+   * Optional callback fired after every successful compaction.
+   * @param summary         The summary produced by `summarize`.
+   * @param compactionCount Running count of compactions (1-based).
+   */
+  onCompact?: (summary: string, compactionCount: number) => void;
+}
+
+/**
  * Options for creating a PhasePipeline.
  */
 export interface PhasePipelineOptions {
@@ -95,6 +123,12 @@ export interface PhasePipelineOptions {
   onPhaseComplete?: (result: PhaseResult, index: number) => void;
   /** If true, auto-approve all gates (useful for testing) */
   autoApprove?: boolean;
+  /**
+   * Trajectory compaction settings.
+   * When set, the pipeline monitors cumulative phase output size and
+   * summarises the history whenever the threshold is breached.
+   */
+  compaction?: CompactionOptions;
 }
 
 /**
@@ -139,6 +173,10 @@ export class PhasePipeline {
   private options: PhasePipelineOptions;
   private phaseResults: PhaseResult[] = [];
   private _status: 'idle' | 'running' | 'completed' | 'failed' | 'rejected' = 'idle';
+  /** Running count of compactions for this pipeline run. */
+  private _compactionCount = 0;
+  /** Summary produced by the most recent compaction, or null. */
+  private _lastCompactionSummary: string | null = null;
 
   constructor(registry: AdapterRegistry, baseContext: AgentContext, options: PhasePipelineOptions) {
     if (!options.phases.length) {
@@ -289,6 +327,12 @@ export class PhasePipeline {
 
       this.phaseResults.push(phaseResult);
       this.options.onPhaseComplete?.(phaseResult, i);
+
+      // ── Trajectory compaction ─────────────────────────────────────────────
+      if (this.options.compaction) {
+        await this._maybeCompact();
+      }
+      // ── End compaction ────────────────────────────────────────────────────
     }
 
     this._status = 'completed';
@@ -299,17 +343,63 @@ export class PhasePipeline {
     };
   }
 
+  /** The summary produced by the last compaction, or `null` if none has occurred. */
+  get lastCompactionSummary(): string | null {
+    return this._lastCompactionSummary;
+  }
+
+  /** Total number of compactions performed so far in this run. */
+  get compactionCount(): number {
+    return this._compactionCount;
+  }
+
   /**
    * Reset the pipeline for re-execution.
    */
   reset(): void {
     this.phaseResults = [];
     this._status = 'idle';
+    this._compactionCount = 0;
+    this._lastCompactionSummary = null;
   }
 
   // --------------------------------------------------------------------------
   // Private helpers
   // --------------------------------------------------------------------------
+
+  /** @internal */
+  private async _maybeCompact(): Promise<void> {
+    const opts = this.options.compaction!;
+    const threshold = opts.thresholdChars ?? 50_000;
+
+    let size = 0;
+    for (const pr of this.phaseResults) {
+      try {
+        size += JSON.stringify({ n: pr.phaseName, r: Array.from(pr.agentResults.values()) }).length;
+      } catch {
+        // ignore serialisation errors
+      }
+    }
+
+    if (size <= threshold) return;
+
+    const summary = await opts.summarize(this.phaseResults);
+    this._compactionCount++;
+    this._lastCompactionSummary = summary;
+
+    // Replace the full history with a single compact stub phase
+    const stub: PhaseResult = {
+      phaseName: `__compacted_${this._compactionCount}`,
+      status: 'completed',
+      agentResults: new Map([
+        ['__summary', { success: true, data: summary, metadata: { compacted: true, compactionCount: this._compactionCount } }],
+      ]),
+      durationMs: 0,
+    };
+    this.phaseResults = [stub];
+
+    opts.onCompact?.(summary, this._compactionCount);
+  }
 
   private buildPayload(agentId: string, phase: PhaseDefinition, defaultPayload?: AgentPayload): AgentPayload {
     if (phase.payloadFactory) {

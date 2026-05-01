@@ -98,6 +98,26 @@ export interface CommitResult {
   entry?: BlackboardEntry;
 }
 
+/**
+ * Metadata about a blackboard entry — returned by {@link LockedBlackboard.readMetadata}.
+ * Deliberately excludes the raw `value` so callers can inspect entry shape
+ * without paying the cost of deserializing (or accidentally leaking) large values.
+ */
+export interface BlackboardEntryMetadata {
+  /** Blackboard key. */
+  key: string;
+  /** JavaScript `typeof` of the stored value. */
+  type: string;
+  /** Approximate serialised byte size of the value. */
+  sizeBytes: number;
+  /** Monotonically increasing write counter for this key. */
+  version: number;
+  /** ISO-8601 timestamp of the last write. */
+  timestamp: string;
+  /** TTL in milliseconds, or `null` for no expiry. */
+  ttl: number | null;
+}
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -1081,6 +1101,59 @@ ${cacheContent}
       const entry = this.cache.get(key);
       return entry && !this.isExpired(entry);
     });
+  }
+
+  /**
+   * Return metadata for a single blackboard entry without exposing its value.
+   *
+   * Useful for orchestrators that need to inspect entry shape, age, or size
+   * before deciding whether to read the full value.
+   *
+   * @param key - Blackboard key to query.
+   * @returns   Metadata object, or `null` if the key does not exist / has expired.
+   */
+  readMetadata(key: string): BlackboardEntryMetadata | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (this.isExpired(entry)) {
+      this.cache.delete(key);
+      this.persistToDisk();
+      return null;
+    }
+    return this._entryToMetadata(entry);
+  }
+
+  /**
+   * Return metadata for all live (non-expired) blackboard entries.
+   *
+   * @returns Array of metadata objects — one per live key, in insertion order.
+   */
+  listMetadata(): BlackboardEntryMetadata[] {
+    const out: BlackboardEntryMetadata[] = [];
+    for (const [, entry] of Array.from(this.cache.entries())) {
+      if (!this.isExpired(entry)) {
+        out.push(this._entryToMetadata(entry));
+      }
+    }
+    return out;
+  }
+
+  /** @internal */
+  private _entryToMetadata(entry: BlackboardEntry): BlackboardEntryMetadata {
+    let sizeBytes = 0;
+    try {
+      sizeBytes = Buffer.byteLength(JSON.stringify(entry.value), 'utf8');
+    } catch {
+      sizeBytes = 0;
+    }
+    return {
+      key: entry.key,
+      type: Array.isArray(entry.value) ? 'array' : typeof entry.value,
+      sizeBytes,
+      version: entry.version,
+      timestamp: entry.timestamp,
+      ttl: entry.ttl,
+    };
   }
 
   /**

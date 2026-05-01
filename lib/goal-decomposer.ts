@@ -114,6 +114,29 @@ export interface RunTeamOptions {
   plannerRetries?: number;
   /** Callback for approval before execution starts */
   approvalCallback?: (dag: TaskDAG) => Promise<boolean>;
+  /**
+   * Maximum sub-goal recursion depth (default: 1 — no recursion).
+   *
+   * When a task node has `params._subgoal: string` AND a `subGoalDecomposer`
+   * is provided, the runner will recursively decompose and execute the sub-goal
+   * as a nested `TeamRunner.run()` call, up to this depth limit.
+   */
+  maxDepth?: number;
+  /**
+   * Current recursion depth. Set automatically by the runner — do not set manually.
+   * @internal
+   */
+  depth?: number;
+  /**
+   * Agent pool available for recursive sub-goal decomposition.
+   * Must be provided when `maxDepth > 1`.
+   */
+  agents?: TeamAgent[];
+  /**
+   * GoalDecomposer instance used to plan recursive sub-goals.
+   * Must be provided when `maxDepth > 1`.
+   */
+  subGoalDecomposer?: GoalDecomposer;
 }
 
 /** Final result from a team run */
@@ -509,6 +532,8 @@ export class TeamRunner extends EventEmitter {
       continueOnFailure = false,
       sessionId,
       metadata,
+      maxDepth = 1,
+      depth: currentDepth = 0,
     } = options;
 
     const start = Date.now();
@@ -588,6 +613,57 @@ export class TeamRunner extends EventEmitter {
             const depResult = results.get(depId);
             if (depResult) depResults[depId] = depResult.data;
           }
+
+          // ── Recursive sub-goal decomposition ─────────────────────────────
+          if (
+            typeof node.params._subgoal === 'string' &&
+            currentDepth < maxDepth &&
+            options.subGoalDecomposer &&
+            options.agents
+          ) {
+            const subgoal = node.params._subgoal as string;
+            const childDag = await options.subGoalDecomposer.decompose(
+              subgoal,
+              options.agents,
+              { ...(metadata ?? {}), parentTaskId: node.id, depth: currentDepth + 1 },
+              options.plannerRetries ?? 1,
+            );
+            const childRunner = new TeamRunner(this.executor);
+            const childResult = await childRunner.run(childDag, {
+              ...options,
+              depth: currentDepth + 1,
+            });
+
+            const result: AgentResult = {
+              success: childResult.success,
+              data: {
+                subgoal,
+                summary: childResult.summary,
+                stats: childResult.stats,
+                results: Object.fromEntries(
+                  Array.from(childResult.results.entries()).map(([k, v]) => [k, v.data]),
+                ),
+              },
+              metadata: { taskId: node.id, subgoalDepth: currentDepth + 1 },
+            };
+
+            results.set(taskId, result);
+            if (result.success) {
+              node.status = 'completed';
+              node.result = result;
+              node.completedAt = Date.now();
+              this.emit('task:complete', node, result);
+            } else {
+              node.status = 'failed';
+              node.error = `Sub-goal failed: ${childResult.summary}`;
+              node.result = result;
+              node.completedAt = Date.now();
+              this.emit('task:fail', node, node.error);
+              if (!continueOnFailure) aborted = true;
+            }
+            return; // Skip normal executor path
+          }
+          // ── End sub-goal ──────────────────────────────────────────────────
 
           const payload: AgentPayload = {
             action: node.action,
@@ -730,7 +806,14 @@ export async function runTeam(
     }
   }
 
-  return runner.run(dag, options);
+  // Thread agents + decomposer into options so recursive sub-goal calls can use them
+  const enrichedOptions: RunTeamOptions = {
+    ...options,
+    agents: options.agents ?? agents,
+    subGoalDecomposer: options.subGoalDecomposer ?? decomposer,
+  };
+
+  return runner.run(dag, enrichedOptions);
 }
 
 // ============================================================================

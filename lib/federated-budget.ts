@@ -327,6 +327,63 @@ export class FederatedBudget {
   }
 
   /**
+   * Spawn a child budget whose ceiling is drawn from this budget's remaining pool.
+   *
+   * RLM-style recursive budget propagation: the child gets an isolated spend
+   * tracker capped at `childCeiling` (or the full remaining amount if omitted).
+   * Call `commit()` on the returned handle to propagate the child's total spend
+   * back to the parent as a single atomic `spend()` call.
+   *
+   * This enables recursive sub-agent trees where each level can only consume
+   * what its parent has left, and costs bubble back up the chain automatically.
+   *
+   * @example
+   * ```typescript
+   * const root = new FederatedBudget({ ceiling: 10_000 });
+   * const { budget: child, commit } = root.spawnChild('sub-agent-A', 3000);
+   * child.spend('worker-1', 800);
+   * child.spend('worker-2', 600);
+   * commit(); // propagates 1400 tokens back to root
+   * root.getTotalSpent(); // 1400
+   * ```
+   *
+   * @param spenderId     agentId recorded on the parent when `commit()` is called.
+   * @param childCeiling  Optional upper bound for the child (defaults to `remaining()`).
+   * @returns             Object with the child `FederatedBudget` and a `commit` function.
+   */
+  spawnChild(
+    spenderId: string,
+    childCeiling?: number,
+  ): { budget: FederatedBudget; commit: () => SpendResult } {
+    if (!spenderId || typeof spenderId !== 'string') {
+      throw new TypeError('FederatedBudget.spawnChild: spenderId must be a non-empty string');
+    }
+
+    const available = this.remaining();
+    const effectiveCeiling = Math.min(
+      childCeiling !== undefined ? childCeiling : available,
+      available,
+    );
+    // Guarantee a valid (positive) ceiling even when the parent is exhausted.
+    const safeCeiling = effectiveCeiling > 0 ? effectiveCeiling : 1;
+
+    const child = new FederatedBudget({
+      ceiling: safeCeiling,
+      perAgentCeiling: this._perAgentCeiling,
+    });
+
+    const commit = (): SpendResult => {
+      const childSpent = child.getTotalSpent();
+      if (childSpent <= 0) {
+        return { allowed: true, remaining: this.remaining() };
+      }
+      return this.spend(spenderId, childSpent);
+    };
+
+    return { budget: child, commit };
+  }
+
+  /**
    * Restore budget state from the blackboard backend.
    *
    * Reads the entry stored under `budgetKey`, deserializes the snapshot, and
