@@ -1,4 +1,4 @@
-﻿---
+---
 name: Feature Request
 about: Suggest a feature for Network-AI
 title: "[FEATURE] "

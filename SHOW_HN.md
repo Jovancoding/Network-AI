@@ -1,4 +1,4 @@
-﻿# Show HN: Network-AI — Multi-Agent Race Condition Prevention for TypeScript
+# Show HN: Network-AI — Multi-Agent Race Condition Prevention for TypeScript
 
 **Post title:**
 > Show HN: Network-AI – plug-and-play orchestrator that prevents race conditions when AI agents share state

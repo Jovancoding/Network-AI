@@ -1,4 +1,4 @@
-﻿# Awesome List PR Submissions
+# Awesome List PR Submissions
 
 Ready-to-use PR titles, one-liners, and context for each list.
 Submit these as pull requests to the respective repositories.

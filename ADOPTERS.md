@@ -1,4 +1,4 @@
-﻿# Network-AI Adopters
+# Network-AI Adopters
 
 This file lists organizations and individuals using Network-AI in production or active evaluation.
 

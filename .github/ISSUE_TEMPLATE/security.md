@@ -1,4 +1,4 @@
-﻿---
+---
 name: Security Vulnerability
 about: Report a security issue (use Security Advisories for private reports)
 title: "[SECURITY] "

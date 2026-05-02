@@ -1,4 +1,4 @@
-﻿# Contributing to Network-AI
+# Contributing to Network-AI
 
 Network-AI is a solo-maintained project with high quality standards. Contributions are welcome but must meet strict requirements.
 

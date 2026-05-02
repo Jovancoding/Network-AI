@@ -1,4 +1,4 @@
-﻿# Network-AI Quick Start Guide
+# Network-AI Quick Start Guide
 
 Get the Multi-Agent Swarm Orchestrator running in **under 5 minutes**.
 

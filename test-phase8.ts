@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Phase 8: Claude-Code Inspired Enhancements — Test Suite
  *
  * Tests for:

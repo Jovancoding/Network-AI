@@ -1,4 +1,4 @@
-﻿                                    # Changelog
+                                    # Changelog
 
 All notable changes to Network-AI will be documented in this file.
 
