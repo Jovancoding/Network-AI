@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.2] - 2026-05-02
+
+### Fixed
+- **socket.json**: Added `networkAccess` ignore entries for all Socket.dev-flagged files — 3 direct-fetch adapters (HermesAdapter, PydanticAIAdapter, RLMAdapter), 2 lib modules with direct fetch use (SwarmTransport, McpToolConsumer), 1 false-positive (AuthGuardian — word "fetch" appears only in comments/regex), and ~16 files flagged via Socket.dev's transitive import-graph analysis.
+- **socket.json**: Added `shellExec` ignore entries for `AgentRuntime` (ShellExecutor, sandboxed child_process.spawn) and `McpToolConsumer` (stdio MCP server subprocess spawning). No functional changes. 2834 tests pass.
+
 ## [5.2.1] - 2026-05-02
 
 ### Fixed

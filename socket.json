@@ -63,6 +63,130 @@
       {
         "path": "dist/adapters/minimax-adapter.js",
         "reason": "Intentional — compiled output of MiniMaxAdapter. It talks to MiniMax endpoints as configured by the caller."
+      },
+      {
+        "path": "adapters/hermes-adapter.ts",
+        "reason": "Intentional — HermesAdapter includes a built-in fetch-based transport for OpenAI-compatible completion endpoints. Users may substitute their own client; the built-in transport calls only the URL supplied by the caller."
+      },
+      {
+        "path": "dist/adapters/hermes-adapter.js",
+        "reason": "Intentional — compiled output of HermesAdapter. Uses fetch for its built-in OpenAI-compatible completion transport; calls only the URL supplied by the caller."
+      },
+      {
+        "path": "adapters/pydantic-ai-adapter.ts",
+        "reason": "Intentional — PydanticAIAdapter uses fetch to call PydanticAI-compatible HTTP endpoints as part of its BYOC adapter behavior. The URL is supplied by the caller."
+      },
+      {
+        "path": "dist/adapters/pydantic-ai-adapter.js",
+        "reason": "Intentional — compiled output of PydanticAIAdapter. Uses fetch for outbound HTTP calls to caller-supplied PydanticAI endpoints."
+      },
+      {
+        "path": "adapters/rlm-adapter.ts",
+        "reason": "Intentional — RLMAdapter uses fetch to call RLM-compatible HTTP endpoints as part of its BYOC adapter behavior. The URL is supplied by the caller."
+      },
+      {
+        "path": "dist/adapters/rlm-adapter.js",
+        "reason": "Intentional — compiled output of RLMAdapter. Uses fetch for outbound HTTP calls to caller-supplied RLM endpoints."
+      },
+      {
+        "path": "lib/swarm-transport.ts",
+        "reason": "Intentional — SwarmTransport uses fetch to relay messages between swarm nodes over HTTP. Network transport is the documented purpose of this module; the endpoint URL is configured by the caller."
+      },
+      {
+        "path": "dist/lib/swarm-transport.js",
+        "reason": "Intentional — compiled output of SwarmTransport. Uses fetch to relay messages to a caller-configured HTTP endpoint."
+      },
+      {
+        "path": "lib/mcp-tool-consumer.ts",
+        "reason": "Intentional — McpToolConsumer uses fetch for HTTP-based MCP server communication (SSE/HTTP transport mode). Outbound requests go only to the MCP server URL configured by the caller."
+      },
+      {
+        "path": "dist/lib/mcp-tool-consumer.js",
+        "reason": "Intentional — compiled output of McpToolConsumer. Uses fetch for HTTP/SSE MCP transport to a caller-configured MCP server URL."
+      },
+      {
+        "path": "lib/auth-guardian.ts",
+        "reason": "False positive — the word 'fetch' appears only in a JSDoc example string and a capability-detection regex pattern. AuthGuardian does not make any outbound HTTP calls."
+      },
+      {
+        "path": "dist/lib/auth-guardian.js",
+        "reason": "False positive — 'fetch' appears only in a JSDoc example string and a capability-detection regex. AuthGuardian does not make any outbound HTTP calls."
+      },
+      {
+        "path": "adapters/adapter-registry.ts",
+        "reason": "Intentional — adapter-registry re-exports all 29 adapters; Socket.dev's import-graph analysis flags it because it transitively references adapters that use fetch. No direct HTTP calls are made here."
+      },
+      {
+        "path": "dist/adapters/adapter-registry.js",
+        "reason": "Intentional — compiled adapter-registry re-exports all adapters; flagged transitively because some adapters use fetch. No direct HTTP calls are made in this file."
+      },
+      {
+        "path": "index.ts",
+        "reason": "Intentional — the main entry point re-exports all adapters and lib modules; Socket.dev's import-graph analysis flags it because it transitively references adapters that use fetch."
+      },
+      {
+        "path": "dist/index.js",
+        "reason": "Intentional — compiled main entry point; flagged transitively because it re-exports all adapters including those that use fetch. No direct HTTP calls are made in this file."
+      },
+      {
+        "path": "dist/lib/approval-inbox.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; ApprovalInbox does not make direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/lib/blackboard-backend-crdt.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; BlackboardBackendCRDT does not make direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/lib/blackboard-backend-redis.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; BlackboardBackendRedis connects to Redis via its client library, not via fetch."
+      },
+      {
+        "path": "dist/lib/compliance-monitor.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; ComplianceMonitor does not make direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/lib/control-plane.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; ControlPlane does not make direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/lib/dashboard-server.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; DashboardServer does not make direct outbound HTTP calls via fetch."
+      },
+      {
+        "path": "dist/lib/federated-budget.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; FederatedBudget does not make direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/lib/fsm-journey.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; JourneyFSM does not make direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/lib/logger.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; Logger does not make direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/lib/mcp-blackboard-tools.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; MCP blackboard tools call the local blackboard, not external HTTP endpoints."
+      },
+      {
+        "path": "dist/lib/mcp-bridge.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; McpBridge bridges MCP servers but does not make direct outbound fetch calls."
+      },
+      {
+        "path": "dist/lib/mcp-tools-control.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; MCP control tools operate on local state, not external HTTP endpoints."
+      },
+      {
+        "path": "dist/lib/mcp-tools-extended.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; extended MCP tools read from the local data directory, not external HTTP endpoints."
+      },
+      {
+        "path": "dist/lib/playground.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; Playground does not make direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/lib/work-tree-dashboard.js",
+        "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; WorkTreeDashboard does not make direct outbound HTTP calls."
       }
     ],
     "urlStrings": [
@@ -145,6 +269,22 @@
       {
         "path": "examples/demo-runner.ts",
         "reason": "Intentional — demo runner uses spawn('npx', ['ts-node', file]) to execute example scripts. This is a developer convenience script, not part of the core library."
+      },
+      {
+        "path": "lib/agent-runtime.ts",
+        "reason": "Intentional — AgentRuntime's ShellExecutor uses child_process.spawn to run sandboxed shell commands within an explicit SandboxPolicy. Shell access is only available when the caller opts in by configuring and enabling the ShellExecutor."
+      },
+      {
+        "path": "dist/lib/agent-runtime.js",
+        "reason": "Intentional — compiled output of AgentRuntime. ShellExecutor uses child_process.spawn for sandboxed command execution under a caller-configured SandboxPolicy."
+      },
+      {
+        "path": "lib/mcp-tool-consumer.ts",
+        "reason": "Intentional — McpToolConsumer uses child_process.spawn to launch MCP server subprocesses for stdio-based MCP transport. Process spawning is required by the MCP stdio protocol; the caller provides the server command."
+      },
+      {
+        "path": "dist/lib/mcp-tool-consumer.js",
+        "reason": "Intentional — compiled output of McpToolConsumer. Uses child_process.spawn to launch caller-configured MCP server subprocesses for stdio transport."
       }
     ],
     "filesystemAccess": [
