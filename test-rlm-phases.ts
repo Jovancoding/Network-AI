@@ -65,19 +65,7 @@ function fail(test: string, err?: string) {
 function assert(cond: boolean, name: string, detail?: string) {
   cond ? pass(name) : fail(name, detail ?? 'Assertion failed');
 }
-async function assertThrowsAsync(fn: () => Promise<unknown>, name: string, substr?: string) {
-  try {
-    await fn();
-    fail(name, 'Expected error but nothing was thrown');
-  } catch (e) {
-    const msg = (e as Error).message ?? String(e);
-    if (substr && !msg.includes(substr)) {
-      fail(name, `Expected "${substr}" in error, got: "${msg}"`);
-    } else {
-      pass(name);
-    }
-  }
-}
+
 function assertThrowsSync(fn: () => unknown, name: string, substr?: string) {
   try {
     fn();
@@ -186,7 +174,7 @@ async function testSpawnChild() {
   {
     const parent = new FederatedBudget({ ceiling: 500 });
     parent.spend('prior', 490);
-    const { budget: child, commit } = parent.spawnChild('big-spender');
+    const { budget: child, commit: _commit } = parent.spawnChild('big-spender');
     child.spend('work', 100); // allowed in child (ceiling = 10 — safe floor when parent has 10 left)
     // Actually parent.remaining() = 10, so child ceiling = 10. 100 > 10, so child.spend would be denied.
     // Let's just test that commit with a large child spend denies correctly.
