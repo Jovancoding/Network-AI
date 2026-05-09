@@ -1435,6 +1435,59 @@ export type {
   TeamRunnerEvents,
 } from './lib/goal-decomposer';
 
+// Context Throttler — Metadata-driven blackboard pruning (Phase 12)
+export { ContextThrottler, filterState } from './lib/context-throttler';
+export type {
+  ScopeMetadata,
+  BlackboardSnapshot,
+  ThrottleResult,
+  ContextThrottlerOptions,
+} from './lib/context-throttler';
+
+// Partition Planner — Logical work partitioning to prevent redundant research (Phase 12)
+export {
+  PartitionPlanner,
+  createLexicalOverlapChecker,
+  createLLMPartitionPlanner,
+  parsePartitionJSON,
+} from './lib/partition-planner';
+export type {
+  PartitionEntry,
+  PartitionSchema,
+  PartitionPlannerFunction,
+  OverlapCheckFunction,
+  PartitionPlannerOptions,
+  PartitionResult,
+} from './lib/partition-planner';
+
+// Coverage Gate — Recursive refinement loop with score-gated completion (Phase 12)
+export {
+  CoverageGate,
+  createKeywordEvaluator,
+  createLLMEvaluator,
+} from './lib/coverage-gate';
+export type {
+  CoverageResult,
+  CoverageEvaluatorFunction,
+  CoverageGateOptions,
+  CoverageGateResult,
+  RefinementRound,
+} from './lib/coverage-gate';
+
+// Route Classifier — Short-circuit routing for factual lookups (Phase 12)
+export {
+  RouteClassifier,
+  createHeuristicClassifier,
+  createLLMClassifier,
+} from './lib/route-classifier';
+export type {
+  RouteCategory,
+  ClassificationResult,
+  ClassifierFunction,
+  RouteResult,
+  RouteClassifierOptions,
+} from './lib/route-classifier';
+
 // Live Agent Topology — Real-time agent graph + dashboard (Phase 11)
 export { TopologyTracker } from './lib/topology';
 export type {

@@ -13,6 +13,12 @@
 
 import { EventEmitter } from 'events';
 import type { AgentPayload, AgentContext, AgentResult } from '../types/agent-adapter';
+import type { ScopeMetadata, BlackboardSnapshot } from './context-throttler';
+import { filterState } from './context-throttler';
+import type { PartitionSchema } from './partition-planner';
+import { PartitionPlanner } from './partition-planner';
+import type { CoverageGate } from './coverage-gate';
+import type { RouteClassifier } from './route-classifier';
 
 // ============================================================================
 // TYPES
@@ -69,6 +75,12 @@ export interface TeamAgent {
   defaultAction?: string;
   /** Default parameters */
   defaultParams?: Record<string, unknown>;
+  /**
+   * Scope metadata tags for ContextThrottler — the agent will only receive
+   * blackboard keys that match at least one of these tags.
+   * Use `['*']` to opt out of filtering (see ContextThrottler).
+   */
+  scopeMetadata?: ScopeMetadata;
 }
 
 /** Function that invokes an LLM to produce a decomposition plan */
@@ -137,6 +149,35 @@ export interface RunTeamOptions {
    * Must be provided when `maxDepth > 1`.
    */
   subGoalDecomposer?: GoalDecomposer;
+  /**
+   * When provided, the RouteClassifier is run before DAG planning.
+   * If the goal is classified as FACTUAL_LOOKUP the DAG is bypassed entirely
+   * and the result is returned immediately.
+   * If classified as SYSTEM_FAILURE an error is thrown.
+   */
+  routeClassifier?: RouteClassifier;
+  /**
+   * Agent ID to use for the short-circuit FACTUAL_LOOKUP path.
+   * Required when `routeClassifier` is provided and you want short-circuit execution.
+   */
+  lookupAgentId?: string;
+  /**
+   * Partition schema to inject as boundary constraints into each agent's params.
+   * Generate via `PartitionPlanner.plan()` before calling `runTeam()`.
+   */
+  partitionSchema?: PartitionSchema;
+  /**
+   * When provided, the CoverageGate is evaluated after the DAG completes.
+   * If the score is below threshold the gaps are fed back into the GoalDecomposer
+   * and another round of execution is triggered (up to `gate.maxRefinements`).
+   * Requires a blackboard snapshot supplier via `blackboardSnapshot`.
+   */
+  coverageGate?: CoverageGate;
+  /**
+   * Function that returns the current blackboard snapshot for CoverageGate evaluation.
+   * Called after each DAG execution round.
+   */
+  blackboardSnapshot?: () => Record<string, unknown>;
 }
 
 /** Final result from a team run */
@@ -776,15 +817,90 @@ export async function runTeam(
   config: { planner: PlannerFunction; executor: ExecutorFunction },
   options: RunTeamOptions = {},
 ): Promise<TeamResult> {
+  // ── 1. Route Classifier — short-circuit before any DAG work ────────────────
+  if (options.routeClassifier) {
+    const routeResult = await options.routeClassifier.route(
+      goal,
+      // Wrap executor to match RouteClassifier's simpler signature
+      async (agentId, payload, context) => config.executor(agentId, payload as AgentPayload, context as AgentContext),
+      options.lookupAgentId,
+    );
+
+    if (routeResult.shortCircuited) {
+      if (routeResult.error) {
+        throw new Error(`RouteClassifier: ${routeResult.error}`);
+      }
+      // Build a synthetic single-task DAG result for the short-circuit answer
+      const syntheticDag: TaskDAG = {
+        goal,
+        nodes: [{
+          id: 'lookup-1',
+          description: 'Short-circuit factual lookup',
+          agent: options.lookupAgentId ?? 'lookup',
+          action: 'answer',
+          params: { goal },
+          dependencies: [],
+          priority: 1,
+          status: 'completed',
+          result: { success: true, data: routeResult.answer },
+          completedAt: Date.now(),
+          startedAt: Date.now(),
+        }],
+        edges: new Map([['lookup-1', []]]),
+        createdAt: Date.now(),
+      };
+      const results = new Map<string, AgentResult>([['lookup-1', { success: true, data: routeResult.answer }]]);
+      return {
+        success: true,
+        dag: syntheticDag,
+        results,
+        summary: `Goal: "${goal}" — answered via short-circuit (${routeResult.classification.category})`,
+        durationMs: 0,
+        stats: { total: 1, completed: 1, failed: 0, skipped: 0 },
+      };
+    }
+  }
+
   const decomposer = new GoalDecomposer(config.planner);
   const runner = new TeamRunner(config.executor);
+
+  // ── 2. Partition Schema injection ─────────────────────────────────────────
+  // When a partitionSchema is provided, inject _partitionConstraint into the
+  // metadata so the planner can include it per-agent in its prompt context.
+  const partitionContext: Record<string, unknown> = {
+    ...(options.metadata ?? {}),
+  };
+  if (options.partitionSchema) {
+    partitionContext._partitionSchema = options.partitionSchema;
+  }
+
+  // ── 3. Context Throttler — prune blackboard per agent scope metadata ───────
+  // Build a filtered metadata map keyed by agent ID (used as planning context).
+  const agentContextMap: Record<string, unknown> = {};
+  const blackboardNow: BlackboardSnapshot = options.blackboardSnapshot ? options.blackboardSnapshot() : {};
+  for (const agent of agents) {
+    if (agent.scopeMetadata && agent.scopeMetadata.length > 0) {
+      const pruned = filterState(agent.id, blackboardNow, agent.scopeMetadata);
+      agentContextMap[agent.id] = pruned.filteredState;
+    }
+  }
+  if (Object.keys(agentContextMap).length > 0) {
+    partitionContext._agentContextMap = agentContextMap;
+  }
 
   const dag = await decomposer.decompose(
     goal,
     agents,
-    options.metadata,
+    Object.keys(partitionContext).length > 0 ? partitionContext : options.metadata,
     options.plannerRetries ?? 1,
   );
+
+  // Inject partition constraints directly into each task node's params
+  if (options.partitionSchema) {
+    for (const node of dag.nodes) {
+      node.params = PartitionPlanner.injectConstraint(node.agent, node.params, options.partitionSchema);
+    }
+  }
 
   // Optional approval gate
   if (options.approvalCallback) {
@@ -813,7 +929,44 @@ export async function runTeam(
     subGoalDecomposer: options.subGoalDecomposer ?? decomposer,
   };
 
-  return runner.run(dag, enrichedOptions);
+  let result = await runner.run(dag, enrichedOptions);
+
+  // ── 4. Coverage Gate — recursive refinement loop ──────────────────────────
+  if (options.coverageGate && options.blackboardSnapshot) {
+    const gate = options.coverageGate;
+    gate.reset();
+    let gateResult = await gate.evaluate(goal, options.blackboardSnapshot());
+
+    while (!gateResult.passed && !gateResult.maxRefinementsReached) {
+      const gapGoal = `Fill these gaps to complete the original goal "${goal}": ${gateResult.evaluation.gaps.join('; ')}`;
+      const gapDag = await decomposer.decompose(gapGoal, agents, options.metadata, options.plannerRetries ?? 1);
+
+      if (options.partitionSchema) {
+        for (const node of gapDag.nodes) {
+          node.params = PartitionPlanner.injectConstraint(node.agent, node.params, options.partitionSchema);
+        }
+      }
+
+      const gapResult = await runner.run(gapDag, enrichedOptions);
+
+      // Merge gap results into the main result
+      for (const [k, v] of gapResult.results) {
+        result.results.set(k, v);
+      }
+
+      gateResult = await gate.evaluate(goal, options.blackboardSnapshot());
+    }
+
+    // Update result success flag based on final gate state
+    if (!gateResult.passed && gateResult.maxRefinementsReached) {
+      result = {
+        ...result,
+        summary: result.summary + ` [CoverageGate: max refinements reached, score=${gateResult.evaluation.score}]`,
+      };
+    }
+  }
+
+  return result;
 }
 
 // ============================================================================

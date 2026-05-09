@@ -5,6 +5,24 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.3.0] - 2026-05-09
+
+### Added
+- **Context Throttler** (`lib/context-throttler.ts`) — prune blackboard keys before LLM calls based on per-agent scope metadata. `filterState()` pure function + `ContextThrottler` class with `registerScope` / `deregisterScope` / `filterAll`; wildcard `["*"]` pass-through, `exactMatch` and `maxKeys` options.
+- **Partition Planner** (`lib/partition-planner.ts`) — assign non-overlapping focus areas to agents before DAG execution. `PartitionPlanner` class with pluggable `PartitionPlannerFunction`; built-in `createLexicalOverlapChecker()` (zero cost); `parsePartitionJSON()` with markdown-fence stripping; `PartitionPlanner.injectConstraint()` static helper; `strictOverlap` throws on detected overlap.
+- **Coverage Gate** (`lib/coverage-gate.ts`) — recursive refinement loop: evaluate completeness, re-run `GoalDecomposer` for gaps until score ≥ threshold. `CoverageGate` class with configurable `threshold` (default 90) and `maxRefinements` (default 3); built-in `createKeywordEvaluator()`; fail-open when max refinements reached; full `history` + `gapsRequeued` tracking; `reset()`.
+- **Route Classifier** (`lib/route-classifier.ts`) — classify goals before DAG planning and short-circuit `FACTUAL_LOOKUP` goals directly to a lookup agent, bypassing the blackboard entirely. `RouteClassifier` class with pluggable `ClassifierFunction`; built-in `createHeuristicClassifier()` (keyword + length heuristic, zero cost); `createLLMClassifier()` for LLM-backed classification; `route()` method with executor short-circuit; surfaces executor errors in `result.error`.
+- **`WORKFLOW_STATES.EVALUATING`** (`lib/fsm-journey.ts`) — new FSM state for the Coverage Gate refinement loop (orchestrator re-evaluating completeness).
+- **`TeamAgent.scopeMetadata`** — optional `ScopeMetadata` field on `TeamAgent`; `runTeam()` auto-builds a per-agent context map from the blackboard snapshot and passes it to the planner as `_agentContextMap`.
+- **`RunTeamOptions` extensions** — four new optional fields: `routeClassifier`, `lookupAgentId`, `partitionSchema`, `coverageGate`, `blackboardSnapshot`; fully backward-compatible (all optional).
+- **`test-phase12.ts`** — 65 new deterministic assertions (no LLM/network/I/O) across 6 sections covering all 4 modules + EVALUATING state + `runTeam` integration.
+
+### Changed
+- `runTeam()` now executes in four phases: (1) Route classification → short-circuit if `FACTUAL_LOOKUP`; (2) Partition schema + context throttler — builds filtered context map and injects `_partitionConstraint` into each task's params; (3) Normal DAG execution; (4) Coverage gate refinement loop with recursive gap decomposition. All phases are opt-in via the new `RunTeamOptions` fields.
+
+### Stats
+- **28 test suites, 2,899 passing assertions** (up from 27 / 2,834)
+
 ## [5.2.2] - 2026-05-02
 
 ### Fixed

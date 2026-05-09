@@ -17,15 +17,17 @@ export type WorkflowStateName = string;
 
 /** Built-in canonical workflow states for common agent pipelines. */
 export const WORKFLOW_STATES = {
-  INTAKE:    'INTAKE',
-  VALIDATE:  'VALIDATE',
-  RESEARCH:  'RESEARCH',
-  PLAN:      'PLAN',
-  EXECUTE:   'EXECUTE',
-  REVIEW:    'REVIEW',
-  DELIVER:   'DELIVER',
-  COMPLETE:  'COMPLETE',
-  ERROR:     'ERROR',
+  INTAKE:     'INTAKE',
+  VALIDATE:   'VALIDATE',
+  RESEARCH:   'RESEARCH',
+  PLAN:       'PLAN',
+  EXECUTE:    'EXECUTE',
+  REVIEW:     'REVIEW',
+  DELIVER:    'DELIVER',
+  COMPLETE:   'COMPLETE',
+  ERROR:      'ERROR',
+  /** Coverage Gate refinement loop — orchestrator is re-evaluating completeness. */
+  EVALUATING: 'EVALUATING',
 } as const;
 
 /** A single state definition in the FSM. */
