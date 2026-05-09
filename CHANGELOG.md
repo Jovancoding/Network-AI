@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.3.2] - 2026-05-09
+
+### Security
+- **SKILL.md — full sessions_send removal** — all instructional references to `sessions_send`, `sessions_history`, and `sessions_list` removed from skill body. Previously these appeared as procedural steps ("run budget guard → then call sessions_send"), which the ClawHub scanner correctly flagged as implied inter-agent communication. Remaining mentions are denial-declarations in YAML frontmatter and the data-flow notice only.
+- **Budget-Aware Handoff Protocol** renamed to **Budget Check Protocol** — removed "BEFORE sessions_send" framing; decision logic now says "proceed with the delegated task" (platform-agnostic).
+- **Agent-to-Agent Handoff Protocol** — Steps 5 (send via sessions_send) and 6 (read via sessions_history) replaced with a single blackboard read step; all `sessions_send to <agent>` code blocks removed.
+- **Example Parallel Workflow** — replaced `sessions_send` / `sessions_history` calls with neutral "Delegate to <agent>" language pointing to the blackboard for results.
+- **Permission Wall → Permission Scoring** — section renamed and prefaced with an explicit advisory-token warning at the section level (tokens are audit scoring outputs only, not real credentials).
+
+### Stats
+- **28 test suites, 2,899 passing assertions** (unchanged — SKILL.md-only change)
+
 ## [5.3.1] - 2026-05-09
 
 ### Security

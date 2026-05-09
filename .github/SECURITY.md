@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 5.3.x   | ✅ Yes — full support (current, latest: 5.3.1) |
+| 5.3.x   | ✅ Yes — full support (current, latest: 5.3.2) |
 | 5.2.x   | ✅ Security fixes only |
 | 5.1.x   | ✅ Security fixes only |
 | 5.0.x   | ✅ Security fixes only |

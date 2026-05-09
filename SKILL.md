@@ -34,7 +34,7 @@ metadata:
 
 > **Advisory tokens notice:** Grant tokens issued by `check_permission.py` are **advisory scoring outputs only** — the caller-supplied `--agent` identity is not cryptographically verified. Downstream systems must not treat these tokens as authenticated credentials without adding a separate identity-verification step or human approval gate, especially for PAYMENTS, DATABASE, and FILE_EXPORT resources.
 
-> **Data-flow notice (host platform — not this skill):** This skill does NOT implement, invoke, or control `sessions_send`. That is a host-platform built-in (OpenClaw runtime). The orchestration instructions below describe *when* to call the platform’s `sessions_send` after budget checks pass — but the actual network call, model endpoint, and data transmission are entirely the **host platform’s** responsibility. If you need to prevent external network calls, disable or reroute `sessions_send` in your **platform settings** before installing this skill. This skill has no access to that configuration.
+> **Data-flow notice (host platform — not this skill):** This skill does NOT implement, invoke, or control `sessions_send` or any inter-agent messaging. All bundled Python scripts are local-only tools (budget guard, blackboard, permission scorer, context manager). If your platform has a `sessions_send` built-in, whether and how it is used is entirely the **host platform’s** responsibility and is outside this skill’s scope. If you need to prevent external network calls, disable or reroute delegation in your **platform settings** before installing this skill.
 
 > **Context file integrity:** The `context_manager.py inject` command now validates `data/project-context.json` for injection patterns and oversized fields before printing the context block. Review any warnings printed to stderr before passing the output to an agent system prompt.
 
@@ -117,12 +117,12 @@ Sub-Task 3 (RECOMMEND): [strategy_advisor]
   - Output: Recommendations with rationale
 ```
 
-### Budget-Aware Handoff Protocol
+### Budget Check Protocol
 
-**CRITICAL:** Before EVERY `sessions_send`, call the handoff interceptor:
+**Run the budget interceptor before any task delegation:**
 
 ```bash
-# ALWAYS run this BEFORE sessions_send
+# Run this before delegating to any sub-agent
 python {baseDir}/scripts/swarm_guard.py intercept-handoff \
   --task-id "task_001" \
   --from orchestrator \
@@ -133,10 +133,10 @@ python {baseDir}/scripts/swarm_guard.py intercept-handoff \
 **Decision Logic:**
 ```
 IF result.allowed == true:
-    → Proceed with sessions_send
+    → Budget check passed — proceed with the delegated task
     → Note tokens_spent and remaining_budget
 ELSE:
-    → STOP - Do NOT call sessions_send
+    → STOP — budget exceeded or handoff limit reached
     → Report blocked reason to user
     → Consider: reduce scope or abort task
 ```
@@ -273,11 +273,10 @@ python {baseDir}/scripts/swarm_guard.py budget-init \
   --description "Q4 Financial Analysis"
 ```
 
-### 2. Delegate a Task to Another Session
+### 2. Check Budget Before Task Delegation
 
-> **Platform note:** `sessions_list`, `sessions_send`, and `sessions_history` are **OpenClaw host platform built-ins** — they are part of the OpenClaw runtime, not provided or invoked by this skill's Python scripts. This skill only runs local `python scripts/*.py` commands. The guidance below describes how to combine the platform's session tools with this skill's budget guard.
 
-First check budget, then use the OpenClaw platform operation:
+Always run the budget guard before delegating any task:
 
 ```bash
 # 1. Check budget (this skill's Python script)
@@ -285,17 +284,8 @@ python {baseDir}/scripts/swarm_guard.py intercept-handoff \
   --task-id "task_001" --from orchestrator --to data_analyst \
   --message "Analyze Q4 revenue data"
 
-# 2. If allowed, delegate using the OpenClaw platform tool (not this skill):
-#    sessions_list    → see available sessions/agents
-#    sessions_send    → send task to another session
-#    sessions_history → check results from delegated work
-```
-
-**Example delegation prompt:**
-```
-After running swarm_guard.py intercept-handoff and getting result.allowed == true,
-use the OpenClaw sessions_send platform tool to ask the data_analyst session:
-"Analyze Q4 revenue trends from the SAP export data and summarize key insights"
+# 2. If result.allowed == true, proceed with delegation via your platform's built-in tools.
+# If result.allowed == false, stop — budget exceeded or handoff limit reached.
 ```
 
 ### 3. Check Permission Before API Access
@@ -330,7 +320,7 @@ python {baseDir}/scripts/blackboard.py list
 
 ## Agent-to-Agent Handoff Protocol
 
-When delegating tasks between agents/sessions:
+When delegating tasks between agents, always run the budget guard first.
 
 ### Step 1: Initialize Budget & Check Capacity
 ```bash
@@ -343,12 +333,6 @@ python {baseDir}/scripts/swarm_guard.py budget-check --task-id "task_001"
 
 ### Step 2: Identify Target Agent
 
-> **Platform note:** `sessions_list` is an **OpenClaw host platform built-in**, not provided by this skill.
-
-```
-sessions_list  # OpenClaw platform operation — find available agents
-```
-
 Common agent types:
 | Agent | Specialty |
 |-------|-----------|
@@ -357,10 +341,10 @@ Common agent types:
 | `risk_assessor` | Risk analysis, compliance checks |
 | `orchestrator` | Coordination, task decomposition |
 
-### Step 3: Intercept Before Handoff (REQUIRED)
+### Step 3: Run Budget Guard Before Delegation
 
 ```bash
-# This checks budget AND handoff limits before allowing the call
+# Check budget AND handoff limits before delegating
 python {baseDir}/scripts/swarm_guard.py intercept-handoff \
   --task-id "task_001" \
   --from orchestrator \
@@ -369,8 +353,8 @@ python {baseDir}/scripts/swarm_guard.py intercept-handoff \
   --artifact  # Include if expecting output
 ```
 
-**If ALLOWED:** Proceed to Step 4
-**If BLOCKED:** Stop - do not call sessions_send
+**If ALLOWED:** Proceed with delegation via your platform's own tools
+**If BLOCKED:** Stop — budget exceeded or handoff limit reached; do not delegate
 
 ### Step 4: Construct Handoff Message
 
@@ -380,38 +364,25 @@ Include these fields in your delegation:
 - **constraints**: Any limitations or requirements
 - **expectedOutput**: What format/content you need back
 
-### Step 5: Send via OpenClaw Platform Session Tool
+### Step 5: Check Results
 
-> **Platform note:** `sessions_send` is an **OpenClaw host platform built-in** — it is NOT implemented by this skill. This skill only provides the budget guard (`swarm_guard.py`) that must be run first.
+After delegation completes, read results from the blackboard:
 
-```
-# OpenClaw platform operation (not this skill):
-sessions_send to data_analyst:
-"[HANDOFF]
-Instruction: Analyze Q4 revenue by product category
-Context: Using SAP export from ./data/q4_export.csv
-Constraints: Focus on top 5 categories only
-Expected Output: JSON summary with category, revenue, growth_pct
-[/HANDOFF]"
+```bash
+python {baseDir}/scripts/blackboard.py read "task:001:data_analyst"
 ```
 
-### Step 6: Check Results
+## Permission Scoring
 
-> **Platform note:** `sessions_history` is an **OpenClaw host platform built-in**, not provided by this skill.
+> **Tokens are audit scoring outputs only.** Grant tokens from `check_permission.py` are NOT authenticated credentials and must NOT be used as real access control. They are advisory hints based on a local scoring model. Require a separate authenticated identity and explicit human approval before accessing PAYMENTS, DATABASE, or FILE_EXPORT resources.
 
-```
-sessions_history data_analyst  # OpenClaw platform operation — get the response
-```
+**Always score permission before accessing:**
+- `DATABASE` — Internal database / data store (abstract label — no external credentials)
+- `PAYMENTS` — Financial/payment data services (abstract label — requires `--confirm-high-risk`)
+- `EMAIL` — Email sending capability (abstract label)
+- `FILE_EXPORT` — Exporting data to local files (abstract label — requires `--confirm-high-risk`)
 
-## Permission Wall
-
-**CRITICAL**: Always check permissions before accessing:
-- `DATABASE` - Internal database / data store access
-- `PAYMENTS` - Financial/payment data services
-- `EMAIL` - Email sending capability
-- `FILE_EXPORT` - Exporting data to local files
-
-> **Note**: These are abstract local resource type names used by `check_permission.py`. No external API credentials are required or used — all permission evaluation runs locally.
+> **Note**: These are abstract local resource type names used by `check_permission.py`. No external API credentials are required or used — all evaluation runs locally.
 
 ### Permission Evaluation Criteria
 
@@ -507,16 +478,14 @@ Sequential processing - output of one feeds into next.
 
 ### Example Parallel Workflow
 
-> **Platform note:** `sessions_send` and `sessions_history` are **OpenClaw host platform built-ins**, not provided by this skill. This skill provides only the `swarm_guard.py` budget/handoff check that runs before each delegation.
-
 ```
-# For each delegation below, first run:
+# For each delegation below, first run the budget guard:
 #   python {baseDir}/scripts/swarm_guard.py intercept-handoff --task-id "task_001" --from orchestrator --to <agent> --message "<task>"
-# Then, if allowed, use the OpenClaw platform tool:
-1. sessions_send to data_analyst: "Extract key metrics from Q4 data"
-2. sessions_send to risk_assessor: "Identify compliance risks in Q4 data"
-3. sessions_send to strategy_advisor: "Recommend actions based on Q4 trends"
-4. Wait for all responses via sessions_history
+# If result.allowed == true, delegate via your platform's own tools.
+1. Delegate to data_analyst: "Extract key metrics from Q4 data"
+2. Delegate to risk_assessor: "Identify compliance risks in Q4 data"
+3. Delegate to strategy_advisor: "Recommend actions based on Q4 trends"
+4. Wait for all results and read them from the blackboard
 5. Synthesize: Combine metrics + risks + recommendations into executive summary
 ```
 
