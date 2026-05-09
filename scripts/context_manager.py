@@ -74,6 +74,70 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _validate_context(ctx: dict[str, Any]) -> list[str]:
+    """
+    Validate the project context file against the expected schema.
+
+    Returns a list of warning strings (empty = clean).
+    Checks:
+    - Required top-level keys are present
+    - String fields are not excessively long (injection/poisoning guard)
+    - List entries are strings or dicts, not executable-looking content
+    - No obvious prompt-injection patterns in goals, decisions, or banned entries
+    """
+    import re as _re
+    warnings: list[str] = []
+
+    REQUIRED_KEYS = {"project", "goals", "stack", "milestones", "decisions",
+                     "banned_approaches", "updated_at"}
+    missing = REQUIRED_KEYS - set(ctx.keys())
+    if missing:
+        warnings.append(f"Missing keys in context file: {', '.join(sorted(missing))}")
+
+    # Field length caps
+    project = ctx.get("project", {})
+    for field in ("name", "description", "version"):
+        val = project.get(field, "")
+        if isinstance(val, str) and len(val) > 500:
+            warnings.append(f"project.{field} exceeds 500 characters \u2014 consider shortening.")
+
+    # Injection pattern check on free-text list fields
+    INJECTION_RE = _re.compile(
+        r'ignore\s+(previous|above|prior|all)|override\s+(policy|restriction|rule)|'
+        r'system\s*prompt|you\s+are\s+(now|a)|act\s+as\s+(if|a|an)|'
+        r'pretend\s+(to|that|you)|bypass\s+(security|check|restriction)|'
+        r'disregard\s+(policy|rule)|admin\s+(mode|access|override)|'
+        r'\bsudo\b|\bjailbreak\b',
+        _re.IGNORECASE,
+    )
+
+    def _check_text(label: str, text: str) -> None:
+        if INJECTION_RE.search(text):
+            warnings.append(
+                f"Possible injection pattern detected in {label}: {text[:80]!r}"
+            )
+        if len(text) > 2000:
+            warnings.append(f"{label} entry exceeds 2000 characters \u2014 review before injecting.")
+
+    for i, goal in enumerate(ctx.get("goals", [])):
+        if isinstance(goal, str):
+            _check_text(f"goals[{i}]", goal)
+
+    for i, dec in enumerate(ctx.get("decisions", [])):
+        if isinstance(dec, dict):
+            for fld in ("decision", "rationale"):
+                if isinstance(dec.get(fld), str):
+                    _check_text(f"decisions[{i}].{fld}", dec[fld])
+        elif isinstance(dec, str):
+            _check_text(f"decisions[{i}]", dec)
+
+    for i, banned in enumerate(ctx.get("banned_approaches", [])):
+        if isinstance(banned, str):
+            _check_text(f"banned_approaches[{i}]", banned)
+
+    return warnings
+
+
 def _load() -> dict[str, Any]:
     if not CONTEXT_PATH.exists():
         print(
@@ -127,6 +191,11 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_show(args: argparse.Namespace) -> int:  # noqa: ARG001
     ctx = _load()
+    warnings = _validate_context(ctx)
+    if warnings:
+        print("[context_manager] VALIDATION WARNINGS — review before injecting:", file=sys.stderr)
+        for w in warnings:
+            print(f"  ! {w}", file=sys.stderr)
     print(json.dumps(ctx, indent=2))
     return 0
 
@@ -134,6 +203,12 @@ def cmd_show(args: argparse.Namespace) -> int:  # noqa: ARG001
 def cmd_inject(args: argparse.Namespace) -> int:  # noqa: ARG001
     """Print a formatted block suitable for injection into an agent system prompt."""
     ctx = _load()
+    warnings = _validate_context(ctx)
+    if warnings:
+        print("[context_manager] VALIDATION WARNINGS \u2014 context has potential issues:", file=sys.stderr)
+        for w in warnings:
+            print(f"  ! {w}", file=sys.stderr)
+        print("[context_manager] Proceeding with inject, but review warnings above.", file=sys.stderr)
     p = ctx.get("project", {})
 
     lines: list[str] = []

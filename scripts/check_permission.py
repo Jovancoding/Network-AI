@@ -41,6 +41,17 @@ GRANT_TOKEN_TTL_MINUTES = 5
 GRANTS_FILE = Path(__file__).parent.parent / "data" / "active_grants.json"
 AUDIT_LOG = Path(__file__).parent.parent / "data" / "audit_log.jsonl"
 
+# ADVISORY TOKENS — IMPORTANT
+# Grant tokens produced by this script are ADVISORY scoring outputs only.
+# They are NOT authenticated credentials. The agent_id supplied via --agent
+# is accepted as-is from the caller and is NOT verified against an identity
+# provider. Downstream systems MUST treat these tokens as hints, not proof
+# of identity, and SHOULD require a separate authenticated session or human
+# approval before honouring access to sensitive resources.
+#
+# For PAYMENTS, DATABASE (write), and FILE_EXPORT the caller must also pass
+# --confirm-high-risk to acknowledge the advisory-only nature of the grant.
+
 # Default trust levels for known agents
 DEFAULT_TRUST_LEVELS = {
     "orchestrator": 0.9,
@@ -48,6 +59,13 @@ DEFAULT_TRUST_LEVELS = {
     "strategy_advisor": 0.7,
     "risk_assessor": 0.85,
 }
+
+# Agents whose identity is pre-registered. Any agent_id NOT in this set
+# receives a reduced trust score (0.3) and triggers an advisory warning.
+KNOWN_AGENTS: set[str] = set(DEFAULT_TRUST_LEVELS.keys())
+
+# Resource types that require --confirm-high-risk before a grant is issued
+HIGH_RISK_RESOURCES: set[str] = {"PAYMENTS", "DATABASE"}
 
 # Base risk scores for resource types
 BASE_RISKS = {
@@ -258,48 +276,88 @@ def save_grant(grant: dict[str, Any]) -> None:
     GRANTS_FILE.write_text(json.dumps(grants, indent=2))
 
 
-def evaluate_permission(agent_id: str, resource_type: str, 
-                       justification: str, scope: Optional[str] = None) -> dict[str, Any]:
+def evaluate_permission(
+    agent_id: str,
+    resource_type: str,
+    justification: str,
+    scope: Optional[str] = None,
+    confirm_high_risk: bool = False,
+) -> dict[str, Any]:
     """
     Evaluate a permission request using weighted scoring.
-    
+
+    NOTE: These tokens are ADVISORY ONLY — the caller supplies their own
+    agent_id and it is not authenticated. Downstream systems must not treat
+    the resulting token as proof of identity without additional verification.
+
     Weights:
     - Justification Quality: 40%
     - Agent Trust Level: 30%
     - Risk Assessment: 30%
     """
+    # Warn if agent_id is not in the pre-registered known-agents list
+    unknown_agent = agent_id not in KNOWN_AGENTS
+
     # Log the request
     log_audit("permission_request", {
         "agent_id": agent_id,
         "resource_type": resource_type,
         "justification": justification,
-        "scope": scope
+        "scope": scope,
+        "unknown_agent": unknown_agent,
     })
-    
+
+    # Require explicit acknowledgement for high-risk resources
+    needs_confirmation = (
+        resource_type in HIGH_RISK_RESOURCES
+        or (resource_type == "DATABASE" and scope and re.search(
+            r'\b(write|delete|update|modify|create)\b', scope, re.IGNORECASE
+        ))
+    )
+    if needs_confirmation and not confirm_high_risk:
+        return {
+            "granted": False,
+            "advisory": True,
+            "reason": (
+                f"{resource_type} is a high-risk resource. Re-run with --confirm-high-risk "
+                "to acknowledge that this token is advisory only and does not authenticate "
+                "the supplied agent identity."
+            ),
+            "scores": {"justification": None, "trust": None, "risk": None},
+        }
+
     # 1. Justification Quality (40% weight)
     justification_score = score_justification(justification)
     if justification_score < 0.3:
         return {
             "granted": False,
+            "advisory": True,
             "reason": "Justification is insufficient. Please provide specific task context.",
             "scores": {
                 "justification": justification_score,
                 "trust": None,
-                "risk": None
-            }
+                "risk": None,
+            },
         }
-    
+
     # 2. Agent Trust Level (30% weight)
-    trust_level = DEFAULT_TRUST_LEVELS.get(agent_id, 0.5)
+    # Unknown agents receive a reduced base trust score (0.3) — their identity
+    # has not been pre-registered and cannot be verified by this script.
+    trust_level = DEFAULT_TRUST_LEVELS.get(agent_id, 0.3) if not unknown_agent \
+        else 0.3
     if trust_level < 0.4:
         return {
             "granted": False,
-            "reason": "Agent trust level is below threshold. Escalate to human operator.",
+            "advisory": True,
+            "reason": (
+                "Agent trust level is below threshold. Escalate to human operator."
+                + (" (unrecognized agent_id — identity not pre-registered)" if unknown_agent else "")
+            ),
             "scores": {
                 "justification": justification_score,
                 "trust": trust_level,
-                "risk": None
-            }
+                "risk": None,
+            },
         }
     
     # 3. Risk Assessment (30% weight)
@@ -307,12 +365,13 @@ def evaluate_permission(agent_id: str, resource_type: str,
     if risk_score > 0.8:
         return {
             "granted": False,
+            "advisory": True,
             "reason": "Risk assessment exceeds acceptable threshold. Narrow the requested scope.",
             "scores": {
                 "justification": justification_score,
                 "trust": trust_level,
-                "risk": risk_score
-            }
+                "risk": risk_score,
+            },
         }
     
     # Calculate weighted approval score
@@ -325,13 +384,14 @@ def evaluate_permission(agent_id: str, resource_type: str,
     if weighted_score < 0.5:
         return {
             "granted": False,
+            "advisory": True,
             "reason": f"Combined evaluation score ({weighted_score:.2f}) below threshold (0.5).",
             "scores": {
                 "justification": justification_score,
                 "trust": trust_level,
                 "risk": risk_score,
-                "weighted": weighted_score
-            }
+                "weighted": weighted_score,
+            },
         }
     
     # Generate grant
@@ -346,15 +406,19 @@ def evaluate_permission(agent_id: str, resource_type: str,
         "scope": scope,
         "expires_at": expires_at,
         "restrictions": restrictions,
-        "granted_at": datetime.now(timezone.utc).isoformat()
+        "granted_at": datetime.now(timezone.utc).isoformat(),
+        "advisory": True,           # Always advisory — not an authenticated credential
+        "unknown_agent": unknown_agent,
     }
-    
+
     # Save grant and log
     save_grant(grant)
     log_audit("permission_granted", grant)
-    
+
     return {
         "granted": True,
+        "advisory": True,           # Token is advisory — agent identity was not verified
+        "unknown_agent": unknown_agent,
         "token": token,
         "expires_at": expires_at,
         "restrictions": restrictions,
@@ -362,8 +426,14 @@ def evaluate_permission(agent_id: str, resource_type: str,
             "justification": justification_score,
             "trust": trust_level,
             "risk": risk_score,
-            "weighted": weighted_score
-        }
+            "weighted": weighted_score,
+        },
+        "notice": (
+            "This token was issued based on local scoring only. "
+            "The agent identity supplied via --agent was NOT cryptographically verified. "
+            "Treat this token as advisory and require human approval before granting "
+            "access to sensitive systems."
+        ),
     }
 
 
@@ -649,6 +719,16 @@ Examples:
         action="store_true",
         help="Output result as JSON"
     )
+    parser.add_argument(
+        "--confirm-high-risk",
+        action="store_true",
+        dest="confirm_high_risk",
+        help=(
+            "Required for PAYMENTS and DATABASE resources. Acknowledges that the issued "
+            "token is advisory only and that the caller-supplied agent identity was not "
+            "cryptographically verified."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -672,17 +752,21 @@ Examples:
         agent_id=args.agent,
         resource_type=args.resource,
         justification=args.justification,
-        scope=args.scope
+        scope=args.scope,
+        confirm_high_risk=getattr(args, "confirm_high_risk", False),
     )
 
     if args.json:
         print(json.dumps(result, indent=2))
     else:
         if result["granted"]:
-            print("GRANTED")
-            print(f"Token: {result['token']}")
-            print(f"Expires: {result['expires_at']}")
+            print("GRANTED  [ADVISORY — agent identity was NOT verified]")
+            print(f"Token:        {result['token']}")
+            print(f"Expires:      {result['expires_at']}")
             print(f"Restrictions: {', '.join(result['restrictions'])}")
+            if result.get("unknown_agent"):
+                print("WARNING: agent_id is not in the pre-registered known-agents list.")
+            print(f"\nNOTICE: {result.get('notice', '')}")
         else:
             print("DENIED")
             print(f"Reason: {result['reason']}")

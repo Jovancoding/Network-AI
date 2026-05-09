@@ -1,13 +1,14 @@
 ---
 name: network-ai
-description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. The bundled Python scripts make no network calls and have zero third-party dependencies. Workflow delegations via the host platform's sessions_send may invoke external model APIs."
+description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. All bundled scripts run locally with zero network calls and zero third-party dependencies."
 metadata:
   openclaw:
     emoji: "\U0001F41D"
     homepage: https://network-ai.org
     bundle_scope: "Python scripts only (scripts/*.py). All execution is local. Only Python stdlib — no other runtimes, adapters, or CLI tools are included."
-    network_calls: "none — bundled scripts make zero network calls. The host platform's sessions_send (not part of this skill) may invoke external models."
-    sessions_send: "NOT implemented or invoked by this skill. sessions_send is a host-platform built-in. This skill only provides budget guards that run before the platform delegates."
+    network_calls: "none — bundled scripts make zero network calls and spawn no subprocesses."
+    inter_agent_comms: "none — this skill does not implement, invoke, or control inter-agent messaging or sessions_send. All coordination is via local file-based blackboard only."
+    sessions_send: "NOT implemented or invoked by this skill. sessions_send is a host-platform built-in entirely outside this skill's control. See data-flow notice below."
     sessions_ops: "platform-provided — outside this skill's control"
     requires:
       bins:
@@ -31,7 +32,11 @@ metadata:
 
 > **Scope:** The bundled Python scripts (`scripts/*.py`) make **no network calls**, use only the Python standard library, and have **zero third-party dependencies**. Tokens are UUID-based (`grant_{uuid4().hex}`) stored in `data/active_grants.json`. Audit logging is plain JSONL (`data/audit_log.jsonl`).
 
-> **Data-flow notice:** This skill does NOT implement, invoke, or control `sessions_send`. That is a host-platform built-in (OpenClaw runtime). The orchestration instructions below describe *when* to call the platform's `sessions_send` after budget checks pass — but the actual network call, model endpoint, and data transmission are entirely the host platform's responsibility. If you need to prevent external network calls, disable or reroute `sessions_send` in your platform settings before installing this skill.
+> **Advisory tokens notice:** Grant tokens issued by `check_permission.py` are **advisory scoring outputs only** — the caller-supplied `--agent` identity is not cryptographically verified. Downstream systems must not treat these tokens as authenticated credentials without adding a separate identity-verification step or human approval gate, especially for PAYMENTS, DATABASE, and FILE_EXPORT resources.
+
+> **Data-flow notice (host platform — not this skill):** This skill does NOT implement, invoke, or control `sessions_send`. That is a host-platform built-in (OpenClaw runtime). The orchestration instructions below describe *when* to call the platform’s `sessions_send` after budget checks pass — but the actual network call, model endpoint, and data transmission are entirely the **host platform’s** responsibility. If you need to prevent external network calls, disable or reroute `sessions_send` in your **platform settings** before installing this skill. This skill has no access to that configuration.
+
+> **Context file integrity:** The `context_manager.py inject` command now validates `data/project-context.json` for injection patterns and oversized fields before printing the context block. Review any warnings printed to stderr before passing the output to an agent system prompt.
 
 > **PII / sensitive-data warning:** The `justification` field in permission requests and the audit log (`data/audit_log.jsonl`) store free-text strings provided by agents. **Do not include PII, secrets, or credentials in justification text.** Consider restricting file permissions on `data/` or running this skill in an isolated workspace.
 
