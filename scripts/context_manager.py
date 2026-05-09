@@ -125,9 +125,11 @@ def _validate_context(ctx: dict[str, Any]) -> list[str]:
 
     for i, dec in enumerate(ctx.get("decisions", [])):
         if isinstance(dec, dict):
+            dec_dict = cast(dict[str, object], dec)
             for fld in ("decision", "rationale"):
-                if isinstance(dec.get(fld), str):
-                    _check_text(f"decisions[{i}].{fld}", dec[fld])
+                fld_val = dec_dict.get(fld)
+                if isinstance(fld_val, str):
+                    _check_text(f"decisions[{i}].{fld}", fld_val)
         elif isinstance(dec, str):
             _check_text(f"decisions[{i}]", dec)
 

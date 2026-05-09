@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.3.1] - 2026-05-09
+
+### Security
+- **Advisory token enforcement** (`scripts/check_permission.py`) — grant tokens are now explicitly marked `advisory: true` with a notice field explaining they are not verified credentials. All grant/deny outputs carry this flag.
+- **KNOWN_AGENTS allowlist** (`scripts/check_permission.py`) — unknown agent identities receive a reduced trust score of `0.3` (was `0.5`) and an `unknown_agent: true` warning flag in all outputs; CLI output shows `"[ADVISORY — agent identity was NOT verified]"`.
+- **High-risk resource gating** (`scripts/check_permission.py`) — `PAYMENTS` and `DATABASE` resources now require an explicit `--confirm-high-risk` flag or the request is denied. Prevents accidental access without operator acknowledgment.
+- **Context injection validation** (`scripts/context_manager.py`) — `_validate_context()` runs schema checks and injection-pattern detection on `goals`, `decisions`, and `banned_approaches` before `inject` / `show` commands proceed; warnings printed to stderr.
+- **SKILL.md hardening** — removed `sessions_send` mention from skill description; added `inter_agent_comms: none` to OpenClaw metadata; separated advisory-token and data-flow notices into distinct prose blocks; added context-file integrity notice for the new validation step.
+- **Pyright type safety** (`scripts/context_manager.py`) — resolved `reportUnknownMemberType` / `reportUnknownArgumentType` errors in `_validate_context()` by casting `dec` to `dict[str, object]` via the module-level `cast` import before field access.
+
+### Stats
+- **28 test suites, 2,899 passing assertions** (unchanged — security fixes are in Python scripts and docs only)
+
 ## [5.3.0] - 2026-05-09
 
 ### Added

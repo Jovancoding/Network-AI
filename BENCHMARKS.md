@@ -1,6 +1,6 @@
 # Benchmarks & Performance
 
-> Performance data for Network-AI v5.1.4 deployments. Your swarm is only as fast as the backend it calls — this page helps you choose the right setup.
+> Performance data for Network-AI v5.3.1 deployments. Your swarm is only as fast as the backend it calls — this page helps you choose the right setup.
 
 ## BlackboardValidator Throughput
 

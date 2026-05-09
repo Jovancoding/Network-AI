@@ -69,9 +69,11 @@ Pre-configured trust scores for known agents:
 | `risk_assessor` | 0.85 | Risk analysis specialist |
 | `data_analyst` | 0.8 | Data processing agent |
 | `strategy_advisor` | 0.7 | Business strategy agent |
-| Unknown agents | 0.5 | Default trust level |
+| Unknown agents | 0.3 | Reduced trust — `unknown_agent: true` warning flag emitted |
 
 **Denial threshold: 0.4** (low-trust agents are denied and escalated to human)
+
+> **Advisory tokens (v5.3.1):** All grant tokens are explicitly marked `advisory: true`. They are not verified credentials — the token format does not cryptographically bind the caller to the `agent_id` field. The host platform is responsible for actual caller authentication. Unknown agents receive trust 0.3 and an `unknown_agent: true` flag in all outputs.
 
 ### Factor 3: Risk Assessment (30%)
 
@@ -80,9 +82,9 @@ Base risk scores by resource type:
 | Resource | Base Risk | Reason |
 |----------|-----------|--------|
 | `EMAIL` | 0.4 | Lower sensitivity |
-| `DATABASE` | 0.5 | Business data access |
+| `DATABASE` | 0.5 | Business data access — requires `--confirm-high-risk` |
 | `FILE_EXPORT` | 0.6 | Data exfiltration risk |
-| `PAYMENTS` | 0.7 | Financial data sensitivity |
+| `PAYMENTS` | 0.7 | Financial data sensitivity — requires `--confirm-high-risk` |
 
 **Risk modifiers:**
 - Broad scope ("*", "all", empty) → +0.2
@@ -116,9 +118,9 @@ Base risk scores by resource type:
 ### Using Tokens
 
 ```bash
-# 1. Request permission
+# 1. Request permission (high-risk resources require --confirm-high-risk)
 result=$(python scripts/check_permission.py --agent data_analyst --resource DATABASE \
-  --justification "Need Q4 invoices for report" --json)
+  --justification "Need Q4 invoices for report" --confirm-high-risk --json)
 
 # 2. Extract token
 token=$(echo $result | jq -r '.token')

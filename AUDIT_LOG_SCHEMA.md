@@ -1,4 +1,4 @@
-# Audit Log Schema — Network-AI v5.1.4
+# Audit Log Schema — Network-AI v5.3.1
 
 Network-AI writes a JSONL audit trail during permission management and swarm execution. This document describes every field and event type.
 

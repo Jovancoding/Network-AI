@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.1.4 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 2,834 tests, 65+ modules.
+Network-AI v5.3.1 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 2,899 tests, 65+ modules.
 
 ## The Multi-Agent Race Condition Problem
 
@@ -265,6 +265,10 @@ python scripts/context_manager.py update --section milestones --complete "Ship v
 
 | Module | File | Purpose |
 |--------|------|---------|
+| `ContextThrottler` | `lib/context-throttler.ts` | Prune blackboard keys per-agent scope before LLM calls; `filterState()` + wildcard / `exactMatch` / `maxKeys` options |
+| `RouteClassifier` | `lib/route-classifier.ts` | Classify goals pre-DAG; short-circuit `FACTUAL_LOOKUP` to a lookup agent bypassing blackboard |
+| `PartitionPlanner` | `lib/partition-planner.ts` | Assign non-overlapping focus areas to agents; pluggable planner + `createLexicalOverlapChecker()` |
+| `CoverageGate` | `lib/coverage-gate.ts` | Recursive refinement loop: evaluate completeness, re-run GoalDecomposer for gaps until score ≥ threshold |
 | `MCPToolConsumer` | `lib/mcp-tool-consumer.ts` | Consume remote MCP servers (stdio + HTTP transport) |
 | `ApprovalInbox` | `lib/approval-inbox.ts` | Web approval queue with REST API + SSE streaming |
 | `AgentVCR` | `lib/agent-vcr.ts` | Record/replay agent calls with cassette files |
@@ -365,6 +369,10 @@ Network-AI/
 │   ├── agent-runtime.ts          # Sandboxed execution with SandboxPolicy, ShellExecutor (v4.14)
 │   ├── console-ui.ts             # Interactive terminal dashboard with ANSI TUI (v4.14)
 │   ├── strategy-agent.ts         # Meta-orchestrator with AgentPool, WorkloadPartitioner (v4.14)
+│   ├── context-throttler.ts       # Prune blackboard keys per-agent scope (v5.3)
+│   ├── route-classifier.ts        # Goal routing + FACTUAL_LOOKUP short-circuit (v5.3)
+│   ├── partition-planner.ts       # Non-overlapping agent focus areas (v5.3)
+│   ├── coverage-gate.ts           # Recursive completeness refinement loop (v5.3)
 │   └── goal-decomposer.ts        # LLM-powered goal → task DAG → parallel execution (v4.15)
 ├── scripts/                      # Python helper scripts (local orchestration only)
 │   ├── blackboard.py             # Shared state management with atomic commits

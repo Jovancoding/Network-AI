@@ -23,7 +23,7 @@ This document exists so an engineer or architect can evaluate Network-AI in unde
 
 ## What It Does (One Paragraph)
 
-Network-AI is a TypeScript/Node.js orchestration layer that sits between your agents and your shared state. It enforces: atomic blackboard writes (no race conditions when two agents write simultaneously), permission gating (agents must request access to sensitive resources and provide a scored justification), budget ceilings (per-agent token limits; rogue agents get cut off mid-task), FSM-based workflow governance (agents are blocked from skipping pipeline stages), and real-time compliance monitoring (tool abuse, turn-taking violations, response timeouts). v5.0 adds: approval inbox (web-accessible approval queue), job queue (persistent priority FIFO with crash recovery), transport layer (JSON-RPC 2.0 with HMAC auth), agent VCR (record/replay for testing), comparison runner (side-by-side adapter evaluation), and 9 new adapters. v5.1.4 adds: RLMAdapter (recursive language model / any RLM-compatible HTTP endpoint), FederatedBudget child spending, blackboard metadata API, PhasePipeline compaction, semaphore-based fan-out, HookContext depth, and sub-goal recursion. It ships as an npm package with a companion Python skill bundle for OpenClaw/ClawHub environments.
+Network-AI is a TypeScript/Node.js orchestration layer that sits between your agents and your shared state. It enforces: atomic blackboard writes (no race conditions when two agents write simultaneously), permission gating (agents must request access to sensitive resources and provide a scored justification), budget ceilings (per-agent token limits; rogue agents get cut off mid-task), FSM-based workflow governance (agents are blocked from skipping pipeline stages), and real-time compliance monitoring (tool abuse, turn-taking violations, response timeouts). v5.0 adds: approval inbox (web-accessible approval queue), job queue (persistent priority FIFO with crash recovery), transport layer (JSON-RPC 2.0 with HMAC auth), agent VCR (record/replay for testing), comparison runner (side-by-side adapter evaluation), and 9 new adapters. v5.1.4 adds: RLMAdapter (recursive language model / any RLM-compatible HTTP endpoint), FederatedBudget child spending, blackboard metadata API, PhasePipeline compaction, semaphore-based fan-out, HookContext depth, and sub-goal recursion. v5.3.x adds: Context Throttler (prune blackboard keys per-agent scope), Route Classifier (goal routing + FACTUAL_LOOKUP short-circuit), Partition Planner (non-overlapping agent focus areas), Coverage Gate (recursive completeness refinement), advisory token enforcement in the permission system, and context injection validation in the project context manager. It ships as an npm package with a companion Python skill bundle for OpenClaw/ClawHub environments.
 
 ---
 
@@ -68,6 +68,7 @@ Full architecture: [ARCHITECTURE.md](ARCHITECTURE.md)
 | OpenSSF Scorecard | ✅ SHA-pinned CI actions, provenance publishing |
 | npm provenance | ✅ Published with `--provenance` since v4.0.0 |
 | Secret scanning | ✅ Enabled on repository |
+| ClawHub Security Scanner | ✅ All three v5.3.0 findings resolved (advisory tokens, context validation, inter-agent comms declaration) |
 | Vulnerability disclosure | [SECURITY.md](SECURITY.md) — 48h acknowledgment, 7-day response |
 
 ---
