@@ -1538,6 +1538,28 @@ export type { WorkTreeDashboardOptions, AgentLogEntry, DashboardAgentInfo, Syste
 export { ControlPlane } from './lib/control-plane';
 export type { ControlPlaneOptions, WorkspaceConfig, WorkspaceSummary, CPAgentInfo } from './lib/control-plane';
 
+// ============================================================================
+// Phase 13 (v5.4.0): Multi-Environment Isolation
+// ============================================================================
+
+// Environment Manager — isolated data dirs, promotion chain, backup/restore
+export { EnvironmentManager } from './lib/env-manager';
+export type {
+  EnvName,
+  GateType,
+  EnvConfig,
+  PromotionResult,
+  EnvFileDiff,
+  EnvDiff,
+  BackupResult,
+  BackupEntry,
+  RestoreResult,
+  PromoteOptions,
+} from './lib/env-manager';
+
+// Source Protection — blocks agent access to source code files
+export { SourceProtectionError } from './lib/agent-runtime';
+
 // QuadTree — Barnes-Hut spatial indexing (Tier 1 scalability)
 export { QuadTree } from './lib/quadtree';
 export type { QTPoint, QTBounds, QTMass } from './lib/quadtree';

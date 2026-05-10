@@ -21,6 +21,28 @@ import { join, normalize, isAbsolute, resolve, dirname } from 'path';
 import { EventEmitter } from 'events';
 
 // ============================================================================
+// ERRORS
+// ============================================================================
+
+/**
+ * Thrown when an agent attempts to access source code files or directories
+ * while `sourceProtection` is enabled on the sandbox policy.
+ */
+export class SourceProtectionError extends Error {
+  /** The path that was blocked */
+  readonly blockedPath: string;
+  /** The agent that attempted access */
+  readonly agentId: string;
+
+  constructor(blockedPath: string, agentId: string) {
+    super(`Source protection: access to '${blockedPath}' is blocked for agent '${agentId}'`);
+    this.name = 'SourceProtectionError';
+    this.blockedPath = blockedPath;
+    this.agentId = agentId;
+  }
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -88,6 +110,18 @@ export interface SandboxPolicyConfig {
   approvalRequired: string[];
   /** Whether read-only file operations auto-approve (default: true) */
   autoApproveReads: boolean;
+  /**
+   * When true, agents cannot access source code files or directories
+   * (lib/, adapters/, bin/, scripts/, *.ts, *.py, root *.json config files).
+   * All access attempts outside `data/<env>/` are blocked and audited.
+   * Default: false.
+   */
+  sourceProtection?: boolean;
+  /**
+   * Active environment name. When set, file access is further restricted
+   * to `data/<env>/` when sourceProtection is enabled.
+   */
+  env?: string;
 }
 
 /** Approval request passed to the approval callback */
@@ -472,6 +506,30 @@ export class FileAccessor {
     this.policy = policy;
   }
 
+  /**
+   * Checks whether the resolved absolute path is blocked by source protection.
+   * Throws SourceProtectionError if access is denied.
+   */
+  private checkSourceProtection(resolvedPath: string, agentId: string): void {
+    const cfg = this.policy.getConfig();
+    if (!cfg.sourceProtection) return;
+
+    const base = cfg.basePath;
+    const env = cfg.env ?? '';
+
+    // The only permitted subtree under source protection is data/<env>/ (when env
+    // is set) or data/ (legacy). All source code paths are blocked.
+    const dataEnvDir = env
+      ? resolve(base, 'data', env)
+      : resolve(base, 'data');
+
+    if (resolvedPath.startsWith(dataEnvDir + require('path').sep) || resolvedPath === dataEnvDir) {
+      return; // allowed
+    }
+
+    throw new SourceProtectionError(resolvedPath, agentId);
+  }
+
   /** Read a file within the sandbox scope */
   async read(filePath: string, agentId: string): Promise<FileResult> {
     const start = Date.now();
@@ -482,6 +540,15 @@ export class FileAccessor {
     }
     if (!this.policy.isPathAllowed(filePath)) {
       return { success: false, path: filePath, error: 'Path not in allowed scope', durationMs: Date.now() - start };
+    }
+
+    try {
+      this.checkSourceProtection(resolved, agentId);
+    } catch (err) {
+      if (err instanceof SourceProtectionError) {
+        return { success: false, path: resolved, error: err.message, durationMs: Date.now() - start };
+      }
+      throw err;
     }
 
     try {
@@ -506,6 +573,15 @@ export class FileAccessor {
     }
 
     try {
+      this.checkSourceProtection(resolved, agentId);
+    } catch (err) {
+      if (err instanceof SourceProtectionError) {
+        return { success: false, path: resolved, error: err.message, durationMs: Date.now() - start };
+      }
+      throw err;
+    }
+
+    try {
       await mkdir(dirname(resolved), { recursive: true });
       await writeFile(resolved, content, 'utf-8');
       return { success: true, path: resolved, durationMs: Date.now() - start };
@@ -525,6 +601,15 @@ export class FileAccessor {
     }
     if (!this.policy.isPathAllowed(dirPath)) {
       return { success: false, path: dirPath, error: 'Path not in allowed scope', durationMs: Date.now() - start };
+    }
+
+    try {
+      this.checkSourceProtection(resolved, agentId);
+    } catch (err) {
+      if (err instanceof SourceProtectionError) {
+        return { success: false, path: resolved, error: err.message, durationMs: Date.now() - start };
+      }
+      throw err;
     }
 
     try {

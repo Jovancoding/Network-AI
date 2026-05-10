@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 5.3.x   | ✅ Yes — full support (current, latest: 5.3.2) |
+| 5.4.x   | ✅ Yes — full support (current, latest: 5.4.0) |
+| 5.3.x   | ✅ Security fixes only |
 | 5.2.x   | ✅ Security fixes only |
 | 5.1.x   | ✅ Security fixes only |
 | 5.0.x   | ✅ Security fixes only |
@@ -59,6 +60,10 @@ Network-AI includes built-in security features:
 - **Strategy Agent Pool Isolation** (v4.14.0) -- `AgentPool` enforces per-pool capacity ceilings; `WorkloadPartitioner` routes tasks by priority class; adaptive scaling respects budget constraints before spawning agents
 - **Goal Decomposer DAG Validation** (v4.15.0) -- `validateDAG()` enforces acyclicity (Kahn's algorithm), rejects self-dependencies and unknown task references; task graphs are validated before execution to prevent infinite loops or orphaned tasks
 - **Team Runner Approval Gate** (v4.15.0) -- optional `approvalCallback` on `runTeam()` requires explicit approval of the full task DAG before any agent execution begins; rejection skips all tasks with audit-ready status
+- **Advisory Token Enforcement** (v5.3.1) -- `check_permission.py` marks all grant tokens `advisory: true`; unknown agent identities receive a reduced trust score of 0.3 and an explicit warning flag; `PAYMENTS` / `DATABASE` resources require `--confirm-high-risk` acknowledgment
+- **Context Injection Validation** (v5.3.1) -- `context_manager.py` runs `_validate_context()` before every `inject` / `show` command: schema checks plus injection-pattern detection on free-text fields; warnings printed to stderr
+- **Environment Isolation** (v5.4.0) -- `EnvironmentManager` enforces a promotion chain (dev→st→sit→qa→preprod→prod) with gate types: `auto`, `confirm`, and `approval`; config files promote, live state never does; auto-backup before each promotion
+- **Source Protection** (v5.4.0) -- `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any out-of-scope access throws `SourceProtectionError` and returns `{success: false}` to the agent
 
 ## Security Scan Results
 

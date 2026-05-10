@@ -16,6 +16,7 @@ import * as readline from 'readline';
 import { LockedBlackboard } from '../lib/locked-blackboard';
 import { AuthGuardian } from '../index';
 import { FederatedBudget } from '../lib/federated-budget';
+import { EnvironmentManager } from '../lib/env-manager';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = (() => {
@@ -28,6 +29,12 @@ const pkg = (() => {
 
 function resolveData(opts: { data?: string }): string {
   return path.resolve(opts.data ?? path.join(process.cwd(), 'data'));
+}
+
+function resolveEnvData(opts: { data?: string; env?: string }): string {
+  const base = resolveData(opts);
+  if (opts.env) return path.join(base, opts.env);
+  return base;
 }
 
 function print(obj: unknown, asJson: boolean): void {
@@ -59,6 +66,7 @@ program
   .version(pkg.version, '-v, --version')
   .enablePositionalOptions()
   .addOption(new Option('--data <path>', 'path to data directory').default('./data'))
+  .addOption(new Option('--env <name>', 'target environment (dev|st|sit|qa|sandbox|preprod|prod)'))
   .addOption(new Option('--json', 'output raw JSON (useful for piping)'));
 
 // ── bb (blackboard) ───────────────────────────────────────────────────────────
@@ -300,6 +308,153 @@ auditCmd.command('clear')
     }
     fs.writeFileSync(logFile, '');
     print(g.json ? { cleared: logFile } : `✓ cleared ${logFile}`, g.json);
+  });
+
+// ── env (environment management) ──────────────────────────────────────────────
+
+const envCmd = program.command('env').description('Multi-environment management (isolation, promotion, backup)');
+
+envCmd.command('init')
+  .description('Scaffold an environment data directory (all 7 envs if no --env given)')
+  .action((_opts: Record<string, unknown>, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; env?: string; json: boolean }>();
+    const mgr = new EnvironmentManager(resolveData(g));
+    if (g.env) {
+      mgr.init(g.env);
+      print(g.json ? { initialized: g.env } : `✓ initialized env '${g.env}'`, g.json);
+    } else {
+      mgr.initAll();
+      print(g.json ? { initialized: mgr.getChain().concat(['sandbox']) } : `✓ all environments initialized`, g.json);
+    }
+  });
+
+envCmd.command('list')
+  .description('List all environments with existence and key count')
+  .action((_opts: Record<string, unknown>, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; env?: string; json: boolean }>();
+    const mgr = new EnvironmentManager(resolveData(g));
+    const envs = mgr.list();
+    if (g.json) {
+      print(envs, true);
+    } else {
+      const lines = envs.map(e => `${e.name.padEnd(10)} ${e.exists ? '✓' : '✗'} (${e.keyCount} keys)`);
+      console.log(lines.join('\n'));
+    }
+  });
+
+envCmd.command('chain')
+  .description('Show the configured promotion chain')
+  .action((_opts: Record<string, unknown>, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const mgr = new EnvironmentManager(resolveData(g));
+    const chain = mgr.getChain();
+    print(g.json ? chain : chain.join(' → '), g.json);
+  });
+
+envCmd.command('diff')
+  .description('Compare config artefacts between two environments')
+  .requiredOption('--from <env>', 'source environment')
+  .requiredOption('--to <env>', 'target environment')
+  .action((opts: { from: string; to: string }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const mgr = new EnvironmentManager(resolveData(g));
+    const result = mgr.diff(opts.from, opts.to);
+    if (g.json) {
+      print(result, true);
+    } else if (result.differences.length === 0) {
+      console.log(`No differences between '${opts.from}' and '${opts.to}'`);
+    } else {
+      for (const d of result.differences) {
+        const sym = d.status === 'added' ? '+' : d.status === 'removed' ? '-' : '~';
+        console.log(`  ${sym} ${d.file} (${d.status})`);
+      }
+    }
+  });
+
+envCmd.command('promote')
+  .description('Promote config artefacts one step up the chain')
+  .requiredOption('--from <env>', 'source environment')
+  .requiredOption('--to <env>', 'target environment')
+  .option('--confirmed-by <name>', 'required for preprod gate')
+  .option('--approved-by <name>', 'required for prod gate')
+  .action((opts: { from: string; to: string; confirmedBy?: string; approvedBy?: string }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const mgr = new EnvironmentManager(resolveData(g));
+    try {
+      const result = mgr.promote(opts.from, opts.to, {
+        confirmedBy: opts.confirmedBy,
+        approvedBy: opts.approvedBy,
+      });
+      print(g.json ? result : `✓ promoted ${opts.from} → ${opts.to} (${result.configsCopied.length} configs copied)`, g.json);
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+// ── env backup subcommand group ───────────────────────────────────────────────
+
+const envBackup = envCmd.command('backup').description('Backup management for an environment');
+
+envBackup.command('create')
+  .description('Create a backup of the environment data directory (alias: network-ai env backup)')
+  .action((_opts: Record<string, unknown>, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; env?: string; json: boolean }>();
+    if (!g.env) die('--env <name> is required for backup create');
+    const mgr = new EnvironmentManager(resolveData(g));
+    const result = mgr.backup(g.env);
+    print(g.json ? result : `✓ backup created: ${result.backupId} (${result.filesCount} files)`, g.json);
+  });
+
+envBackup.command('list')
+  .description('List available backups for an environment')
+  .action((_opts: Record<string, unknown>, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; env?: string; json: boolean }>();
+    if (!g.env) die('--env <name> is required for backup list');
+    const mgr = new EnvironmentManager(resolveData(g));
+    const backups = mgr.listBackups(g.env);
+    if (g.json) {
+      print(backups, true);
+    } else if (backups.length === 0) {
+      console.log('(no backups)');
+    } else {
+      for (const b of backups) {
+        console.log(`  ${b.backupId}  ${b.timestamp}  ${(b.sizeBytes / 1024).toFixed(1)} KB`);
+      }
+    }
+  });
+
+envBackup.command('restore')
+  .description('Restore an environment from a backup')
+  .option('--backup <id>', 'backup ID to restore')
+  .option('--latest', 'restore the most recent backup')
+  .action((opts: { backup?: string; latest?: boolean }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; env?: string; json: boolean }>();
+    if (!g.env) die('--env <name> is required for backup restore');
+    if (!opts.backup && !opts.latest) die('provide --backup <id> or --latest');
+    const mgr = new EnvironmentManager(resolveData(g));
+    let backupId = opts.backup;
+    if (opts.latest) {
+      const backups = mgr.listBackups(g.env);
+      if (backups.length === 0) die(`no backups found for env '${g.env}'`);
+      backupId = backups[0].backupId;
+    }
+    try {
+      const result = mgr.restore(g.env, backupId!);
+      print(g.json ? result : `✓ restored ${result.filesRestored} files from backup '${result.backupId}'`, g.json);
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+envBackup.command('prune')
+  .description('Remove old backups, keeping the N most recent')
+  .requiredOption('--keep <n>', 'number of backups to retain', (v) => parseInt(v, 10))
+  .action((opts: { keep: number }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; env?: string; json: boolean }>();
+    if (!g.env) die('--env <name> is required for backup prune');
+    const mgr = new EnvironmentManager(resolveData(g));
+    const deleted = mgr.pruneBackups(g.env, opts.keep);
+    print(g.json ? { deleted } : `✓ pruned ${deleted} backup(s), keeping ${opts.keep}`, g.json);
   });
 
 // ── parse ─────────────────────────────────────────────────────────────────────

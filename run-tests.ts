@@ -38,6 +38,7 @@ const SUITES = [
   'test-topology.ts',
   'test-rlm-phases.ts',
   'test-phase12.ts',
+  'test-env-manager.ts',
 ];
 
 const WIDTH = 60;

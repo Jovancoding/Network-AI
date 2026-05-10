@@ -5,6 +5,22 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.0] - 2026-05-10
+
+### Added
+- **EnvironmentManager** (`lib/env-manager.ts`) — full multi-environment isolation with promotion chain `dev → st → sit → qa → preprod → prod` and a dead-end `sandbox` tier. Gate types: `auto` (dev/st/sit/qa/sandbox), `confirm` (preprod), `approval` (prod).
+- **Promotion chain** — `promote(from, to, opts?)` copies only config files (`trust_levels.json`, `budget_ceilings.json`, `validation_rules.json`); never promotes live state (`audit_log.jsonl`, `active_grants.json`, `pending_changes/`). Auto-backs-up the destination before overwriting.
+- **Backup / rollback** — `backup(env)`, `restore(env, backupId)`, `listBackups(env)`, `pruneBackups(env, keep)`. Backups stored under `data/<env>/.backups/`. Default retention: 10. Auto-pruned after each `backup()` call.
+- **Environment diff** — `diff(env1, env2)` reports added/removed/changed config keys across environments.
+- **LockedBlackboard env routing** — new `env?` option in `LockedBlackboardOptions`; falls back to `NETWORK_AI_ENV` env var. All blackboard paths (`swarm-blackboard.md`, `.blackboard.lock`, `pending_changes/`) are scoped under `data/<env>/` when set.
+- **Source protection** — `SourceProtectionError` class and `sourceProtection?: boolean` / `env?: string` fields in `SandboxPolicyConfig`. `FileAccessor.read/write/list` block access to any path outside `data/<env>/` when enabled.
+- **Python NETWORK_AI_ENV support** — all five Python scripts (`blackboard.py`, `check_permission.py`, `context_manager.py`, `swarm_guard.py`, `validate_token.py`) now read `NETWORK_AI_ENV` at startup and accept `--env <name>` CLI argument to override data paths at runtime.
+- **CLI `env` command group** — `env init`, `env list`, `env chain`, `env diff`, `env promote`, `env backup create/list/restore/prune` subcommands added to `bin/cli.ts`.
+- **Test suite `test-env-manager.ts`** — 77 new assertions covering all EnvironmentManager features.
+
+### Stats
+- **29 test suites, 2,976 passing assertions** (+77 vs 5.3.2)
+
 ## [5.3.2] - 2026-05-09
 
 ### Security

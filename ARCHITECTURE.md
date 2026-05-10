@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.3.1 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 2,899 tests, 65+ modules.
+Network-AI v5.4.0 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 2,976 tests, 66+ modules.
 
 ## The Multi-Agent Race Condition Problem
 
@@ -55,7 +55,7 @@ flowchart TD
         QG["QualityGateAgent\n(validate blackboard writes)"]:::quality
         QA["QAOrchestratorAgent\n(scenario replay, regression tracking)"]:::quality
         BB["SharedBlackboard\n(shared agent state)\npropose → validate → commit\nfilesystem mutex"]:::blackboard
-        AD["Adapters — plug any framework in, swap freely\n28 adapters: LangChain · AutoGen · CrewAI · MCP · Copilot · LangGraph · Hermes · …"]:::adapters
+        AD["Adapters — plug any framework in, swap freely\n29 adapters: LangChain · AutoGen · CrewAI · MCP · Copilot · LangGraph · Hermes · …"]:::adapters
         RT["AgentRuntime\n(sandbox policy, approval gates)"]:::security
         CUI["ConsoleUI\n(TUI dashboard + pipe mode)"]:::app
         SA["StrategyAgent\n(AgentPool, WorkloadPartitioner,\nadaptive scaling)"]:::routing
@@ -265,6 +265,7 @@ python scripts/context_manager.py update --section milestones --complete "Ship v
 
 | Module | File | Purpose |
 |--------|------|---------|
+| `EnvironmentManager` | `lib/env-manager.ts` | Multi-env promotion chain (dev→st→sit→qa→preprod→prod+sandbox), backup/restore, env diff, gate enforcement |
 | `ContextThrottler` | `lib/context-throttler.ts` | Prune blackboard keys per-agent scope before LLM calls; `filterState()` + wildcard / `exactMatch` / `maxKeys` options |
 | `RouteClassifier` | `lib/route-classifier.ts` | Classify goals pre-DAG; short-circuit `FACTUAL_LOOKUP` to a lookup agent bypassing blackboard |
 | `PartitionPlanner` | `lib/partition-planner.ts` | Assign non-overlapping focus areas to agents; pluggable planner + `createLexicalOverlapChecker()` |

@@ -35,11 +35,25 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
+import os
 
 # Configuration
 GRANT_TOKEN_TTL_MINUTES = 5
-GRANTS_FILE = Path(__file__).parent.parent / "data" / "active_grants.json"
-AUDIT_LOG = Path(__file__).parent.parent / "data" / "audit_log.jsonl"
+
+def _resolve_data_dir(env: str = "") -> "Path":
+    """Return the active data directory, scoped to <env> when set."""
+    import re as _re
+    _env = env or os.environ.get("NETWORK_AI_ENV", "")
+    base = Path(__file__).parent.parent / "data"
+    if _env:
+        if not _re.match(r'^[a-zA-Z0-9_-]+$', _env):
+            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
+        return base / _env
+    return base
+
+_DATA_DIR = _resolve_data_dir()
+GRANTS_FILE = _DATA_DIR / "active_grants.json"
+AUDIT_LOG = _DATA_DIR / "audit_log.jsonl"
 
 # ADVISORY TOKENS — IMPORTANT
 # Grant tokens produced by this script are ADVISORY scoring outputs only.
@@ -729,8 +743,20 @@ Examples:
             "cryptographically verified."
         ),
     )
+    parser.add_argument(
+        "--env",
+        default="",
+        help="Target environment (dev|st|sit|qa|sandbox|preprod|prod). Overrides NETWORK_AI_ENV."
+    )
 
     args = parser.parse_args()
+
+    # Re-resolve data paths if --env was provided explicitly.
+    # Use globals() to avoid Pyright reportConstantRedefinition on uppercase names.
+    if args.env:
+        _data = _resolve_data_dir(args.env)
+        globals()['GRANTS_FILE'] = _data / "active_grants.json"
+        globals()['AUDIT_LOG'] = _data / "audit_log.jsonl"
 
     # --- Action: --active-grants ---
     if args.active_grants:

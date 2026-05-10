@@ -4,17 +4,17 @@ This file is read automatically by OpenAI Codex CLI when working in this reposit
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.0.0.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.4.0.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 2,711 tests across 26 suites
+npm run test:all              # Run all 2,976 tests across 29 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
-npm run test:adapters         # All 28 adapter tests
+npm run test:adapters         # All 29 adapter tests
 npm run test:priority         # Priority & preemption tests
 npm run test:cli              # CLI layer tests
 ```
@@ -38,7 +38,8 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/console-ui.ts` — ConsoleUI: interactive terminal dashboard with ANSI TUI
 - `lib/strategy-agent.ts` — StrategyAgent: meta-orchestrator with AgentPool, WorkloadPartitioner, adaptive scaling
 - `lib/goal-decomposer.ts` — GoalDecomposer, TeamRunner, runTeam: LLM-powered goal → task DAG → parallel execution
-- `adapters/` — 28 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
+- `lib/env-manager.ts` — EnvironmentManager: promotion chain dev→st→sit→qa→preprod→prod, backup/restore, env diff, NETWORK_AI_ENV routing
+- `adapters/` — 29 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)
 - `bin/console.ts` — Interactive console with pipe mode (`npx network-ai-console`)

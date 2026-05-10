@@ -251,7 +251,7 @@ export class MCPToolConsumer extends EventEmitter implements MCPServerConnection
       params: {
         protocolVersion: '2024-11-05',
         capabilities: {},
-        clientInfo: clientInfo ?? { name: 'network-ai', version: '5.0.0' },
+        clientInfo: clientInfo ?? { name: 'network-ai', version: '5.4.0' },
       },
     });
     if (response.error) {

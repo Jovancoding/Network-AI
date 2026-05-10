@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------||
-| 5.3.x   | ✅ Yes — full support (current, latest: 5.3.2) |
+| 5.4.x   | ✅ Yes — full support (current, latest: 5.4.0) |
+| 5.3.x   | ✅ Security fixes only |
 | 5.2.x   | ✅ Security fixes only |
 | 5.1.x   | ✅ Security fixes only |
 | 5.0.x   | ✅ Security fixes only |
@@ -68,12 +69,14 @@ Network-AI includes built-in security features:
 - **RLMAdapter BYOC Transport** (v5.1.4) -- `RLMAdapter` delegates all HTTP to a bring-your-own client (`RLMHttpClient`); no built-in network code runs without an explicit client; endpoint validation rejects empty strings before any request is attempted; error paths surface structured `RLM_REQUEST_FAILED` / `AGENT_NOT_FOUND` codes rather than raw stack traces
 - **Advisory Token Enforcement** (v5.3.1) -- `check_permission.py` marks all grant tokens `advisory: true`; unknown agent identities receive a reduced trust score of 0.3 and an explicit warning flag; `PAYMENTS` / `DATABASE` resources require `--confirm-high-risk` acknowledgment before a token is issued
 - **Context Injection Validation** (v5.3.1) -- `context_manager.py` runs `_validate_context()` before every `inject` / `show` command: schema checks (type enforcement on all fields) plus injection-pattern detection on free-text fields (`goals`, `decisions`, `banned_approaches`) using the same 16-pattern set from justification hardening; warnings printed to stderr before execution proceeds
+- **Environment Isolation** (v5.4.0) -- `EnvironmentManager` enforces a promotion chain (dev→st→sit→qa→preprod→prod) with gate types: `auto`, `confirm`, and `approval`; config files promote, live state (`audit_log.jsonl`, `active_grants.json`) never does; auto-backup before each promotion
+- **Source Protection** (v5.4.0) -- `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any out-of-scope access throws `SourceProtectionError` and returns `{success: false}` to the agent without leaking path details
 
 ## Security Scan Results
 
 - **VirusTotal**: Benign (0/64 engines)
 - **OpenClaw Scanner**: Benign, HIGH CONFIDENCE
-- **ClawHub Security Scanner** (v5.3.1): All three findings resolved — advisory token enforcement, context injection validation, inter-agent communication declaration
+- **ClawHub Security Scanner** (v5.4.0): All findings resolved — advisory token enforcement, context injection validation, inter-agent communication declaration, environment isolation, source protection
 - **CodeQL**: v4.3.2 clean — A2A bearer tokens transmitted only via `Authorization` header; no URL embedding; streaming paths carry no credential material; `AbortController` guards prevent hanging fetch calls; CLI layer adds no new network surface (fully in-process); CWE-367 TOCTOU alerts #86/#87 resolved — `audit tail` and CLI test now open fd first and use `fs.fstatSync(fd)` instead of `fs.statSync(filename)`
 - **CodeQL** (historical): v3.3.0 — all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed; v3.4.0 clean; v3.4.1 — #65–#68 HIGH (insecure temporary file) resolved via `path.resolve()` sanitization and `mode: 0o700` directory permissions
 - **Snyk**: All High/Medium findings resolved in v3.0.3

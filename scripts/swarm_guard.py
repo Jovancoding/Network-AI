@@ -38,8 +38,19 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 # Configuration
-DATA_DIR = Path(__file__).parent.parent / "data"
-BLACKBOARD_PATH = Path(__file__).parent.parent / "swarm-blackboard.md"
+def _resolve_data_dir(env: str = "") -> Path:
+    """Return the active data directory, scoped to <env> when set."""
+    import re as _re
+    _env = env or os.environ.get("NETWORK_AI_ENV", "")
+    base = Path(__file__).parent.parent / "data"
+    if _env:
+        if not _re.match(r'^[a-zA-Z0-9_-]+$', _env):
+            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
+        return base / _env
+    return base
+
+DATA_DIR = _resolve_data_dir()
+BLACKBOARD_PATH = DATA_DIR / "swarm-blackboard.md"
 AUDIT_LOG = DATA_DIR / "audit_log.jsonl"
 
 # ============================================================================
@@ -872,8 +883,20 @@ Examples:
     parser.add_argument("--operation", "-o", default="unknown", help="Operation type")
     parser.add_argument("--description", "-d", default="", help="Task description")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument(
+        "--env",
+        default="",
+        help="Target environment (dev|st|sit|qa|sandbox|preprod|prod). Overrides NETWORK_AI_ENV."
+    )
     
     args = parser.parse_args()
+
+    # Re-resolve data paths if --env was provided explicitly
+    global DATA_DIR, AUDIT_LOG
+    if args.env:
+        DATA_DIR = _resolve_data_dir(args.env)
+        AUDIT_LOG = DATA_DIR / "audit_log.jsonl"
+
     guard = SwarmGuard()
     
     if args.command == "check-handoff":

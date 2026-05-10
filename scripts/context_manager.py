@@ -43,8 +43,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
-CONTEXT_PATH = Path(__file__).parent.parent / "data" / "project-context.json"
-AUDIT_LOG_PATH = Path(__file__).parent.parent / "data" / "audit_log.jsonl"
+def _resolve_data_dir(env: str = "") -> Path:
+    """Return the active data directory, scoped to <env> when set."""
+    import re as _re, os as _os
+    _env = env or _os.environ.get("NETWORK_AI_ENV", "")
+    base = Path(__file__).parent.parent / "data"
+    if _env:
+        if not _re.match(r'^[a-zA-Z0-9_-]+$', _env):
+            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
+        return base / _env
+    return base
+
+_DATA_DIR = _resolve_data_dir()
+CONTEXT_PATH = _DATA_DIR / "project-context.json"
+AUDIT_LOG_PATH = _DATA_DIR / "audit_log.jsonl"
 
 EMPTY_CONTEXT: dict[str, Any] = {
     "project": {
@@ -391,12 +403,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_update.add_argument("--set", help="JSON object to merge/set (used by stack and project)")
     p_update.add_argument("--complete", help="Mark a milestone as completed (milestones section)")
 
+    # Global --env flag on root parser
+    parser.add_argument(
+        "--env",
+        default="",
+        help="Target environment (dev|st|sit|qa|sandbox|preprod|prod). Overrides NETWORK_AI_ENV."
+    )
+
     return parser
 
 
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+
+    # Re-resolve data paths if --env was provided explicitly.
+    # Use globals() to avoid Pyright reportConstantRedefinition on uppercase names.
+    if args.env:
+        _data = _resolve_data_dir(args.env)
+        globals()['CONTEXT_PATH'] = _data / "project-context.json"
+        globals()['AUDIT_LOG_PATH'] = _data / "audit_log.jsonl"
 
     dispatch = {
         "init": cmd_init,

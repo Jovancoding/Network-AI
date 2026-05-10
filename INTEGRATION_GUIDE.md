@@ -305,6 +305,83 @@ Connect your AI model to `http://localhost:3001/sse` — it can now:
 
 ---
 
+### Phase 7 — Multi-Environment Promotion (v5.4.0+)
+
+**Goal:** Promote validated config from dev → staging → production through gate-enforced checkpoints.
+
+```bash
+# Initialise the full environment chain in one command
+npx network-ai env init --all
+
+# After validating in dev, promote config to st (auto-gate — no approval needed)
+npx network-ai env promote --from dev --to st
+
+# Review differences before promoting further
+npx network-ai env diff --from st --to sit
+
+# preprod requires a human confirmation
+npx network-ai env promote --from sit --to qa
+npx network-ai env promote --from qa --to preprod --confirmed-by "jane.doe"
+
+# prod requires an approval token
+npx network-ai env promote --from preprod --to prod --approved-by "security-board"
+```
+
+**Backup and rollback:**
+
+```bash
+# Create a named backup before a risky change
+npx network-ai env backup create --env prod
+
+# List available backups
+npx network-ai env backup list --env prod
+
+# Roll back to the latest backup
+npx network-ai env backup restore --env prod --latest
+```
+
+**From TypeScript:**
+
+```typescript
+import { EnvironmentManager } from 'network-ai';
+
+const mgr = new EnvironmentManager('.');
+await mgr.initAll();
+
+// Promote config files only (live state never promotes)
+const result = await mgr.promote('dev', 'st');
+console.log(result.copiedFiles);   // ['trust_levels.json', 'budget_ceilings.json']
+
+// Auto-backup destination before overwriting
+const backup = await mgr.backup('st');
+console.log(backup.id);            // '2026-05-10T12-00-00-000Z'
+
+// Diff two envs
+const diff = await mgr.diff('dev', 'prod');
+for (const f of diff.files) {
+  console.log(f.file, f.status, f.changedKeys);
+}
+```
+
+**Source protection** — lock agents inside `data/<env>/`:
+
+```typescript
+import { AgentRuntime, SandboxPolicy } from 'network-ai';
+
+const policy: SandboxPolicy = {
+  allowedCommands: [],
+  allowedPaths: ['data/dev/'],
+  sourceProtection: true,
+  env: 'dev',
+};
+
+const runtime = new AgentRuntime({ policy });
+```
+
+Any `FileAccessor.read/write/list` call outside `data/dev/` will throw `SourceProtectionError` and be caught as `{ success: false, error: '...' }`.
+
+---
+
 ## 5. Enterprise Concerns
 
 ### Authentication & IAM
@@ -419,7 +496,7 @@ Run these before declaring the integration production-ready:
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
 - [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
 - [ ] `npx ts-node test-phase7.ts` — 94 Phase 7 tests pass (hooks, flow control, composer, semantic search)
-- [ ] `npm run test:all` — all 2,711 tests pass across 26 suites
+- [ ] `npm run test:all` — all 2,976 tests pass across 29 suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety
@@ -477,7 +554,7 @@ Run these before declaring the integration production-ready:
 |----------|---------------|
 | [QUICKSTART.md](QUICKSTART.md) | Get running in 5 minutes |
 | [QUICKSTART.md § CLI](QUICKSTART.md) | CLI reference — bb, auth, budget, audit commands |
-| [references/adapter-system.md](references/adapter-system.md) | All 28 adapters with code examples |
+| [references/adapter-system.md](references/adapter-system.md) | All 29 adapters with code examples |
 | [references/trust-levels.md](references/trust-levels.md) | Trust scoring formula and agent roles |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission system, justification scoring, token lifecycle |
 | [references/blackboard-schema.md](references/blackboard-schema.md) | Blackboard key conventions and namespacing |
@@ -487,4 +564,4 @@ Run these before declaring the integration production-ready:
 
 ---
 
-*Network-AI v5.1.4 · MIT License · https://github.com/Jovancoding/Network-AI*
+*Network-AI v5.4.0 · MIT License · https://github.com/Jovancoding/Network-AI*

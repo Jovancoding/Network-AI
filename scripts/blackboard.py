@@ -63,10 +63,22 @@ try:
 except ImportError:
     pass  # fcntl unavailable on Windows; file-based lock fallback is used instead
 
-# Default blackboard location
-BLACKBOARD_PATH = Path(__file__).parent.parent / "swarm-blackboard.md"
-LOCK_PATH = Path(__file__).parent.parent / "data" / ".blackboard.lock"
-PENDING_DIR = Path(__file__).parent.parent / "data" / "pending_changes"
+# Default blackboard location — respects NETWORK_AI_ENV for multi-env isolation
+def _resolve_data_dir(env: str = "") -> Path:
+    """Return the active data directory, scoped to <env> when set."""
+    _env = env or os.environ.get("NETWORK_AI_ENV", "")
+    base = Path(__file__).parent.parent / "data"
+    if _env:
+        # Validate to prevent path traversal (CWE-22)
+        if not re.match(r'^[a-zA-Z0-9_-]+$', _env):
+            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
+        return base / _env
+    return base
+
+_DATA_DIR = _resolve_data_dir()
+BLACKBOARD_PATH = _DATA_DIR / "swarm-blackboard.md"
+LOCK_PATH = _DATA_DIR / ".blackboard.lock"
+PENDING_DIR = _DATA_DIR / "pending_changes"
 
 # Lock timeout settings
 LOCK_TIMEOUT_SECONDS = 10
@@ -667,8 +679,17 @@ Examples:
         default=BLACKBOARD_PATH,
         help="Path to blackboard file"
     )
+    parser.add_argument(
+        "--env",
+        default="",
+        help="Target environment (dev|st|sit|qa|sandbox|preprod|prod). Overrides NETWORK_AI_ENV."
+    )
     
     args = parser.parse_args()
+    # Re-resolve data dir if --env was provided explicitly
+    if args.env:
+        _data = _resolve_data_dir(args.env)
+        args.path = _data / "swarm-blackboard.md"
     bb = SharedBlackboard(args.path)
     
     try:

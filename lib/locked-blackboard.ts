@@ -54,6 +54,12 @@ export interface LockedBlackboardOptions {
   conflictResolution?: ConflictResolutionStrategy;
   /** Minimum milliseconds between consecutive write/commit operations (0 = no throttle) */
   throttleMs?: number;
+  /**
+   * Environment name (e.g. `'dev'`, `'prod'`).  When set, all data is scoped
+   * to `<basePath>/<env>/` keeping environments completely isolated.
+   * Falls back to the `NETWORK_AI_ENV` environment variable when not provided.
+   */
+  env?: string;
 }
 
 export interface BlackboardEntry {
@@ -339,24 +345,45 @@ export class LockedBlackboard {
     // Resolve to an absolute path to prevent insecure relative/temp-dir path propagation
     const resolvedBase = resolve(basePath);
     this.basePath = resolvedBase;
-    this.blackboardPath = join(resolvedBase, 'swarm-blackboard.md');
-    this.lockPath = join(resolvedBase, 'data', '.blackboard.lock');
-    this.pendingDir = join(resolvedBase, 'data', 'pending_changes');
-    this.lock = new FileLock(this.lockPath);
 
     // Support both signatures:
     //   new LockedBlackboard(path, auditLogger, options)
     //   new LockedBlackboard(path, options)
-    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && ('conflictResolution' in auditLoggerOrOptions || 'throttleMs' in auditLoggerOrOptions)) {
+    let env: string | undefined;
+    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && ('conflictResolution' in auditLoggerOrOptions || 'throttleMs' in auditLoggerOrOptions || 'env' in auditLoggerOrOptions)) {
       const opts = auditLoggerOrOptions as LockedBlackboardOptions;
       this.conflictResolution = opts.conflictResolution ?? 'first-commit-wins';
       this.throttleMs = opts.throttleMs ?? 0;
+      env = opts.env;
     } else {
       this.auditLogger = auditLoggerOrOptions as SecureAuditLogger | undefined;
       this.conflictResolution = options?.conflictResolution ?? 'first-commit-wins';
       this.throttleMs = options?.throttleMs ?? 0;
+      env = options?.env;
     }
-    
+
+    // Fall back to NETWORK_AI_ENV environment variable when env not supplied
+    const activeEnv = env ?? process.env['NETWORK_AI_ENV'] ?? '';
+
+    // Validate env name to prevent path traversal (CWE-22)
+    if (activeEnv && !/^[a-zA-Z0-9_-]+$/.test(activeEnv)) {
+      throw new Error(`Invalid environment name '${activeEnv}': only alphanumeric, dash, and underscore are allowed`);
+    }
+
+    if (activeEnv) {
+      // Scope all data to <basePath>/<env>/ for full environment isolation
+      const envBase = join(resolvedBase, activeEnv);
+      this.blackboardPath = join(envBase, 'swarm-blackboard.md');
+      this.lockPath = join(envBase, '.blackboard.lock');
+      this.pendingDir = join(envBase, 'pending_changes');
+    } else {
+      // Legacy paths — backward compatible with existing deployments
+      this.blackboardPath = join(resolvedBase, 'swarm-blackboard.md');
+      this.lockPath = join(resolvedBase, 'data', '.blackboard.lock');
+      this.pendingDir = join(resolvedBase, 'data', 'pending_changes');
+    }
+
+    this.lock = new FileLock(this.lockPath);
     this.initialize();
   }
 

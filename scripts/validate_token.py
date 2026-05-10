@@ -24,7 +24,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-GRANTS_FILE = Path(__file__).parent.parent / "data" / "active_grants.json"
+def _resolve_data_dir(env: str = "") -> Path:
+    """Return the active data directory, scoped to <env> when set."""
+    import re as _re, os as _os
+    _env = env or _os.environ.get("NETWORK_AI_ENV", "")
+    base = Path(__file__).parent.parent / "data"
+    if _env:
+        if not _re.match(r'^[a-zA-Z0-9_-]+$', _env):
+            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
+        return base / _env
+    return base
+
+GRANTS_FILE = _resolve_data_dir() / "active_grants.json"
 
 
 def validate_token(token: str) -> dict[str, Any]:
@@ -77,8 +88,19 @@ def main():
     parser = argparse.ArgumentParser(description="Validate a permission grant token")
     parser.add_argument("token", help="Grant token to validate")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument(
+        "--env",
+        default="",
+        help="Target environment (dev|st|sit|qa|sandbox|preprod|prod). Overrides NETWORK_AI_ENV."
+    )
     
     args = parser.parse_args()
+
+    # Re-resolve data paths if --env was provided explicitly
+    global GRANTS_FILE
+    if args.env:
+        GRANTS_FILE = _resolve_data_dir(args.env) / "active_grants.json"
+
     result = validate_token(args.token)
     
     if args.json:

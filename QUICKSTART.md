@@ -323,6 +323,46 @@ network-ai auth check grant_a1b2c3...
 network-ai auth revoke grant_a1b2c3...
 ```
 
+### Multi-Environment (`env`) — v5.4.0+
+
+Isolate agent state across dev / staging / production using the promotion chain.
+
+```bash
+# Initialise all environments at once
+network-ai env init --all
+
+# Or initialise a single environment
+network-ai env init --env dev
+
+# List environments and key counts
+network-ai env list
+
+# Show the promotion chain
+network-ai env chain
+
+# Diff two environments (shows +added / -removed / ~changed config keys)
+network-ai env diff --from dev --to prod
+
+# Promote config from dev → st (auto-gate, no approval needed)
+network-ai env promote --from dev --to st
+
+# Promote to preprod (requires --confirmed-by)
+network-ai env promote --from qa --to preprod --confirmed-by "jane.doe"
+
+# Promote to prod (requires --approved-by)
+network-ai env promote --from preprod --to prod --approved-by "security-board"
+
+# Backup / restore
+network-ai env backup create --env prod
+network-ai env backup list   --env prod
+network-ai env backup restore --env prod --latest
+network-ai env backup prune  --env prod --keep 5
+```
+
+Set `NETWORK_AI_ENV=dev` to automatically route all blackboard and Python script operations to `data/dev/`.
+
+---
+
 ### Budget (`budget`)
 
 ```bash

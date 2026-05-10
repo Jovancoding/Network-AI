@@ -60,6 +60,14 @@ pip install filelock  # only needed if you see locking issues on Windows
 
 The `data/` directory is created automatically on first run. No configuration files, environment variables, or credentials are required.
 
+> **Multi-environment support (v5.4.0):** All five Python scripts now read the `NETWORK_AI_ENV` environment variable at startup and accept a `--env <name>` CLI argument. When set, all data paths are routed to `data/<env>/` instead of the root `data/` directory. Use this to isolate dev, staging, and production state.
+>
+> ```bash
+> # Run against the dev environment
+> NETWORK_AI_ENV=dev python3 scripts/blackboard.py list
+> python3 scripts/check_permission.py --active-grants --env dev
+> ```
+
 Multi-agent coordination system for complex workflows requiring task delegation, parallel execution, and permission-controlled access to sensitive APIs.
 
 ## 🎯 Orchestrator System Instructions
