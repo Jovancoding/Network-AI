@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.1] - 2026-05-10
+
+### Security
+- **TOCTOU race condition** (CWE-367) resolved in `lib/env-manager.ts` — `_touchJson()` and `_touchFile()` now use `openSync(O_CREAT | O_EXCL | O_WRONLY, 0o600)` instead of `existsSync` + `writeFileSync`, eliminating the window between existence check and file creation (CodeQL alerts #149, #150).
+
+### Fixed
+- Removed unused `basename` import in `lib/env-manager.ts` (CodeQL alert #152).
+- Removed unused `SourceProtectionError` import in `test-env-manager.ts` (CodeQL alert #153).
+- Removed unused `resolveEnvData` function in `bin/cli.ts` (CodeQL alert #151).
+
+### Stats
+- **29 test suites, 2,976 passing assertions** (unchanged)
+
 ## [5.4.0] - 2026-05-10
 
 ### Added

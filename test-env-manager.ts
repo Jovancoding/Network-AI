@@ -25,7 +25,7 @@ import * as path from 'path';
 import { EnvironmentManager } from './lib/env-manager';
 import type { PromoteOptions } from './lib/env-manager';
 import { LockedBlackboard } from './lib/locked-blackboard';
-import { SandboxPolicy, FileAccessor, SourceProtectionError } from './lib/agent-runtime';
+import { SandboxPolicy, FileAccessor } from './lib/agent-runtime';
 
 // ── tiny test harness ─────────────────────────────────────────────────────────
 

@@ -31,12 +31,6 @@ function resolveData(opts: { data?: string }): string {
   return path.resolve(opts.data ?? path.join(process.cwd(), 'data'));
 }
 
-function resolveEnvData(opts: { data?: string; env?: string }): string {
-  const base = resolveData(opts);
-  if (opts.env) return path.join(base, opts.env);
-  return base;
-}
-
 function print(obj: unknown, asJson: boolean): void {
   if (asJson) {
     console.log(JSON.stringify(obj, null, 2));

@@ -42,7 +42,8 @@ npx ts-node setup.ts --check
 | `a2a` | A2A | none | Agent-to-Agent protocol |
 | `codex` | Codex | `openai` | OpenAI Codex CLI |
 | `minimax` | MiniMax | none | MiniMax chat completions |
-| `nemoclaw` | NemoClaw | none | NVIDIA sandboxed agent execution |\n| `aps` | APS | none | Delegation-chain trust mapping |
+| `nemoclaw` | NemoClaw | none | NVIDIA sandboxed agent execution |
+| `aps` | APS | none | Delegation-chain trust mapping |
 | `copilot` | GitHub Copilot | none | Code generate/review/explain/fix/test/refactor |
 | `langgraph` | LangGraph | `@langchain/langgraph` | Compiled StateGraph execution |
 | `anthropic-computer-use` | Anthropic Computer Use | `@anthropic-ai/sdk` | Screenshot/click/type/scroll automation |

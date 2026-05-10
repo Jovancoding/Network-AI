@@ -26,8 +26,11 @@ import {
   copyFileSync,
   statSync,
   rmSync,
+  openSync,
+  closeSync,
+  constants,
 } from 'fs';
-import { join, resolve, basename } from 'path';
+import { join, resolve } from 'path';
 import { randomUUID } from 'crypto';
 
 // ============================================================================
@@ -534,15 +537,21 @@ export class EnvironmentManager {
   }
 
   private _touchJson(filePath: string, defaultValue: unknown): void {
-    if (!existsSync(filePath)) {
-      writeFileSync(filePath, JSON.stringify(defaultValue, null, 2), { mode: 0o600 });
-    }
+    try {
+      const fd = openSync(filePath, (constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY) as number, 0o600);
+      try {
+        writeFileSync(fd, JSON.stringify(defaultValue, null, 2));
+      } finally {
+        closeSync(fd);
+      }
+    } catch { /* file already exists — that's fine */ }
   }
 
   private _touchFile(filePath: string): void {
-    if (!existsSync(filePath)) {
-      writeFileSync(filePath, '', { mode: 0o600 });
-    }
+    try {
+      const fd = openSync(filePath, (constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY) as number, 0o600);
+      closeSync(fd);
+    } catch { /* file already exists — that's fine */ }
   }
 
   private _listConfigFiles(dir: string): string[] {
