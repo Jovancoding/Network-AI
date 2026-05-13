@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.4] - 2026-05-13
+
+### Fixed
+- **`import os` missing in `scripts/swarm_guard.py`** (ClawHub ASI08) — `os.environ.get("NETWORK_AI_ENV", "")` was called before `os` was imported, causing `NameError` on startup and silently disabling all budget and health-check guards. Added `import os` to the module imports.
+
+### Stats
+- **29 test suites, 2,976 passing assertions** (unchanged)
+- Zero TypeScript compile errors (`npx tsc --noEmit`)
+
 ## [5.4.3] - 2026-05-13
 
 ### Added

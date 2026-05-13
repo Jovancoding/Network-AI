@@ -712,7 +712,8 @@ This skill is scanned on every publish. The following Notes are flagged by desig
 | **ASI01** Agent Goal Hijack | High | Orchestrator skill forces 3-sub-task decomposition by design | Use this skill only when multi-agent orchestration is desired; disable for simple one-shot tasks |
 | **ASI03** Identity and Privilege Abuse | High | Grant tokens are advisory only — caller identity is not cryptographically verified | Tokens are explicitly marked advisory in SKILL.md and source; require separate platform auth and human approval before any real database, payment, email, or export action |
 | **ASI06** Memory and Context Poisoning | High | Persistent `data/project-context.json` is injected into agent sessions by design | `_validate_context()` runs injection-pattern detection before every inject; do not store secrets/credentials; review `data/project-context.json` before use; clear `data/` between projects |
-| **ASI07** Insecure Inter-Agent Communication | Medium | Skill delegates work but inter-agent messaging is handled by the host platform | SKILL.md explicitly documents that `sessions_send` and all inter-agent messaging are the host platform's responsibility; configure host platform network settings before use with sensitive tasks |
+| **ASI07** Insecure Inter-Agent Communication | High | Blackboard is local file-based; origin/identity depends on local file access, not authenticated messaging | Run in a trusted workspace; restrict file permissions on `data/`; review blackboard changes before relying on them for important decisions |
+| **ASI08** Cascading Failures | ~~High~~ Resolved | `os` was referenced before import in `swarm_guard.py` — fixed in v5.4.4; `import os` now present | Fixed — `swarm_guard.py` now imports `os` at module level; budget/health guard starts correctly |
 
 ## References
 

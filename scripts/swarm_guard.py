@@ -3,7 +3,7 @@
 # All I/O is local file operations only:
 #   READS:  data/swarm_budgets.json, data/heartbeats.json, data/audit_log.jsonl
 #   WRITES: data/swarm_budgets.json, data/heartbeats.json, data/audit_log.jsonl
-# Imports used: argparse, json, sys, datetime, pathlib, typing
+# Imports used: argparse, json, os, sys, datetime, pathlib, typing
 # No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
 """
 Swarm Guard - Prevents Handoff Tax, Silent Failures, and Budget Overruns
@@ -32,6 +32,7 @@ Examples:
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
