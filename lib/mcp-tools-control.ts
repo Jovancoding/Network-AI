@@ -67,7 +67,7 @@ export interface ControlMcpToolsOptions {
 const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   {
     name: 'config_get',
-    description: 'Read the current Network-AI orchestrator configuration (maxParallelAgents, defaultTimeout, enableTracing, etc.).',
+    description: 'Read one or all live orchestrator configuration values. Returns {ok:true, key, value} for a single key, or {ok:true, config:{...}} for all keys. Returns {ok:false, error:"Unknown config key: \\"...\\" Known keys: ..."} if the key is not recognised. Call without a key to discover available config names; use config_set to update values at runtime.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -78,7 +78,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'config_set',
-    description: 'Update a Network-AI configuration value at runtime. Changes take effect immediately for all subsequent operations.',
+    description: 'Update a live orchestrator configuration value at runtime. Returns {ok:true, key, value, previous} on success. Returns {ok:false, error:"Unknown config key..."} with a list of valid keys if the key is not recognised, or {ok:false, error:"..."} if value is not valid JSON. Call config_get first to see current values and available keys; changes take effect immediately for all subsequent operations.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -90,7 +90,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'agent_list',
-    description: 'List all agents currently registered with the orchestrator, including their status and last activity.',
+    description: 'List all agents registered with the orchestrator and their current status. Returns {ok:true, agents:[{agentId, status, lastSeen, taskCount}], count}. Returns {ok:false, error:"..."} if the registry is unavailable. Use status_filter to narrow results (active, idle, stopped, error); call this before agent_spawn to confirm the target agent is registered and active, or before agent_stop to verify the agent is running.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -101,7 +101,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'agent_spawn',
-    description: 'Dispatch a task to a named agent by writing a task record to the blackboard. The agent will pick it up on its next poll cycle.',
+    description: 'Write a task record to the blackboard to dispatch work to a named agent on its next poll cycle. Returns {ok:true, taskKey, agentId, instruction, written:true} on success. Returns {ok:false, error:"..."} if agent_id, task_key, or instruction is missing, or if payload_json is malformed. Call agent_list first to confirm the target agent is registered; verify the task was recorded with blackboard_read after spawning.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -116,7 +116,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'agent_stop',
-    description: 'Signal an agent to stop by writing a stop record to the blackboard and updating its status.',
+    description: 'Signal a running agent to stop by writing a stop record to the blackboard and marking it stopped in the registry. Returns {ok:true, agentId, reason, stopped:true}. Returns {ok:false, error:"..."} if agent_id is missing. The agent observes the stop signal on its next poll — it does not terminate immediately. Call agent_list first to confirm the agent is currently active.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -128,7 +128,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'fsm_transition',
-    description: 'Manually advance an FSM (Finite State Machine) to a new state by writing the transition to the blackboard.',
+    description: 'Advance a named FSM (Finite State Machine) to a new state and record the transition on the blackboard. Returns {ok:true, fsmId, transition:{from, to}, blackboardWritten:true} on success. Returns {ok:false, error:"..."} if fsm_id, new_state, or agent_id is missing, or if metadata_json is not valid JSON. Use after a workflow phase completes to activate the next state; call orchestrator_info first to confirm the current FSM state before transitioning.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -142,7 +142,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'orchestrator_info',
-    description: 'Get a snapshot of the entire orchestrator: version, config, agent count, blackboard key count, and system health.',
+    description: 'Return a full health snapshot of the orchestrator: version, config values, registered agent count, blackboard key count, and system uptime. Returns {ok:true, version, config:{...}, agentCount, blackboardKeyCount, uptime}. This tool always succeeds — it never returns {ok:false}. Use as the first call when connecting to confirm the server is healthy and to discover current config before calling config_get or agent_list.',
     inputSchema: {
       type: 'object',
       properties: {},

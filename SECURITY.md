@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------||
-| 5.4.x   | ✅ Yes — full support (current, latest: 5.4.1) |
+| 5.4.x   | ✅ Yes — full support (current, latest: 5.4.2) |
 | 5.3.x   | ✅ Security fixes only |
 | 5.2.x   | ✅ Security fixes only |
 | 5.1.x   | ✅ Security fixes only |
@@ -76,7 +76,7 @@ Network-AI includes built-in security features:
 
 - **VirusTotal**: Benign (0/64 engines)
 - **OpenClaw Scanner**: Benign, HIGH CONFIDENCE
-- **ClawHub Security Scanner** (v5.4.1): All findings resolved — advisory token enforcement, context injection validation, inter-agent communication declaration, environment isolation, source protection
+- **ClawHub Security Scanner** (v5.4.2): 3 Notes acknowledged and mitigated with documented controls — ASI03 (advisory token identity: tokens are explicitly marked advisory; separate platform auth and human approval required for sensitive resources) and ASI06 ×2 (persistent context poisoning: `_validate_context()` runs injection-pattern detection before every inject; PII-in-justification: SKILL.md PII warning enforced). These Notes reflect by-design characteristics of the skill and will recur on future scans; the documented controls are the mitigation, not an elimination of the pattern.
 - **CodeQL** (v5.4.1): All alerts resolved — CWE-367 TOCTOU (#149, #150) fixed via `O_CREAT|O_EXCL` open; unused imports/function (#151–#153) removed
 - **CodeQL**: v4.3.2 clean — A2A bearer tokens transmitted only via `Authorization` header; no URL embedding; streaming paths carry no credential material; `AbortController` guards prevent hanging fetch calls; CLI layer adds no new network surface (fully in-process); CWE-367 TOCTOU alerts #86/#87 resolved — `audit tail` and CLI test now open fd first and use `fs.fstatSync(fd)` instead of `fs.statSync(filename)`
 - **CodeQL** (historical): v3.3.0 — all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed; v3.4.0 clean; v3.4.1 — #65–#68 HIGH (insecure temporary file) resolved via `path.resolve()` sanitization and `mode: 0o700` directory permissions

@@ -58,7 +58,7 @@ export interface IBlackboard {
 export const BLACKBOARD_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   {
     name: 'blackboard_read',
-    description: 'Read a single entry from the shared blackboard by key. Returns the value, source agent, and timestamp, or null if not found.',
+    description: 'Read a single entry from the shared blackboard by key. Returns {ok:true, key, value, sourceAgent, timestamp} when found, or {ok:true, key, value:null} when the key does not exist or has expired. Returns {ok:false, error:"..."} if the blackboard is unavailable. Use when you know the exact key; call blackboard_list with a prefix filter first if you need to discover available keys.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -76,7 +76,7 @@ export const BLACKBOARD_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'blackboard_write',
-    description: 'Write a value to the shared blackboard. Requires agent identity verification. Returns the written entry.',
+    description: 'Write a JSON-encoded value to the shared blackboard under the given key with optional TTL and auth token. Returns {ok:true, key, value, sourceAgent, timestamp} on success. Returns {ok:false, error:"..."} if value is not valid JSON, agent_id is missing, or the agent token is rejected. Use namespaced keys (e.g. "task:result:q3") to avoid collisions between agents; confirm the write with blackboard_read if the consumer agent needs the entry immediately.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -106,7 +106,7 @@ export const BLACKBOARD_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'blackboard_list',
-    description: 'List all keys currently on the blackboard. Optionally filter by key prefix.',
+    description: 'List all active (non-expired) keys on the shared blackboard, optionally filtered by a key prefix. Returns {ok:true, keys:["..."], count}. Returns {ok:false, error:"..."} if the blackboard is unavailable. Use before blackboard_read when you do not know the exact key name; filter with a prefix such as "task:" to scope results to a specific namespace.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -124,7 +124,7 @@ export const BLACKBOARD_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'blackboard_delete',
-    description: 'Delete an entry from the blackboard by key. Agent must have write access to the key.',
+    description: 'Remove an entry from the shared blackboard by key. Returns {ok:true, deleted:true, key} if the entry existed and was removed, or {ok:true, deleted:false, key} if the key was not found. Returns {ok:false, error:"..."} if the agent token is rejected or the blackboard is unavailable. Use to clean up completed task entries or invalidate stale data; call blackboard_exists first to confirm the key is present before attempting deletion.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -146,7 +146,7 @@ export const BLACKBOARD_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'blackboard_exists',
-    description: 'Check whether a key exists on the blackboard (and has not expired).',
+    description: 'Check whether a specific key is present and not expired on the shared blackboard. Returns {ok:true, exists:true} or {ok:true, exists:false}. Returns {ok:false, error:"..."} if the blackboard is unavailable. Prefer this over blackboard_read when you only need to confirm presence without fetching the value — lighter-weight and avoids unnecessary data transfer.',
     inputSchema: {
       type: 'object',
       properties: {

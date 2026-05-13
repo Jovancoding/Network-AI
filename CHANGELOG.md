@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.2] - 2026-05-13
+
+### Improved
+- **MCP tool descriptions** — all 22 tool definitions in `lib/mcp-blackboard-tools.ts`, `lib/mcp-tools-extended.ts`, and `lib/mcp-tools-control.ts` now include: explicit return shapes (`{ok:true, ...}` / `{ok:false, error:"..."}`), behavior on error and edge cases, and usage guidelines (when to call this tool vs. a related one, recommended call ordering). Targets Glama Tool Definition Quality Score improvements for `behavior` and `usage` sub-scores.
+
+### Fixed
+- **ClawHub security documentation** — `SECURITY.md`, `.github/SECURITY.md`, and `ENTERPRISE.md` now accurately describe the 3 ClawHub Notes (ASI03, ASI06 ×2) as by-design patterns with documented controls, rather than "resolved". Notes reflect inherent characteristics of the advisory-token and persistent-context design; documented controls are the mitigation.
+
+### Stats
+- **29 test suites, 2,976 passing assertions** (unchanged)
+
 ## [5.4.1] - 2026-05-10
 
 ### Security
