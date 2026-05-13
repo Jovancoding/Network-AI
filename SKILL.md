@@ -703,6 +703,17 @@ python {baseDir}/scripts/swarm_guard.py supervisor-review --task-id "task_001"
 - Run `sessions_list` (OpenClaw platform built-in) to see available sessions
 - Session may need to be started first
 
+## Security Scan Findings (ClawHub)
+
+This skill is scanned on every publish. The following Notes are flagged by design and will recur on every scan. They are acknowledged and mitigated with documented controls — they are not bugs or vulnerabilities.
+
+| Finding | Confidence | Why it recurs | Documented control |
+|---------|------------|---------------|--------------------|
+| **ASI01** Agent Goal Hijack | High | Orchestrator skill forces 3-sub-task decomposition by design | Use this skill only when multi-agent orchestration is desired; disable for simple one-shot tasks |
+| **ASI03** Identity and Privilege Abuse | High | Grant tokens are advisory only — caller identity is not cryptographically verified | Tokens are explicitly marked advisory in SKILL.md and source; require separate platform auth and human approval before any real database, payment, email, or export action |
+| **ASI06** Memory and Context Poisoning | High | Persistent `data/project-context.json` is injected into agent sessions by design | `_validate_context()` runs injection-pattern detection before every inject; do not store secrets/credentials; review `data/project-context.json` before use; clear `data/` between projects |
+| **ASI07** Insecure Inter-Agent Communication | Medium | Skill delegates work but inter-agent messaging is handled by the host platform | SKILL.md explicitly documents that `sessions_send` and all inter-agent messaging are the host platform's responsibility; configure host platform network settings before use with sensitive tasks |
+
 ## References
 
 This skill is part of the larger [Network-AI](https://github.com/Jovancoding/Network-AI) project. See the repository for full documentation on the permission system, blackboard schema, and trust-level calculations.

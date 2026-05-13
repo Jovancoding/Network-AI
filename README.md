@@ -472,7 +472,7 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | [QUICKSTART.md](QUICKSTART.md) | Installation, first run, CLI reference, PowerShell guide, Python scripts CLI |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Race condition problem, FSM design, handoff protocol, module inventory, project structure |
 | [BENCHMARKS.md](BENCHMARKS.md) | Provider performance, rate limits, local GPU, `max_completion_tokens` guide |
-| [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail, v5.0 security additions |
+| [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail, v5.0 security additions, ClawHub scan findings |
 | [ENTERPRISE.md](ENTERPRISE.md) | Evaluation checklist, stability policy, security summary, integration entry points |
 | [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md) | Audit log field reference, all event types, scoring formula |
 | [ADOPTERS.md](ADOPTERS.md) | Known adopters — open a PR to add yourself |
