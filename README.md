@@ -5,7 +5,7 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.4.2-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.4.3-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![Tests](https://img.shields.io/badge/tests-2976%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-29%20supported-blueviolet.svg)](#adapter-system)
@@ -477,6 +477,7 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md) | Audit log field reference, all event types, scoring formula |
 | [ADOPTERS.md](ADOPTERS.md) | Known adopters — open a PR to add yourself |
 | [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | End-to-end integration walkthrough with v5.0 modules |
+| [SKILL.md](SKILL.md) | OpenClaw/ClawHub Python skill — setup, orchestrator protocol, security scan findings |
 | [references/adapter-system.md](references/adapter-system.md) | Adapter architecture, all 29 adapters, writing custom adapters |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission scoring, resource types, IAuthValidator interface |
 | [references/trust-levels.md](references/trust-levels.md) | Trust level configuration, APS delegation-chain mapping |
@@ -523,7 +524,7 @@ Join our Discord server to discuss multi-agent AI coordination, get help, and sh
 
 ---
 
-MIT License — [LICENSE](LICENSE) &nbsp;·&nbsp; [CHANGELOG](CHANGELOG.md) &nbsp;·&nbsp; [CONTRIBUTING](CONTRIBUTING.md) &nbsp;·&nbsp; [![RSS](https://img.shields.io/badge/RSS-releases-orange?logo=rss)](https://github.com/Jovancoding/Network-AI/releases.atom)
+MIT License — [LICENSE](LICENSE) &nbsp;·&nbsp; [CHANGELOG](CHANGELOG.md) &nbsp;·&nbsp; [CONTRIBUTING](CONTRIBUTING.md) &nbsp;·&nbsp; [Code of Conduct](CODE_OF_CONDUCT.md) &nbsp;·&nbsp; [Security Policy](SECURITY.md) &nbsp;·&nbsp; [![RSS](https://img.shields.io/badge/RSS-releases-orange?logo=rss)](https://github.com/Jovancoding/Network-AI/releases.atom)
 
 <details>
 <summary>Keywords</summary>

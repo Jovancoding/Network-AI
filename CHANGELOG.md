@@ -5,6 +5,20 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.3] - 2026-05-13
+
+### Added
+- **SKILL.md security scan findings table** — new `## Security Scan Findings (ClawHub)` section documents all 4 ClawHub Notes (ASI01 agent goal hijack, ASI03 advisory token identity, ASI06 context poisoning, ASI07 inter-agent communication boundary) with confidence level, why each recurs by design, and the documented control.
+- **README documentation table** — `SKILL.md` row added (OpenClaw/ClawHub Python skill — setup, orchestrator protocol, security scan findings).
+- **README footer** — Code of Conduct and Security Policy links added alongside License, Changelog, Contributing.
+
+### Fixed
+- **UTF-8 BOM** stripped from `package.json`, `skill.json`, and `openapi.yaml` — PowerShell `Out-File -Encoding utf8` was inserting a BOM that caused `ts-node` to crash with `SyntaxError: Unexpected token '﻿'` in CI.
+
+### Stats
+- **29 test suites, 2,976 passing assertions** (unchanged)
+- Zero TypeScript compile errors (`npx tsc --noEmit`)
+
 ## [5.4.2] - 2026-05-13
 
 ### Improved
