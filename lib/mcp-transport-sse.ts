@@ -279,7 +279,7 @@ export class McpSseServer {
   /** Start listening. Resolves when the server is ready. */
   listen(): Promise<void> {
     this._server = requireHttp().createServer((req, res) => this._handleRequest(req, res));
-    // Warn when binding to a non-loopback address without authentication
+    // Warn when binding to a non-loopback address — defense-in-depth notice
     const isLoopback = this._opts.host === '127.0.0.1' || this._opts.host === 'localhost' || this._opts.host === '::1';
     if (!isLoopback && !this._opts.secret) {
       process.stderr.write(
@@ -348,17 +348,6 @@ export class McpSseServer {
   // --------------------------------------------------------------------------
 
   private _handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
-    // CORS — allow any MCP client to connect
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204);
-      res.end();
-      return;
-    }
-
     const base = `http://${req.headers.host ?? `localhost:${this._opts.port}`}`;
     let parsed: URL;
     try {
@@ -371,10 +360,16 @@ export class McpSseServer {
 
     const path = parsed.pathname;
 
-    // CORS — allow Cursor / Claude Desktop / browser clients
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // CORS — restrict to localhost origins only (prevents cross-origin browser attacks)
+    const origin = req.headers['origin'] ?? '';
+    const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    if (isLocalOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       res.end();

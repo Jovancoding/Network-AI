@@ -299,14 +299,15 @@ async function main(): Promise<void> {
   }
 
   // SSE/HTTP mode
-  const isLoopback = args.host === '127.0.0.1' || args.host === 'localhost' || args.host === '::1';
-  if (!isLoopback && !args.secret) {
-    console.warn(
-      '\n[network-ai-server] WARNING: Binding to ' + args.host +
-      ' with no --secret set. Any network-reachable client can access all' +
-      ' 22 MCP tools, including config_set and agent_spawn. Pass' +
-      ' --secret <token> or set NETWORK_AI_MCP_SECRET to require authentication.\n'
+  if (!args.secret) {
+    process.stderr.write(
+      '[network-ai-server] ERROR: --secret <token> or NETWORK_AI_MCP_SECRET must be set for SSE mode.\n' +
+      '  Without a secret every request is accepted, including cross-origin browser requests\n' +
+      '  that can invoke all MCP tools (config_set, agent_spawn, blackboard_write, …) without credentials.\n' +
+      '  Set a secret: --secret <token>  or  export NETWORK_AI_MCP_SECRET=<token>\n' +
+      '  For local stdio use (Claude Desktop / Cursor / Glama) run with --stdio instead.\n'
     );
+    process.exit(1);
   }
 
   const server = new McpSseServer(combined, {

@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.5] - 2026-05-16
+
+### Security
+- **GHSA-j3vx-cx2r-pvg8** (CWE-346, High, CVSS 7.6) — Unauthenticated Cross-Origin MCP Tool Invocation via Empty Default Secret.
+  - `bin/mcp-server.ts`: SSE mode now hard-exits at startup with a clear error if no `--secret` / `NETWORK_AI_MCP_SECRET` is set. Empty-string default no longer allows open access.
+  - `lib/mcp-transport-sse.ts`: CORS `Access-Control-Allow-Origin` changed from unconditional `*` to an allowlist restricted to `localhost` and `127.0.0.1` origins only. Non-local origins receive no ACAO header. Removed duplicate CORS block. `Vary: Origin` header added.
+  - Reported by 232-323 and min8282.
+
+### Stats
+- **29 test suites, 2,976 passing assertions** (unchanged)
+- Zero TypeScript compile errors (`npx tsc --noEmit`)
+
 ## [5.4.4] - 2026-05-13
 
 ### Fixed

@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 5.4.x   | ✅ Yes — full support (current, latest: 5.4.4) |
+| 5.4.x   | ✅ Yes — full support (current, latest: 5.4.5) |
 | 5.3.x   | ✅ Security fixes only |
 | 5.2.x   | ✅ Security fixes only |
 | 5.1.x   | ✅ Security fixes only |
@@ -69,7 +69,8 @@ Network-AI includes built-in security features:
 
 - **VirusTotal**: Benign (0/64 engines)
 - **OpenClaw Scanner**: Benign, HIGH CONFIDENCE
-- **ClawHub Security Scanner** (v5.4.4): 4 Notes acknowledged and mitigated — ASI01 (agent goal hijack, by design: Orchestrator skill decomposes into 3 sub-tasks; SKILL.md documents when to enable/disable), ASI03 (advisory token identity, by design: tokens explicitly marked advisory, separate platform auth required), ASI06 (persistent context poisoning, by design: `_validate_context()` injection detection, SKILL.md warns against storing secrets, clear `data/` between projects), ASI07 (inter-agent communication boundary, by design: all inter-agent messaging is host platform's responsibility, documented in SKILL.md). These Notes reflect inherent design characteristics and will recur on future scans; the documented controls are the mitigation.
+- **GHSA-j3vx-cx2r-pvg8** (CWE-346, High, CVSS 7.6) — Unauthenticated Cross-Origin MCP Tool Invocation via Empty Default Secret — **Fixed in v5.4.5**. SSE server now requires a non-empty secret at startup; CORS restricted to localhost origins only. Reported by 232-323 and min8282.
+- **ClawHub Security Scanner** (v5.4.5): 4 Notes acknowledged and mitigated — ASI01 (agent goal hijack, by design: Orchestrator skill decomposes into 3 sub-tasks; SKILL.md documents when to enable/disable), ASI03 (advisory token identity, by design: tokens explicitly marked advisory, separate platform auth required), ASI06 (persistent context poisoning, by design: `_validate_context()` injection detection, SKILL.md warns against storing secrets, clear `data/` between projects), ASI07 (inter-agent communication boundary, by design: all inter-agent messaging is host platform's responsibility, documented in SKILL.md). These Notes reflect inherent design characteristics and will recur on future scans; the documented controls are the mitigation.
 - **CodeQL**: v4.3.2 clean — A2A bearer tokens transmitted only via `Authorization` header; no URL embedding; streaming paths carry no credential material; `AbortController` guards prevent hanging fetch calls; CLI layer adds no new network surface (fully in-process); CWE-367 TOCTOU alerts #86/#87 resolved — `audit tail` and CLI test now open fd first and use `fs.fstatSync(fd)` instead of `fs.statSync(filename)`
 - **CodeQL** (historical): v3.3.0 — all fixable alerts resolved; unused imports cleaned; false-positive detection patterns dismissed; v3.4.0 clean; v3.4.1 — #65–#68 HIGH (insecure temporary file) resolved via `path.resolve()` sanitization and `mode: 0o700` directory permissions
 - **Snyk**: All High/Medium findings resolved in v3.0.3
