@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SECURITY: This script makes NO network calls and spawns NO subprocesses.
 # All I/O is local file operations only:
-#   READS:  data/active_grants.json
+#   READS:  data[/<env>]/active_grants.json, data[/<env>]/.signing_key
 #   WRITES: none
-# Imports used: argparse, json, sys, datetime, pathlib, typing
+# Imports used: argparse, json, sys, hmac, hashlib, datetime, pathlib, typing
 # No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
 """
 Validate Grant Token
@@ -18,11 +18,13 @@ Example:
 """
 
 import argparse
+import hashlib
+import hmac
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 def _resolve_data_dir(env: str = "") -> Path:
     """Return the active data directory, scoped to <env> when set."""
@@ -36,6 +38,47 @@ def _resolve_data_dir(env: str = "") -> Path:
     return base
 
 GRANTS_FILE = _resolve_data_dir() / "active_grants.json"
+
+
+def _load_signing_key() -> "Optional[bytes]":
+    """
+    Load the local HMAC-SHA256 signing key used by check_permission.py.
+    Returns None if the key file does not exist or cannot be read.
+    """
+    key_file = GRANTS_FILE.parent / ".signing_key"
+    if not key_file.exists():
+        return None
+    try:
+        return bytes.fromhex(key_file.read_text().strip())
+    except (ValueError, OSError):
+        return None
+
+
+def _verify_grant_sig(grant: "dict[str, Any]") -> "Optional[bool]":
+    """
+    Verify the HMAC-SHA256 signature stored in a grant record.
+
+    Returns:
+      True  — signature present and valid
+      False — signature present but invalid (tampered)
+      None  — no signature (pre-v5.5.2 token) or key unavailable
+    """
+    stored_sig = grant.get("_sig")
+    if not stored_sig:
+        return None  # Backward-compatible: unsigned token from before v5.5.2
+    key = _load_signing_key()
+    if key is None:
+        return None  # Key not present — cannot verify; treat as unverified
+    payload = "|".join([
+        grant.get("token", ""),
+        grant.get("agent_id", ""),
+        grant.get("resource_type", ""),
+        grant.get("scope") or "",
+        grant.get("expires_at", ""),
+        grant.get("granted_at", ""),
+    ])
+    expected = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, stored_sig)
 
 
 def validate_token(token: str) -> dict[str, Any]:
@@ -61,7 +104,15 @@ def validate_token(token: str) -> dict[str, Any]:
         }
     
     grant = grants[token]
-    
+
+    # Guard against tampered grant records (checks HMAC-SHA256 signature)
+    sig_result = _verify_grant_sig(grant)
+    if sig_result is False:
+        return {
+            "valid": False,
+            "reason": "Token signature invalid — grant record may have been tampered with",
+        }
+
     # Check expiration
     expires_at = grant.get("expires_at")
     if expires_at:
@@ -80,7 +131,8 @@ def validate_token(token: str) -> dict[str, Any]:
     
     return {
         "valid": True,
-        "grant": grant
+        "grant": grant,
+        "sig_verified": sig_result is True,
     }
 
 

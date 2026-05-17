@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # SECURITY: This script makes NO network calls and spawns NO subprocesses.
 # All I/O is local file operations only:
-#   READS:  data/active_grants.json, data/audit_log.jsonl
-#   WRITES: data/active_grants.json, data/audit_log.jsonl
-# Imports used: argparse, json, re, sys, uuid, datetime, pathlib, typing
+#   READS:  data[/<env>]/active_grants.json, data[/<env>]/audit_log.jsonl,
+#           data[/<env>]/.signing_key (HMAC key; auto-created on first run)
+#   WRITES: data[/<env>]/active_grants.json, data[/<env>]/audit_log.jsonl,
+#           data[/<env>]/.signing_key (on first run only; chmod 0o600)
+# Imports used: argparse, json, re, sys, uuid, hmac, hashlib, datetime, pathlib, typing
 # No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
 """
 AuthGuardian Permission Checker
@@ -28,6 +30,8 @@ Examples:
 """
 
 import argparse
+import hashlib
+import hmac
 import json
 import re
 import sys
@@ -264,6 +268,51 @@ def generate_grant_token() -> str:
     return f"grant_{uuid.uuid4().hex}"
 
 
+def _load_signing_key() -> bytes:
+    """
+    Load or create the local HMAC-SHA256 signing key for grant tokens.
+
+    The key is stored at data[/<env>]/.signing_key as a 32-byte hex string.
+    It is auto-generated with os.urandom(32) on first use and restricted to
+    mode 0o600.  It lives inside the env-scoped data dir so multi-environment
+    deployments each have an independent key.
+    """
+    key_file = _DATA_DIR / ".signing_key"
+    if key_file.exists():
+        try:
+            return bytes.fromhex(key_file.read_text().strip())
+        except (ValueError, OSError):
+            pass  # Corrupt key file — regenerate below
+    key = os.urandom(32)
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    key_file.write_text(key.hex())
+    try:
+        key_file.chmod(0o600)  # Restrict to owner; no-op on Windows
+    except OSError:
+        pass
+    return key
+
+
+def _sign_grant(grant: dict[str, Any]) -> str:
+    """
+    Return an HMAC-SHA256 hex signature over the canonical grant fields.
+
+    Covered fields: token, agent_id, resource_type, scope, expires_at, granted_at.
+    Storing this in the grant record lets validate_token.py detect any
+    post-issuance tampering of active_grants.json.
+    """
+    payload = "|".join([
+        grant.get("token", ""),
+        grant.get("agent_id", ""),
+        grant.get("resource_type", ""),
+        grant.get("scope") or "",
+        grant.get("expires_at", ""),
+        grant.get("granted_at", ""),
+    ])
+    key = _load_signing_key()
+    return hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
 def log_audit(action: str, details: dict[str, Any]) -> None:
     """Append entry to audit log."""
     ensure_data_dir()
@@ -412,7 +461,7 @@ def evaluate_permission(
     token = generate_grant_token()
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=GRANT_TOKEN_TTL_MINUTES)).isoformat()
     restrictions = RESTRICTIONS.get(resource_type, [])
-    
+
     grant: dict[str, Any] = {
         "token": token,
         "agent_id": agent_id,
@@ -424,6 +473,9 @@ def evaluate_permission(
         "advisory": True,           # Always advisory — not an authenticated credential
         "unknown_agent": unknown_agent,
     }
+
+    # Sign the grant — lets validate_token.py detect tampered grant records
+    grant["_sig"] = _sign_grant(grant)
 
     # Save grant and log
     save_grant(grant)

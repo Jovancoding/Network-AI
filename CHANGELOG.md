@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.2] - 2026-05-17
+
+### Fixed
+- **`scripts/check_permission.py` — HMAC-SHA256 grant token integrity** (ClawScan ASI03)
+  Grant tokens previously had no integrity protection on their stored payload. An attacker with local file access could edit `data/active_grants.json` to forge elevated permissions.
+
+  `check_permission.py` now computes an HMAC-SHA256 signature over each grant’s canonical fields (`token|agent_id|resource_type|scope|expires_at|granted_at`) using a locally-generated 32-byte signing key (`data[/<env>]/.signing_key`, chmod 0o600, auto-created on first run). The signature is stored as `_sig` in the grant record.
+
+  `validate_token.py` verifies `_sig` before returning `valid: true`; a tampered record returns `{"valid": false, "reason": "Token signature invalid"}`. Tokens issued before v5.5.2 (no `_sig`) continue to validate with `"sig_verified": false` for backward compatibility. Uses Python stdlib `hmac` + `hashlib` only — zero new dependencies.
+
+  > The advisory-identity finding (caller-supplied `--agent` is not externally authenticated) is by design and is documented in SKILL.md and the publisher note on ClawHub.
+
 ## [5.5.1] - 2026-05-17
 
 ### Fixed

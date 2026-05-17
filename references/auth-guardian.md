@@ -73,7 +73,9 @@ Pre-configured trust scores for known agents:
 
 **Denial threshold: 0.4** (low-trust agents are denied and escalated to human)
 
-> **Advisory tokens (v5.3.1):** All grant tokens are explicitly marked `advisory: true`. They are not verified credentials — the token format does not cryptographically bind the caller to the `agent_id` field. The host platform is responsible for actual caller authentication. Unknown agents receive trust 0.3 and an `unknown_agent: true` flag in all outputs.
+> **Advisory tokens (v5.3.1+):** All grant tokens carry `advisory: true`. The `--agent` identity claim is accepted as-is and is **not** externally authenticated — the host platform is responsible for actual caller authentication. Unknown agents receive trust 0.3 and an `unknown_agent: true` flag.
+>
+> **Token integrity (v5.5.2):** Grant payloads are now HMAC-SHA256 signed. `check_permission.py` stores `_sig` in every new grant; `validate_token.py` verifies it before returning `valid: true`. A tampered `active_grants.json` record is rejected with `"Token signature invalid"`. The signing key lives at `data[/<env>]/.signing_key` (32 bytes, auto-generated, chmod 0o600). Pre-v5.5.2 tokens (no `_sig`) remain backward-compatible and return `"sig_verified": false`.
 
 ### Factor 3: Risk Assessment (30%)
 
@@ -104,16 +106,20 @@ Base risk scores by resource type:
   "scope": "read:invoices",
   "expires_at": "2026-02-04T15:30:00Z",
   "restrictions": ["read_only", "max_records:100"],
-  "granted_at": "2026-02-04T15:25:00Z"
+  "granted_at": "2026-02-04T15:25:00Z",
+  "advisory": true,
+  "unknown_agent": false,
+  "_sig": "<hmac-sha256-hex>"  ← payload integrity signature (v5.5.2+)
 }
 ```
 
 ### Token Lifecycle
 
 1. **Generation**: Created upon approval with UUID-based identifier
-2. **Validity**: 5 minutes from generation (configurable)
-3. **Validation**: Check before each API call
-4. **Revocation**: Can be manually revoked before expiry
+2. **Signing** (v5.5.2+): HMAC-SHA256 signature computed over `token|agent_id|resource_type|scope|expires_at|granted_at` and stored as `_sig`
+3. **Validity**: 5 minutes from generation (configurable)
+4. **Validation**: `validate_token.py` verifies `_sig` then checks expiry before each API call; returns `sig_verified: true/false`
+5. **Revocation**: Can be manually revoked before expiry (`revoke_token.py [--env <env>]`)
 
 ### Using Tokens
 
