@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.4] - 2026-05-17
+
+### Documentation
+- **SKILL.md — ClawHub scan findings table updated** to reflect v5.5.3 scan results:
+  - `Confidence` column renamed to `Severity` (matches ClawHub UI)
+  - ASI03 advisory tokens: High → Medium
+  - ASI06 project context: High → Medium
+  - New Low row: **ASI03 local grant state** — `.signing_key` / `active_grants.json` are security-relevant local files added in v5.5.2; mitigation: keep `data/` private
+  - New Low row: **ASI06 audit log free text** — do not include PII/secrets in justification text; restrict `data/` access on shared machines
+- **SECURITY.md** — ClawHub scanner v5.5.3 summary entry added (2 Medium, 2 Low, all by-design)
+
 ## [5.5.3] - 2026-05-17
 
 ### Fixed
