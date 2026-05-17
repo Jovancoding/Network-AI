@@ -703,6 +703,49 @@ python {baseDir}/scripts/swarm_guard.py supervisor-review --task-id "task_001"
 - Run `sessions_list` (OpenClaw platform built-in) to see available sessions
 - Session may need to be started first
 
+## Security Framework Assessment (MAESTRO / OWASP AST)
+
+The following findings are drawn from the **MAESTRO Agent Security Threat** framework (OWASP LLM / ASVS mapping). They are addressed by existing architectural controls in Network-AI — not open vulnerabilities.
+
+### AST03 — Over-Privileged Skills · Severity: High
+
+> *Skills are granted broader permissions than their stated function requires, creating excessive blast radius if prompt-injected.*
+
+| Control | How Network-AI addresses it |
+|---|---|
+| **Permission manifest** | `metadata.openclaw` in SKILL.md frontmatter explicitly declares `bundle_scope: "Python scripts only"`, `network_calls: none`, `requires.bins: [python3]` — no shell tools, no API credentials, no external services |
+| **Least-privilege resource gating** | `check_permission.py` uses a weighted scoring model (justification 40 %, trust 30 %, risk 30 %); PAYMENTS and FILE_EXPORT require `--confirm-high-risk` acknowledgment before any token is issued; `--scope` limits every grant to minimum required access |
+| **Abstract resource labels only** | PAYMENTS, DATABASE, EMAIL, FILE_EXPORT are local scoring labels — no external credentials exist in the skill; there is nothing to leak to an external service |
+| **HMAC-signed grant tokens** | Since v5.5.2, every grant record carries `_sig` (HMAC-SHA256 over canonical fields); `validate_token.py` rejects tampered records — privilege escalation via forged grants is detected at validation time |
+| **SandboxPolicy + FileAccessor** | AgentRuntime's `SandboxPolicy` enforces command allowlists/blocklists; `FileAccessor` restricts all file I/O to `data/<env>/`; out-of-scope access throws `SourceProtectionError` and returns `{success: false}` without leaking path details |
+| **Advisory-only tokens** | All grant tokens are explicitly marked `advisory: true`; downstream systems must add a separate authenticated identity check and human approval before any real sensitive action — documented in frontmatter and throughout SKILL.md |
+
+### AST06 — Weak Isolation · Severity: High
+
+> *Skills execute in the host agent's security context with full filesystem, shell, and network access.*
+
+| Control | How Network-AI addresses it |
+|---|---|
+| **Zero network calls, zero subprocesses** | All bundled Python scripts use Python stdlib only, spawn no subprocesses, and make no network calls — declared in `metadata.openclaw.network_calls: none` and `bundle_scope`; enforceable by platform inspection |
+| **AgentRuntime sandbox** | `ShellExecutor` enforces per-command timeout and output-size limits; `SandboxPolicy` allowlist/blocklist prevents unapproved shell commands from running at all |
+| **Source protection** | `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any attempt to read outside that boundary throws `SourceProtectionError` — the agent receives `{success: false}`, no path details leak |
+| **Environment isolation** | `NETWORK_AI_ENV` / `--env` routes all state to `data/<env>/`; dev, staging, and production state are fully separated; live state (`audit_log.jsonl`, `active_grants.json`) never promotes across environments |
+| **ApprovalGate** | High-risk shell or file operations require explicit human or callback approval before execution; auto-approve only in explicitly trusted environments |
+| **No hot-reload surface** | Bundled scripts do not implement or respond to a SkillsWatcher; skill updates require explicit `clawhub install` or `npm install` — no mid-session reload is possible |
+
+### AST07 — Update Drift · Severity: Medium
+
+> *Installed skills drift out of sync — either unpatched (leaving known CVEs open) or blindly auto-updated (potentially receiving malicious patches).*
+
+| Control | How Network-AI addresses it |
+|---|---|
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.5.5"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
+| **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.5.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
+| **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |
+| **No auto-update mechanism** | Updates require explicit user action (`clawhub install`, `npm install network-ai@latest`); there is no background updater or hot-reload path |
+| **CHANGELOG.md audit trail** | Every change — including docs-only patches — is tracked with version, date, and rationale; operators can diff any two versions to assess update risk before applying |
+
 ## Security Scan Findings (ClawHub)
 
 This skill is scanned on every publish. The following Notes are flagged by design and will recur on every scan. They are acknowledged and mitigated with documented controls — they are not bugs or vulnerabilities.

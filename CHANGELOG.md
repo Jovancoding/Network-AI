@@ -5,6 +5,16 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.5] - 2026-05-17
+
+### Documentation
+- **SKILL.md — MAESTRO / OWASP AST security framework assessment section added**
+  Documents Network-AI's architectural mitigations for three MAESTRO Agent Security Threat findings:
+  - **AST03 (Over-Privileged Skills, High)** — permission manifest in frontmatter; least-privilege resource gating with `--confirm-high-risk`; abstract-only resource labels (no external credentials); HMAC-signed grant tokens (v5.5.2); SandboxPolicy + FileAccessor path scoping; advisory-only token enforcement
+  - **AST06 (Weak Isolation, High)** — zero subprocesses / zero network calls (declared in frontmatter); AgentRuntime ShellExecutor allowlist/timeout; SourceProtectionError on out-of-scope paths; NETWORK_AI_ENV environment isolation; ApprovalGate for high-risk ops; no hot-reload surface
+  - **AST07 (Update Drift, Medium)** — exact version pinning in package.json; zero transitive dependencies (Python stdlib only); signed tagged releases; Socket.dev supply chain monitoring; no auto-update mechanism; CHANGELOG.md audit trail
+- ENTERPRISE.md, SECURITY.md (both copies) updated with v5.5.5 reference
+
 ## [5.5.4] - 2026-05-17
 
 ### Documentation
