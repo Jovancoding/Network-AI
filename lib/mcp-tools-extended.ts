@@ -65,7 +65,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   // ---- Budget ---------------------------------------------------------------
   {
     name: 'budget_status',
-    description: 'Get a snapshot of the global FederatedBudget: ceiling, total spent, remaining tokens, and per-agent spend breakdown. Returns {ok:true, ceiling, spent, remaining, perAgent:{agentId:tokensSpent}}. Returns {ok:false, error:"Budget not available"} if no budget is configured. Call before budget_spend to check available capacity; use budget_get_log for a full timestamped transaction history.',
+    description: 'Get a read-only snapshot of the global FederatedBudget: ceiling, total spent, remaining tokens, and per-agent spend breakdown. Never modifies budget state. Returns {ok:true, ceiling, spent, remaining, perAgent:{agentId:tokensSpent}}. Returns {ok:false, error:"Budget not available"} if no budget is configured. agent_id is recorded in the audit log only — it does not filter results. Call before budget_spend to check available capacity; use budget_get_log for a full timestamped transaction history.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -76,7 +76,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'budget_spend',
-    description: 'Deduct tokens from the global FederatedBudget on behalf of an agent. Returns {ok:true, allowed:true, spent, remaining} when approved, or {ok:true, allowed:false, deniedReason, remaining} when the ceiling would be exceeded. Returns {ok:false, error:"..."} if tokens is not a positive integer. Call budget_status first to check remaining balance; never attempt an LLM call after receiving allowed:false — use budget_reset to clear counters at the start of a new task cycle.',
+    description: 'Deduct tokens from the global FederatedBudget on behalf of an agent. Returns {ok:true, allowed:true, spent, remaining} when approved, or {ok:true, allowed:false, deniedReason, remaining} when the ceiling would be exceeded. Returns {ok:false, error:"..."} if tokens is not a positive integer. tokens represents the estimated cost of the upcoming LLM call — pass the expected usage before invoking the model; agent_id is tracked individually in the spend log and reported by budget_status. Call budget_status first to check remaining balance; never attempt an LLM call after receiving allowed:false.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -88,7 +88,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'budget_reset',
-    description: 'Reset all agent spend counters to zero while preserving the ceiling. Returns {ok:true, reset:true, ceiling} on success. Returns {ok:false, error:"confirm must be \\"yes\\""} if the confirm parameter is not "yes" — this guard prevents accidental resets. Use at the start of a new task cycle; call budget_status before and after to verify the reset took effect.',
+    description: 'Reset all agent spend counters to zero while preserving the ceiling. Returns {ok:true, reset:true, ceiling} on success. Returns {ok:false, error:"confirm must be \\"yes\\""} if the confirm parameter is not "yes" — this guard prevents accidental resets. Do not reset mid-task if other agents are actively spending — use only at the start of a new task cycle or after all agents have finished. Call budget_status before and after to verify the reset took effect.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -100,7 +100,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'budget_set_ceiling',
-    description: 'Dynamically change the global token ceiling. Returns {ok:true, ceiling, previous} on success. Returns {ok:false, error:"..."} if ceiling is not a positive number. The ceiling can be raised or lowered at runtime and takes effect immediately for all subsequent budget_spend calls; call budget_status to confirm the new ceiling and remaining balance after updating.',
+    description: 'Dynamically change the global token ceiling for all agents. Returns {ok:true, ceiling, previous} on success. Returns {ok:false, error:"..."} if ceiling is not a positive number. Changes take effect immediately — lowering below current spend will deny all future budget_spend calls until counters are reset via budget_reset; raising allows previously blocked agents to resume. ceiling must be a positive integer (total token budget across all agents); agent_id is recorded in the audit log. Avoid lowering the ceiling while agents are actively running; call budget_status first to check the current spend level.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -112,7 +112,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'budget_get_log',
-    description: 'Return a chronological list of all token spend transactions. Returns {ok:true, log:[{agentId, tokens, timestamp}], count}. Returns {ok:false, error:"..."} if the budget is not available. Use limit to cap the number of entries returned (default 50); prefer budget_status for a summary view. Useful for auditing which agents consumed the most tokens in a task cycle.',
+    description: 'Return a chronological list of all token spend transactions. Read-only — never modifies budget state. Returns {ok:true, log:[{agentId, tokens, timestamp}], count}. Returns {ok:false, error:"..."} if the budget is not available. Use limit to cap the number of entries returned (default 50); prefer budget_status for a summary view. Useful for auditing which agents consumed the most tokens in a task cycle.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -125,7 +125,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   // ---- Token ----------------------------------------------------------------
   {
     name: 'token_create',
-    description: 'Issue a new HMAC/Ed25519-signed security token for an agent scoped to a resource type and permission level. Returns {ok:true, token:{tokenId, agentId, resourceType, scope, issuedAt, expiresAt, signature}}. Returns {ok:false, error:"..."} if the token manager is unavailable. Use before an agent needs access to a protected resource; pass the returned token object as token_json to token_validate to verify it, or to token_revoke when access should be withdrawn.',
+    description: 'Issue a new HMAC/Ed25519-signed security token for an agent scoped to a resource type and permission level. Each call produces a unique token with a fixed expiry managed by the token manager. Returns {ok:true, token:{tokenId, agentId, resourceType, scope, issuedAt, expiresAt, signature}}. Returns {ok:false, error:"..."} if the token manager is unavailable. resource_type is a free-form string identifying the protected resource (e.g. "FILE_SYSTEM", "BLACKBOARD", "API"); scope controls permission level (e.g. "read", "write", "admin"). Pass the full returned token object as token_json to token_validate; call token_revoke with the tokenId when access should be withdrawn.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -138,7 +138,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'token_validate',
-    description: 'Verify a security token\'s HMAC/Ed25519 signature, confirm it has not expired, and check it has not been revoked. Returns {ok:true, valid:true, token:{...}} if the token passes all checks, or {ok:true, valid:false, reason:"..."} if it fails any check. Returns {ok:false, error:"..."} if token_json is not valid JSON. Call before granting access to any protected resource; use token_revoke to invalidate a token that should no longer be trusted.',
+    description: 'Verify a security token\'s HMAC/Ed25519 signature, confirm it has not expired, and check it has not been revoked. Read-only — never modifies token state. Returns {ok:true, valid:true, token:{...}} if the token passes all checks, or {ok:true, valid:false, reason:"..."} if it fails any check (reason indicates which check failed: "invalid_signature", "expired", or "revoked"). Returns {ok:false, error:"..."} if token_json is not valid JSON. Call before granting access to any protected resource; use token_revoke to invalidate a token that should no longer be trusted.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -152,7 +152,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'token_revoke',
-    description: 'Permanently revoke a security token by its tokenId. Returns {ok:true, revoked:true, tokenId} on success. Returns {ok:false, error:"..."} if the token manager is unavailable. Revocation is immediate and irreversible — the token will fail token_validate on all future attempts. Use when an agent session ends, a permission grant expires by policy, or a token may have been compromised.',
+    description: 'Permanently revoke a security token by its tokenId. Returns {ok:true, revoked:true, tokenId} on success. Returns {ok:false, error:"..."} if the token manager is unavailable. Revocation is immediate and irreversible — the token will fail token_validate on all future attempts. token_id is the tokenId field from the token object returned by token_create; reason is optional but written to the audit log and aids security review. Use when an agent session ends, a permission grant expires by policy, or a token may have been compromised.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -165,7 +165,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   // ---- Audit ----------------------------------------------------------------
   {
     name: 'audit_query',
-    description: 'Search the append-only audit log with optional filters. Returns {ok:true, entries:[{timestamp, agentId, eventType, outcome, details}], count}. Returns {ok:false, error:"..."} if the log file cannot be read. All filters are optional and combinable; use audit_tail for the most recent N entries without filtering. Useful for compliance review, debugging agent behavior, or verifying permission grant history.',
+    description: 'Search the append-only audit log with optional filters. Read-only — never modifies the log. Returns {ok:true, entries:[{timestamp, agentId, eventType, outcome, details}], count}. Returns {ok:false, error:"..."} if the log file cannot be read. All filters are optional and combinable; use limit to cap results and avoid large payloads on busy systems (default 100). Use audit_tail for the most recent N entries without filtering; use this tool for compliance review, debugging, or verifying permission grant history.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -180,7 +180,7 @@ const EXTENDED_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'audit_tail',
-    description: 'Return the N most recent entries from the audit log by reading from the end of the file. Returns {ok:true, entries:[{timestamp, agentId, eventType, outcome, details}], count}. Returns {ok:false, error:"..."} if the log file cannot be read. Prefer this over audit_query for real-time monitoring or quick debugging; use audit_query when you need to filter by agent, event type, outcome, or time range.',
+    description: 'Return the N most recent audit log entries in ascending timestamp order (oldest-first within the tail window). Read-only — no side effects. Returns {ok:true, entries:[{timestamp, agentId, eventType, outcome, details}], count}. Returns {ok:false, error:"..."} if the log file cannot be read. n defaults to 20 and is capped at 500 — use a larger value only when debugging a busy system. Prefer audit_query for filtered searches by agent, event type, outcome, or time range; use this tool for real-time monitoring or quick post-action verification.',
     inputSchema: {
       type: 'object',
       properties: {

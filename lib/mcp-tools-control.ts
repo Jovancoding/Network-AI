@@ -78,7 +78,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'config_set',
-    description: 'Update a live orchestrator configuration value at runtime. Returns {ok:true, key, value, previous} on success. Returns {ok:false, error:"Unknown config key..."} with a list of valid keys if the key is not recognised, or {ok:false, error:"..."} if value is not valid JSON. Call config_get first to see current values and available keys; changes take effect immediately for all subsequent operations.',
+    description: 'Update a live orchestrator configuration value at runtime. Changes take effect immediately for all subsequent operations and are written to the audit log — there is no undo. Returns {ok:true, key, value, previous} on success. Returns {ok:false, error:"Unknown config key..."} with a list of valid keys if the key is not recognised, or {ok:false, error:"..."} if value is not valid JSON. Call config_get first to read the current value and confirm the key name before updating.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -90,7 +90,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'agent_list',
-    description: 'List all agents registered with the orchestrator and their current status. Returns {ok:true, agents:[{agentId, status, lastSeen, taskCount}], count}. Returns {ok:false, error:"..."} if the registry is unavailable. Use status_filter to narrow results (active, idle, stopped, error); call this before agent_spawn to confirm the target agent is registered and active, or before agent_stop to verify the agent is running.',
+    description: 'List all agents registered with the orchestrator and their current status. Read-only — no side effects. Returns {ok:true, agents:[{agentId, status, lastSeen, taskCount}], count}. Returns {ok:false, error:"..."} if the registry is unavailable. status_filter accepts one of: "active", "idle", "stopped", or "error" — omit to return all statuses. Call before agent_spawn or agent_stop to confirm the target agent exists and has the expected status.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -116,7 +116,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'agent_stop',
-    description: 'Signal a running agent to stop by writing a stop record to the blackboard and marking it stopped in the registry. Returns {ok:true, agentId, reason, stopped:true}. Returns {ok:false, error:"..."} if agent_id is missing. The agent observes the stop signal on its next poll — it does not terminate immediately. Call agent_list first to confirm the agent is currently active.',
+    description: 'Signal a running agent to stop by writing a stop record to the blackboard and marking it stopped in the registry. Returns {ok:true, agentId, reason, stopped:true}. Returns {ok:false, error:"..."} if agent_id is missing. agent_id must match a value returned by agent_list; reason is optional but written to the audit log under eventType "agent_stop" and helps trace the cause of the stop. The agent observes the stop signal on its next poll — it does not terminate immediately. Call agent_list first to confirm the agent is currently active.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -128,7 +128,7 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
   },
   {
     name: 'fsm_transition',
-    description: 'Advance a named FSM (Finite State Machine) to a new state and record the transition on the blackboard. Returns {ok:true, fsmId, transition:{from, to}, blackboardWritten:true} on success. Returns {ok:false, error:"..."} if fsm_id, new_state, or agent_id is missing, or if metadata_json is not valid JSON. Use after a workflow phase completes to activate the next state; call orchestrator_info first to confirm the current FSM state before transitioning.',
+    description: 'Advance a named FSM (Finite State Machine) to a new state and record the transition on the blackboard. Transitions are irreversible via this tool — new_state is written directly without validating against a predefined state graph, so the caller must ensure the transition is valid. Returns {ok:true, fsmId, transition:{from, to}, blackboardWritten:true} on success. Returns {ok:false, error:"..."} if fsm_id, new_state, or agent_id is missing, or if metadata_json is not valid JSON. Avoid concurrent transitions to the same FSM from multiple agents; call orchestrator_info first to read the current FSM state before transitioning.',
     inputSchema: {
       type: 'object',
       properties: {

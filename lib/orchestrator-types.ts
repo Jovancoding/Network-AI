@@ -356,10 +356,15 @@ export const DEFAULT_RESOURCE_PROFILES: Record<string, ResourceProfile> = {
   EXTERNAL_SERVICE: { baseRisk: 0.4, defaultRestrictions: ['rate_limit:10_per_minute'], description: 'External API calls' },
   EMAIL:            { baseRisk: 0.5, defaultRestrictions: ['rate_limit:5_per_minute', 'no_attachments'], description: 'Email sending' },
   WEBHOOK:          { baseRisk: 0.4, defaultRestrictions: ['allowed_domains_only', 'no_credentials'], description: 'Webhook dispatch' },
+  // --- Basis tier (infrastructure administration) ---
+  ENVIRONMENT_PROMOTE: { baseRisk: 0.95, defaultRestrictions: ['basis_tier_only', 'audit_required', 'approval_required'], description: 'Promote configuration artefacts between deployment environments — Basis-tier agents only' },
 };
 
 export const DEFAULT_AGENT_TRUST: AgentTrustConfig[] = [
   { agentId: 'orchestrator', trustLevel: 0.9, allowedNamespaces: ['*'], allowedResources: ['*'] },
+  // Basis tier — only these agents may request ENVIRONMENT_PROMOTE
+  { agentId: 'basis:transport', trustLevel: 0.95, allowedNamespaces: ['transport:', 'landscape:'], allowedResources: ['ENVIRONMENT_PROMOTE'] },
+  { agentId: 'basis:landscape', trustLevel: 0.9, allowedNamespaces: ['landscape:', 'transport:'], allowedResources: ['ENVIRONMENT_PROMOTE'] },
   { agentId: 'data_analyst', trustLevel: 0.8, allowedNamespaces: ['task:', 'analytics:', 'agent:'], allowedResources: ['SAP_API', 'DATABASE', 'DATA_EXPORT', 'EXTERNAL_SERVICE'] },
   { agentId: 'strategy_advisor', trustLevel: 0.7, allowedNamespaces: ['task:', 'strategy:'], allowedResources: ['EXTERNAL_SERVICE', 'DATA_EXPORT'] },
   { agentId: 'risk_assessor', trustLevel: 0.85, allowedNamespaces: ['task:', 'risk:', 'analytics:'], allowedResources: ['EXTERNAL_SERVICE', 'DATABASE'] },

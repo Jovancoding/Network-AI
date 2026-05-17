@@ -5,6 +5,21 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.0] - 2026-05-17
+
+### Added
+- **Basis Transport Tier** — SAP Basis-inspired configuration transport layer:
+  - `lib/transport-agent.ts`: `TransportAgent` with full state machine (`pending→draining→promoting→canary→complete|rolled_back|failed`), AuthGuardian permission gate, fleet draining, canary violation detection via `ComplianceMonitor`, and automatic rollback via `EnvironmentManager.restore()`.
+  - `lib/landscape-agent.ts`: `LandscapeAgent` slow-poll tracker (30 s) writing `landscape:health:<env>` records to the blackboard; marks environments `degraded` after failed or rolled-back transports.
+  - `AgentPool.setDispatchPause(paused, { percent? })`: pause or partially resume dispatch on any pool. `isDispatchPaused` and `dispatchAllowedPercent` getters added. `canSpawn` respects pause state and partial-capacity limits.
+  - `ENVIRONMENT_PROMOTE` resource profile (baseRisk 0.95) added to `DEFAULT_RESOURCE_PROFILES`; `basis:transport` (trustLevel 0.95) and `basis:landscape` (trustLevel 0.9) entries added to `DEFAULT_AGENT_TRUST`.
+  - `TransportAgent` and `LandscapeAgent` exported from `index.ts` with full type exports.
+  - `test-transport.ts`: 117 new assertions covering happy-path lifecycle, prerequisites, advisory lock exclusion, auth denial, promote failure, canary pass/fail, rollback, `AgentPool` pause mechanics, and `LandscapeAgent` health tracking.
+
+### Stats
+- **30 test suites, 3,093 passing assertions** (+117 vs 5.4.5)
+- Zero TypeScript compile errors (`npx tsc --noEmit`)
+
 ## [5.4.5] - 2026-05-16
 
 ### Security

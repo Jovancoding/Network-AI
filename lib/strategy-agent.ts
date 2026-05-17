@@ -166,6 +166,8 @@ export class AgentPool {
   private _failedCount = 0;
   private _totalTokens = 0;
   private _events: EventEmitter;
+  private _dispatchPaused = false;
+  private _dispatchAllowedPercent = 100;
 
   constructor(template: AgentTemplate, events: EventEmitter) {
     this.template = template;
@@ -191,10 +193,35 @@ export class AgentPool {
   get totalTokensUsed(): number { return this._totalTokens; }
 
   /** Whether the pool can accept more agents */
-  get canSpawn(): boolean { return this.active < this.template.maxConcurrent; }
+  get canSpawn(): boolean {
+    if (this._dispatchPaused) return false;
+    const limit = this._dispatchAllowedPercent < 100
+      ? Math.max(1, Math.floor(this.template.maxConcurrent * this._dispatchAllowedPercent / 100))
+      : this.template.maxConcurrent;
+    return this.active < limit;
+  }
 
   /** How many more agents can be spawned */
   get availableSlots(): number { return Math.max(0, this.template.maxConcurrent - this.active); }
+
+  /** Whether dispatch is currently paused for this pool. */
+  get isDispatchPaused(): boolean { return this._dispatchPaused; }
+
+  /** Current allowed spawn percentage (0–100). */
+  get dispatchAllowedPercent(): number { return this._dispatchAllowedPercent; }
+
+  /**
+   * Pause or partially resume dispatch for this pool.
+   * Used by TransportAgent to drain the fleet before an environment promotion.
+   * @param paused - true to fully pause; false to resume (optionally at a partial rate)
+   * @param options.percent - 1–100 fraction of maxConcurrent slots to allow (ignored when paused=true)
+   */
+  setDispatchPause(paused: boolean, options?: { percent?: number }): void {
+    this._dispatchPaused = paused;
+    if (!paused) {
+      this._dispatchAllowedPercent = Math.min(100, Math.max(1, options?.percent ?? 100));
+    }
+  }
 
   /**
    * Reserve a slot and create a ManagedAgent record.

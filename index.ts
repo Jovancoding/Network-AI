@@ -1118,6 +1118,11 @@ export { SpeculativeExecutor } from './lib/speculative-executor';
 export type { SpeculativeCandidate, SpeculativeResult, SpeculativeOutcome, SpeculativeOptions, SpeculativeExecutorFn } from './lib/speculative-executor';
 export { AgentDebate } from './lib/agent-debate';
 export type { DebateTurn, DebateConfig, DebateOutcome, CritiqueResult, RevisionResult, ProposerFn, CriticFn } from './lib/agent-debate';
+// Basis tier — SAP-inspired transport and landscape agents
+export { TransportAgent } from './lib/transport-agent';
+export type { TransportRequest, TransportStatusRecord, TransportStatus, TransportAgentOptions } from './lib/transport-agent';
+export { LandscapeAgent } from './lib/landscape-agent';
+export type { EnvironmentHealth, EnvironmentHealthStatus, LandscapeAgentOptions } from './lib/landscape-agent';
 export { ApprovalInbox } from './lib/approval-inbox';
 export type { ApprovalEntry, ApprovalInboxOptions, ApprovalStatus, InboxEvent, InboxEventType, InboxStats } from './lib/approval-inbox';
 export { createAdapterTestSuite } from './lib/adapter-test-harness';

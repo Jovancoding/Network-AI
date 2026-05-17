@@ -5,9 +5,9 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.4.5-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.5.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-2976%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-3093%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-29%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -429,7 +429,7 @@ npm run test:phase9       # Agent runtime, console, strategy agent
 npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate, Route Classifier
 ```
 
-**2,976 passing assertions across 29 test suites** (`npm run test:all`):
+**3,093 passing assertions across 30 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -461,6 +461,7 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | `test-rlm-phases.ts` | 123 | FederatedBudget child spending, blackboard metadata API, best-partial result, HookContext depth, sub-goal recursion, semaphore fan-out, PhasePipeline compaction, RLMAdapter end-to-end |
 | `test-phase12.ts` | 65 | Context Throttler, Partition Planner, Coverage Gate, Route Classifier, EVALUATING FSM state, runTeam integration |
 | `test-env-manager.ts` | 77 | Multi-environment isolation, promotion chain, backup/restore, source protection, NETWORK_AI_ENV, blackboard env routing |
+| `test-transport.ts` | 117 | Basis transport tier: `TransportAgent` state machine, `LandscapeAgent` health tracking, `AgentPool` drain/pause, fleet coordination, canary, rollback |
 | `test.ts` | 39 | Core orchestrator smoke tests |
 
 ---

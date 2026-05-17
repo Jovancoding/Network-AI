@@ -39,6 +39,7 @@ const SUITES = [
   'test-rlm-phases.ts',
   'test-phase12.ts',
   'test-env-manager.ts',
+  'test-transport.ts',
 ];
 
 const WIDTH = 60;
