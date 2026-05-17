@@ -286,7 +286,8 @@ export class TransportAgent {
       return updated;
     };
 
-    let status = updateStatus({ startedAt: now() });
+    updateStatus({ startedAt: now() }); // persist initial status record (side effect only)
+    let status: TransportStatusRecord;
 
     // ------------------------------------------------------------------
     // 1. Prerequisite check
@@ -338,7 +339,7 @@ export class TransportAgent {
       // ----------------------------------------------------------------
       // 4. Drain pools tagged for the destination environment
       // ----------------------------------------------------------------
-      status = updateStatus({ status: 'draining' });
+      updateStatus({ status: 'draining' }); // side effect only — value overwritten before next read
       const drainedPools = this._drainPools(request.toEnv);
       await this._waitForDrain(drainedPools);
 
@@ -356,7 +357,7 @@ export class TransportAgent {
       // ----------------------------------------------------------------
       // 6. Promote
       // ----------------------------------------------------------------
-      status = updateStatus({ status: 'promoting', backupId });
+      updateStatus({ status: 'promoting', backupId }); // side effect only — value overwritten before next read
       let promotionResult: PromotionResult;
       try {
         promotionResult = this._envManager.promote(request.fromEnv, request.toEnv, {
@@ -377,7 +378,7 @@ export class TransportAgent {
       const canaryMaxViolations = request.canaryMaxViolations ?? 0;
 
       if (canaryWindowMs > 0 && this._complianceMonitor) {
-        status = updateStatus({ status: 'canary', promotionResult });
+        updateStatus({ status: 'canary', promotionResult }); // side effect only — value overwritten before next read
         this._resumePools(drainedPools, request.canaryPercent ?? 20);
 
         const violationsBefore = this._complianceMonitor.getViolations().length;

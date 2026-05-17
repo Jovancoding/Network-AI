@@ -691,7 +691,6 @@ async function testCanary() {
 
     // Inject violation during canary (by patching getViolations to return extra after first call)
     let callCount = 0;
-    const origGet = monitor.getViolations.bind(monitor);
     monitor.getViolations = () => {
       callCount++;
       if (callCount === 1) return [];                           // before canary window

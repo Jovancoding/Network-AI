@@ -5,6 +5,16 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.3] - 2026-05-17
+
+### Fixed
+- **`lib/transport-agent.ts` — CodeQL useless-assignment-to-local (#155–#158)**
+  The initial `let status = updateStatus({startedAt: now()})` and three intermediate `status = updateStatus({...})` calls (at drain, promote, and canary phases) were dead stores — the assigned value was always overwritten before being read. Fixed by separating the side-effect blackboard write from the `status` declaration and dropping the three intermediate assignments. All `return status` paths retain their preceding assignments; TypeScript strict-mode definite-assignment analysis passes without `!` assertions.
+- **`test-transport.ts` — CodeQL unused variable (#154)**
+  `origGet` saved the original `getViolations` binding but was never used. Removed.
+- **`scripts/check_permission.py` — CodeQL empty-except (#159)**
+  The `except OSError: pass` block in `_load_signing_key()` had no explanatory comment, triggering `py/empty-except`. Added a comment explaining that `chmod 0o600` is unsupported on Windows NTFS and restricted filesystems but the key remains functional.
+
 ## [5.5.2] - 2026-05-17
 
 ### Fixed

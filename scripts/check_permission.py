@@ -289,6 +289,8 @@ def _load_signing_key() -> bytes:
     try:
         key_file.chmod(0o600)  # Restrict to owner; no-op on Windows
     except OSError:
+        # chmod is not supported on all platforms (e.g. Windows NTFS);
+        # the key is still functional — caller must protect the data directory.
         pass
     return key
 
