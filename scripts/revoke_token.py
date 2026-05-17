@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SECURITY: This script makes NO network calls and spawns NO subprocesses.
 # All I/O is local file operations only:
-#   READS:  data/active_grants.json, data/audit_log.jsonl
-#   WRITES: data/active_grants.json, data/audit_log.jsonl
-# Imports used: argparse, json, sys, datetime, pathlib, typing
+#   READS:  data[/<env>]/active_grants.json, data[/<env>]/audit_log.jsonl
+#   WRITES: data[/<env>]/active_grants.json, data[/<env>]/audit_log.jsonl
+# Imports used: argparse, json, os, re, sys, datetime, pathlib, typing
 # No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
 """
 Revoke Grant Token & TTL Enforcement
@@ -22,13 +22,27 @@ Example:
 
 import argparse
 import json
+import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-GRANTS_FILE = Path(__file__).parent.parent / "data" / "active_grants.json"
-AUDIT_LOG = Path(__file__).parent.parent / "data" / "audit_log.jsonl"
+
+def _resolve_data_dir(env: str = "") -> Path:
+    """Return the active data directory, scoped to <env> when set."""
+    _env = env or os.environ.get("NETWORK_AI_ENV", "")
+    base = Path(__file__).parent.parent / "data"
+    if _env:
+        if not re.match(r'^[a-zA-Z0-9_-]+$', _env):
+            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
+        return base / _env
+    return base
+
+
+GRANTS_FILE = _resolve_data_dir() / "active_grants.json"
+AUDIT_LOG = _resolve_data_dir() / "audit_log.jsonl"
 
 
 def log_audit(action: str, details: dict[str, Any]) -> None:
@@ -186,9 +200,20 @@ def main():
     parser.add_argument("--list-expired", action="store_true",
                         help="List expired tokens without removing")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
-    
+    parser.add_argument(
+        "--env",
+        default="",
+        help="Target environment (dev|st|sit|qa|sandbox|preprod|prod). Overrides NETWORK_AI_ENV."
+    )
+
     args = parser.parse_args()
-    
+
+    # Re-resolve data paths if --env was provided explicitly
+    global GRANTS_FILE, AUDIT_LOG
+    if args.env:
+        GRANTS_FILE = _resolve_data_dir(args.env) / "active_grants.json"
+        AUDIT_LOG = _resolve_data_dir(args.env) / "audit_log.jsonl"
+
     # Handle --list-expired
     if args.list_expired:
         result = list_expired_tokens()

@@ -5,6 +5,11 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.1] - 2026-05-17
+
+### Fixed
+- `scripts/revoke_token.py`: added `_resolve_data_dir()` helper and `--env` CLI argument so token revocation and TTL cleanup target the correct environment-scoped `data/<env>/active_grants.json` path, matching the behaviour of `check_permission.py` and `validate_token.py`. Addresses ClawScan finding ASI03 (token files not scoped to `NETWORK_AI_ENV`).
+
 ## [5.5.0] - 2026-05-17
 
 ### Added
