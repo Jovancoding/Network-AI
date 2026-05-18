@@ -5,6 +5,13 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.6] - 2026-05-18
+
+### Chore
+- **socket.json — ContextThrottler false-positive suppression**
+  Added `networkAccess` ignore entries for `lib/context-throttler.ts` and `dist/lib/context-throttler.js`. ContextThrottler is a pure blackboard-pruning utility with zero network calls, zero external dependencies, and no `fetch` usage. Socket.dev's transitive import-graph analysis was flagging it incorrectly, contributing to the Supply Chain Security score reduction.
+- Version bump to 5.5.6 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all 12 doc/config files.
+
 ## [5.5.5] - 2026-05-17
 
 ### Documentation

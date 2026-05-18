@@ -145,6 +145,14 @@
         "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; ComplianceMonitor does not make direct outbound HTTP calls."
       },
       {
+        "path": "lib/context-throttler.ts",
+        "reason": "False positive — ContextThrottler is a pure blackboard-pruning utility; it contains zero network calls, zero fetch usage, and zero external dependencies. Flagged by Socket.dev's transitive import-graph analysis only."
+      },
+      {
+        "path": "dist/lib/context-throttler.js",
+        "reason": "False positive — compiled output of ContextThrottler. Pure in-memory filtering logic; no network calls. Flagged by Socket.dev's transitive import-graph analysis only."
+      },
+      {
         "path": "dist/lib/control-plane.js",
         "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; ControlPlane does not make direct outbound HTTP calls."
       },
