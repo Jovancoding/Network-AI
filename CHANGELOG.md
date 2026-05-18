@@ -5,6 +5,13 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.7] - 2026-05-18
+
+### Chore
+- **socket.json — `shellAccess` false-positive suppression for AgentRuntime and McpToolConsumer**
+  Added `shellAccess` ignore entries for `lib/agent-runtime.ts`, `dist/lib/agent-runtime.js`, `lib/mcp-tool-consumer.ts`, and `dist/lib/mcp-tool-consumer.js`. These files were already covered under `shellExec` (documenting intentional `child_process.spawn` usage), but Socket.dev reports `child_process` module imports under a separate `shellAccess` alert type. Both entries are required to suppress the alert in the dashboard. `AgentRuntime` uses `child_process` only for opt-in sandboxed `ShellExecutor` execution under a caller-configured `SandboxPolicy`; `McpToolConsumer` uses it to spawn caller-configured MCP server subprocesses for stdio transport.
+- Version bump to 5.5.7 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all 12 doc/config files.
+
 ## [5.5.6] - 2026-05-18
 
 ### Chore

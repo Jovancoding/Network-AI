@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.5.6 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,093 tests, 66+ modules.
+Network-AI v5.5.7 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,093 tests, 66+ modules.
 
 ## The Multi-Agent Race Condition Problem
 

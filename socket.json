@@ -295,6 +295,24 @@
         "reason": "Intentional — compiled output of McpToolConsumer. Uses child_process.spawn to launch caller-configured MCP server subprocesses for stdio transport."
       }
     ],
+    "shellAccess": [
+      {
+        "path": "lib/agent-runtime.ts",
+        "reason": "Intentional — AgentRuntime imports child_process to implement ShellExecutor, which runs sandboxed shell commands under an explicit SandboxPolicy. Shell access is only exercised when the caller opts in by configuring and enabling the ShellExecutor."
+      },
+      {
+        "path": "dist/lib/agent-runtime.js",
+        "reason": "Intentional — compiled output of AgentRuntime. Imports child_process for ShellExecutor; sandboxed by SandboxPolicy, opt-in only."
+      },
+      {
+        "path": "lib/mcp-tool-consumer.ts",
+        "reason": "Intentional — McpToolConsumer imports child_process to spawn MCP server subprocesses for stdio-based MCP transport. Process spawning is required by the MCP stdio protocol; the caller provides the server command."
+      },
+      {
+        "path": "dist/lib/mcp-tool-consumer.js",
+        "reason": "Intentional — compiled output of McpToolConsumer. Imports child_process to launch caller-configured MCP server subprocesses for stdio transport."
+      }
+    ],
     "filesystemAccess": [
       {
         "path": "dist/index.js",
