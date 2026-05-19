@@ -1203,6 +1203,8 @@ export type { OpenClawSkill, SkillContext, SkillResult } from './lib/orchestrato
 
 // Phase 3: Priority & Preemption types
 export type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions, BlackboardEntryMetadata } from './lib/locked-blackboard';
+// LockedBlackboard WAL / sweep public API
+export { LockedBlackboard } from './lib/locked-blackboard';
 
 // Phase 5 Part 2: Pluggable Backend API
 export { FileBackend, MemoryBackend } from './lib/blackboard-backend';
@@ -1781,3 +1783,11 @@ export type { ChildOrchestratorConfig, OrchestratorLike, ChildOrchestratorState 
 
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from './types/streaming-adapter';
+
+// Circuit Breaker (v5.6.1)
+export { CircuitBreaker, CircuitOpenError } from './lib/circuit-breaker';
+export type { CircuitBreakerConfig, CircuitState } from './lib/circuit-breaker';
+
+// Telemetry Provider — BYOT (v5.7.0)
+export { NullTelemetryProvider, CapturingTelemetryProvider, createOtelHooks } from './lib/telemetry-provider';
+export type { ITelemetryProvider, SpanAttributes, CapturedSpan } from './lib/telemetry-provider';

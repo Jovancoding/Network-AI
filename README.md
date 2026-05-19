@@ -5,9 +5,9 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.5.8-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.5.9-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-3093%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-3136%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-29%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -118,6 +118,10 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | ✅ Coverage reporter | V8 coverage collection with threshold enforcement |
 | ✅ Job queue | Persistent priority FIFO with retries, crash recovery, pluggable backends |
 | ✅ Approval inbox | Web-accessible approval queue with REST API and SSE streaming |
+| ✅ TTL auto-eviction | `purgeExpired()` on-demand eviction; `startSweep(intervalMs)` / `stopSweep()` background timer (unref'd, default 60 s) |
+| ✅ WAL crash recovery | `LockedBlackboard` Write-Ahead Log survives process crashes; `replayWAL()` replays uncommitted ops on restart; `compactWAL()` for manual truncation |
+| ✅ Circuit Breaker | `AdapterRegistry` per-adapter CLOSED/OPEN/HALF_OPEN state machine; `fallbackChain` for automatic failover; `CircuitOpenError`; zero added dependencies |
+| ✅ OTel telemetry hooks | `ITelemetryProvider` BYOT abstraction — `NullTelemetryProvider`, `CapturingTelemetryProvider`, `createOtelHooks()` factory; plug in any OTel SDK without modifying adapters |
 | ✅ Transport layer | JSON-RPC 2.0 over HTTP with HMAC auth, TTL, node allowlisting |
 | ✅ Playground REPL | Interactive sandbox with mock agents for rapid prototyping |
 | ✅ Adapter test harness | Parameterized test battery for any adapter implementation |
@@ -429,7 +433,7 @@ npm run test:phase9       # Agent runtime, console, strategy agent
 npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate, Route Classifier
 ```
 
-**3,093 passing assertions across 30 test suites** (`npm run test:all`):
+**3,136 passing assertions across 31 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -457,6 +461,7 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | `test-phase8.ts` | 146 | Phase pipeline, confidence filter, matcher-based hooks, fan-out/fan-in |
 | `test-phase9.ts` | 280 | Agent runtime, sandbox policy, shell executor, file accessor, approval gate, console UI, orchestrator wiring, pipe mode, strategy agent |
 | `test-phase10.ts` | 153 | Goal decomposer, task DAG validation, topological layers, JSON parsing, team runner, concurrency, timeouts, events, runTeam one-liner, dependency injection, LLM planner |
+| `test-phase11.ts` | 43 | TTL background sweep, WAL crash recovery, CircuitBreaker, `ITelemetryProvider` / OTel hooks |
 | `test-topology.ts` | 304 | WorkTree, ControlPlane, dashboard server, topology visualization, WebSocket protocol |
 | `test-rlm-phases.ts` | 123 | FederatedBudget child spending, blackboard metadata API, best-partial result, HookContext depth, sub-goal recursion, semaphore fan-out, PhasePipeline compaction, RLMAdapter end-to-end |
 | `test-phase12.ts` | 65 | Context Throttler, Partition Planner, Coverage Gate, Route Classifier, EVALUATING FSM state, runTeam integration |

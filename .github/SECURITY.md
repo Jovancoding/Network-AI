@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 5.5.x   | ✅ Yes — full support (current, latest: 5.5.8) |
+| 5.5.x   | ✅ Yes — full support (current, latest: 5.5.9) |
 | 5.4.x   | ✅ Security fixes only |
 | 5.3.x   | ✅ Security fixes only |
 | 5.2.x   | ✅ Security fixes only |
@@ -66,6 +66,10 @@ Network-AI includes built-in security features:
 - **Context Injection Validation** (v5.3.1) -- `context_manager.py` runs `_validate_context()` before every `inject` / `show` command: schema checks plus injection-pattern detection on free-text fields; warnings printed to stderr
 - **Environment Isolation** (v5.4.0) -- `EnvironmentManager` enforces a promotion chain (dev→st→sit→qa→preprod→prod) with gate types: `auto`, `confirm`, and `approval`; config files promote, live state never does; auto-backup before each promotion
 - **Strict Promotion Chain Enforcement** (v5.5.8) -- `EnvironmentManager` constructor accepts `enforcePromotionChain: true` to require a `.promotion-record.json` in the source environment before any promotion proceeds; prevents skipped-stage deployments; records accumulate incrementally after every successful promotion
+- **TTL Background Sweep** (v5.5.9) -- `LockedBlackboard.startSweep(intervalMs)` evicts expired entries via an unref'd background timer (default 60 s); `stopSweep()` cancels cleanly; prevents stale entries from persisting in memory after their TTL has elapsed
+- **WAL Crash Recovery** (v5.6.0) -- `LockedBlackboard` Write-Ahead Log records every write before file mutation; `replayWAL()` on startup recovers uncommitted ops after unclean process exit; malformed tail bytes silently dropped
+- **Circuit Breaker on AdapterRegistry** (v5.6.1) -- per-adapter `CircuitBreaker` (CLOSED/OPEN/HALF_OPEN) stops calls to failing adapters after `failureThreshold` failures; `fallbackChain` provides automatic failover; `CircuitOpenError` prevents thundering-herd load on degraded adapters
+- **OTel `ITelemetryProvider` BYOT interface** (v5.7.0) -- `createOtelHooks(provider)` wires adapter lifecycle events as spans; `NullTelemetryProvider` default prevents accidental telemetry exfiltration; `CapturingTelemetryProvider` for deterministic CI testing without network calls
 - **Source Protection** (v5.4.0) -- `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any out-of-scope access throws `SourceProtectionError` and returns `{success: false}` to the agent
 
 ## Security Scan Results

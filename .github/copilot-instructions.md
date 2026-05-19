@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.5.8). 3,093 tests across 30 suites.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.5.9). 3,136 tests across 31 suites.
 
 ## Architecture
 
@@ -38,13 +38,15 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, gu
 - `lib/console-ui.ts` — ConsoleUI interactive terminal dashboard
 - `lib/strategy-agent.ts` — StrategyAgent meta-orchestrator with AgentPool, WorkloadPartitioner, adaptive scaling
 - `lib/goal-decomposer.ts` — GoalDecomposer, TeamRunner, runTeam: LLM-powered goal → task DAG → parallel execution
+- `lib/circuit-breaker.ts` — CircuitBreaker CLOSED/OPEN/HALF_OPEN state machine; CircuitOpenError; wired into AdapterRegistry per-adapter with fallbackChain
+- `lib/telemetry-provider.ts` — ITelemetryProvider BYOT interface; NullTelemetryProvider, CapturingTelemetryProvider; createOtelHooks() factory for AdapterHookManager
 - `adapters/` — 29 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 
 ## Build & Test
 
 ```bash
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # All 3,093 tests across 30 suites
+npm run test:all              # All 3,136 tests across 31 suites
 npm test                      # Core orchestrator tests
 npm run test:adapters         # All 29 adapters
 ```

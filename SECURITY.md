@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------||
-| 5.5.x   | ✅ Yes — full support (current, latest: 5.5.8) |
+| 5.5.x   | ✅ Yes — full support (current, latest: 5.5.9) |
 | 5.4.x   | ✅ Security fixes only |
 | 5.3.x   | ✅ Security fixes only |
 | 5.2.x   | ✅ Security fixes only |
@@ -73,6 +73,10 @@ Network-AI includes built-in security features:
 - **Context Injection Validation** (v5.3.1) -- `context_manager.py` runs `_validate_context()` before every `inject` / `show` command: schema checks (type enforcement on all fields) plus injection-pattern detection on free-text fields (`goals`, `decisions`, `banned_approaches`) using the same 16-pattern set from justification hardening; warnings printed to stderr before execution proceeds
 - **Environment Isolation** (v5.4.0) -- `EnvironmentManager` enforces a promotion chain (dev→st→sit→qa→preprod→prod) with gate types: `auto`, `confirm`, and `approval`; config files promote, live state (`audit_log.jsonl`, `active_grants.json`) never does; auto-backup before each promotion
 - **Strict Promotion Chain Enforcement** (v5.5.8) -- `EnvironmentManager` constructor accepts `enforcePromotionChain: true` to require a `.promotion-record.json` in the source environment directory before any promotion proceeds; prevents skipped-stage deployments (e.g., direct dev→prod bypassing sit/qa/preprod); a promotion record is written after every successful promotion regardless of flag state so records accumulate incrementally
+- **TTL Background Sweep** (v5.5.9) -- `LockedBlackboard.startSweep(intervalMs)` runs `purgeExpired()` on an unref'd background timer (default 60 s), automatically evicting expired entries from the in-memory cache; `stopSweep()` cancels the timer cleanly; prevents stale secret or session entries from persisting in memory after their TTL has elapsed
+- **WAL Crash Recovery** (v5.6.0) -- `LockedBlackboard` Write-Ahead Log records every write before the file mutation and a checkpoint after; on startup `replayWAL()` replays ops with missing checkpoints (uncommitted at crash time), preventing silent data loss after unclean process exit; malformed tail bytes from partial writes are silently dropped
+- **Circuit Breaker on AdapterRegistry** (v5.6.1) -- per-adapter `CircuitBreaker` (CLOSED/OPEN/HALF_OPEN) stops forwarding calls to a failing adapter after `failureThreshold` consecutive failures; `CircuitOpenError` is thrown immediately when the circuit is open, preventing thundering-herd load on degraded downstream adapters; automatic recovery via HALF_OPEN probe after `recoveryTimeoutMs`
+- **OTel `ITelemetryProvider` BYOT interface** (v5.7.0) -- `createOtelHooks(provider)` wires `beforeExecute` / `afterExecute` / `onError` spans into `AdapterHookManager`; `NullTelemetryProvider` default prevents accidental telemetry exfiltration if no provider is configured; `CapturingTelemetryProvider` enables deterministic testing of telemetry calls without network calls
 - **Source Protection** (v5.4.0) -- `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any out-of-scope access throws `SourceProtectionError` and returns `{success: false}` to the agent without leaking path details
 
 ## Security Scan Results

@@ -23,6 +23,8 @@ import type {
   AdapterEventType,
 } from '../types/agent-adapter';
 import { AdapterAlreadyRegisteredError, AdapterNotFoundError, ValidationError } from '../lib/errors';
+import { CircuitBreaker, CircuitOpenError } from '../lib/circuit-breaker';
+import type { CircuitBreakerConfig, CircuitState } from '../lib/circuit-breaker';
 
 /**
  * Factory function that creates an adapter instance on demand.
@@ -83,13 +85,21 @@ export class AdapterRegistry {
   private deferredFactories: Map<string, { factory: AdapterFactory; config: AdapterConfig }> = new Map();
   /** Opt-in retry policy for adapter execution. */
   private retryPolicy: RetryPolicy;
+  /** Per-adapter circuit breakers. */
+  private circuitBreakers: Map<string, CircuitBreaker> = new Map();
+  /** Circuit breaker configuration applied to all new breakers. */
+  private circuitBreakerConfig: CircuitBreakerConfig;
+  /** Ordered list of fallback adapter names tried when the primary circuit opens. */
+  private fallbackChain: string[];
 
-  constructor(config?: RegistryConfig & { retryPolicy?: Partial<RetryPolicy> }) {
+  constructor(config?: RegistryConfig & { retryPolicy?: Partial<RetryPolicy>; circuitBreaker?: CircuitBreakerConfig; fallbackChain?: string[] }) {
     if (config) {
       this.defaultAdapterName = config.defaultAdapter ?? null;
       this.routes = config.routes ?? [];
     }
     this.retryPolicy = { ...DEFAULT_RETRY_POLICY, ...config?.retryPolicy };
+    this.circuitBreakerConfig = config?.circuitBreaker ?? {};
+    this.fallbackChain = config?.fallbackChain ?? [];
   }
 
   /**
@@ -97,6 +107,49 @@ export class AdapterRegistry {
    */
   setRetryPolicy(policy: Partial<RetryPolicy>): void {
     this.retryPolicy = { ...this.retryPolicy, ...policy };
+  }
+
+  /**
+   * Update the circuit breaker configuration at runtime.
+   * Only affects breakers created after this call.
+   */
+  setCircuitBreakerConfig(config: CircuitBreakerConfig): void {
+    this.circuitBreakerConfig = { ...this.circuitBreakerConfig, ...config };
+  }
+
+  /**
+   * Return the current state of the circuit breaker for a given adapter.
+   * Returns `'CLOSED'` if no breaker has been created yet (no traffic).
+   */
+  getCircuitState(adapterName: string): CircuitState {
+    return this.circuitBreakers.get(adapterName)?.getState() ?? 'CLOSED';
+  }
+
+  /**
+   * Force-reset the circuit breaker for a given adapter to CLOSED.
+   * Useful for manual recovery or tests.
+   */
+  resetCircuit(adapterName: string): void {
+    this.circuitBreakers.get(adapterName)?.reset();
+  }
+
+  /** Get or lazily create the circuit breaker for `adapterName`. @internal */
+  private getBreaker(adapterName: string): CircuitBreaker {
+    if (!this.circuitBreakers.has(adapterName)) {
+      this.circuitBreakers.set(adapterName, new CircuitBreaker(adapterName, {
+        ...this.circuitBreakerConfig,
+        onStateChange: (from, to, name) => {
+          const eventType: AdapterEventType =
+            to === 'OPEN'      ? 'circuit:open'      :
+            to === 'HALF_OPEN' ? 'circuit:half-open' :
+            'circuit:close';
+          this.emit(eventType, name, { from, to });
+          // Forward to user callback if supplied
+          this.circuitBreakerConfig.onStateChange?.(from, to, name);
+        },
+      }));
+    }
+    return this.circuitBreakers.get(adapterName)!;
   }
 
   // =========================================================================
@@ -459,15 +512,18 @@ export class AdapterRegistry {
 
     this.emit('agent:execution:start', adapter.name, { agentId, payload });
     const startTime = Date.now();
+    const breaker = this.getBreaker(adapter.name);
 
     try {
-      // Strip adapter prefix from agentId if present (e.g., "lc:research" -> "research")
-      const colonIndex = agentId.indexOf(':');
-      const resolvedAgentId = colonIndex > 0 && this.adapters.has(agentId.substring(0, colonIndex))
-        ? agentId.substring(colonIndex + 1)
-        : agentId;
+      const result = await breaker.execute(async () => {
+        // Strip adapter prefix from agentId if present (e.g., "lc:research" -> "research")
+        const colonIndex = agentId.indexOf(':');
+        const resolvedAgentId = colonIndex > 0 && this.adapters.has(agentId.substring(0, colonIndex))
+          ? agentId.substring(colonIndex + 1)
+          : agentId;
 
-      const result = await adapter.executeAgent(resolvedAgentId, payload, context);
+        return adapter.executeAgent(resolvedAgentId, payload, context);
+      });
 
       // Enrich result with routing metadata
       result.metadata = {
@@ -479,6 +535,40 @@ export class AdapterRegistry {
       this.emit('agent:execution:complete', adapter.name, { agentId, result });
       return result;
     } catch (error) {
+      if (error instanceof CircuitOpenError) {
+        // Circuit is OPEN — attempt fallback chain before giving up
+        for (const fallbackName of this.fallbackChain) {
+          if (fallbackName === adapter.name) continue;
+          const fallback = this.adapters.get(fallbackName);
+          if (fallback?.isReady()) {
+            this.emit('agent:execution:fallback', fallbackName, { agentId, originalAdapter: adapter.name, reason: 'circuit-open' });
+            return this.executeOnce(fallback, agentId, payload, context);
+          }
+        }
+        // Also check retryPolicy.fallbackAdapter for backward compat
+        if (this.retryPolicy.fallbackAdapter && this.retryPolicy.fallbackAdapter !== adapter.name) {
+          const fallback = this.adapters.get(this.retryPolicy.fallbackAdapter);
+          if (fallback?.isReady()) {
+            this.emit('agent:execution:fallback', this.retryPolicy.fallbackAdapter, { agentId, originalAdapter: adapter.name, reason: 'circuit-open' });
+            return this.executeOnce(fallback, agentId, payload, context);
+          }
+        }
+        this.emit('agent:execution:error', adapter.name, { agentId, error });
+        return {
+          success: false,
+          error: {
+            code: 'CIRCUIT_OPEN',
+            message: error.message,
+            recoverable: false,
+            nativeError: error,
+          },
+          metadata: {
+            adapter: adapter.name,
+            executionTimeMs: Date.now() - startTime,
+          },
+        };
+      }
+
       this.emit('agent:execution:error', adapter.name, { agentId, error });
       return {
         success: false,

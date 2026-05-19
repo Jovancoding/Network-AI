@@ -19,6 +19,7 @@
 import {
   readFileSync,
   writeFileSync,
+  appendFileSync,
   existsSync,
   mkdirSync,
   unlinkSync,
@@ -130,6 +131,15 @@ export interface BlackboardEntryMetadata {
   timestamp: string;
   /** TTL in milliseconds, or `null` for no expiry. */
   ttl: number | null;
+}
+
+/** @internal Write-Ahead Log record for crash recovery. */
+interface WALRecord {
+  op: 'write' | 'delete' | 'checkpoint';
+  opId: string;
+  key?: string;
+  entry?: BlackboardEntry;
+  ts: string;
 }
 
 // ============================================================================
@@ -348,6 +358,9 @@ export class LockedBlackboard {
   private paused = false;
   private throttleMs = 0;
   private lastWriteTime = 0;
+  private walPath: string = '';
+  private walOpCounter = 0;
+  private sweepTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(basePath: string = '.', auditLoggerOrOptions?: SecureAuditLogger | LockedBlackboardOptions, options?: LockedBlackboardOptions) {
     // Resolve to an absolute path to prevent insecure relative/temp-dir path propagation
@@ -384,11 +397,13 @@ export class LockedBlackboard {
       this.blackboardPath = join(envBase, 'swarm-blackboard.md');
       this.lockPath = join(envBase, '.blackboard.lock');
       this.pendingDir = join(envBase, 'pending_changes');
+      this.walPath = join(envBase, '.wal.jsonl');
     } else {
       // Legacy paths — backward compatible with existing deployments
       this.blackboardPath = join(resolvedBase, 'swarm-blackboard.md');
       this.lockPath = join(resolvedBase, 'data', '.blackboard.lock');
       this.pendingDir = join(resolvedBase, 'data', 'pending_changes');
+      this.walPath = join(resolvedBase, 'data', '.wal.jsonl');
     }
 
     this.lock = new FileLock(this.lockPath);
@@ -411,6 +426,7 @@ export class LockedBlackboard {
 
     // Load existing data
     this.loadFromDisk();
+    this.replayWAL();
     this.loadPendingChanges();
   }
 
@@ -886,9 +902,15 @@ ${cacheContent}
 
       this.cache.set(change.key, entry);
       change.status = 'committed';
+
+      // WAL: record before disk write for crash recovery
+      const walOpId = `wal_${++this.walOpCounter}`;
+      this.appendToWAL({ op: 'write', opId: walOpId, key: change.key, entry });
       
       // Persist to disk (still under lock)
       this.persistToDiskInternal();
+      // WAL: checkpoint after successful disk write
+      this.checkpointWAL(walOpId);
       this.recordWrite();
       
       // Archive the change
@@ -1082,7 +1104,10 @@ ${cacheContent}
       };
 
       this.cache.set(key, entry);
+      const walWriteId = `wal_${++this.walOpCounter}`;
+      this.appendToWAL({ op: 'write', opId: walWriteId, key, entry });
       this.persistToDiskInternal();
+      this.checkpointWAL(walWriteId);
       this.recordWrite();
 
       this.audit('BLACKBOARD_WRITE', sourceAgent, 'write', 'success', {
@@ -1115,7 +1140,10 @@ ${cacheContent}
     try {
       if (this.cache.has(key)) {
         this.cache.delete(key);
+        const walDelId = `wal_${++this.walOpCounter}`;
+        this.appendToWAL({ op: 'delete', opId: walDelId, key });
         this.persistToDiskInternal();
+        this.checkpointWAL(walDelId);
         this.audit('BLACKBOARD_DELETE', 'system', 'delete', 'success', {
           key, lockHolder: holderId,
           lockDurationMs: Date.now() - lockStart,
@@ -1244,6 +1272,158 @@ ${cacheContent}
       this.auditLogger.log(eventType, agentId, action, outcome, details);
     } catch {
       // Audit logging must never block blackboard operations
+    }
+  }
+
+  // ==========================================================================
+  // TTL SWEEP
+  // ==========================================================================
+
+  /**
+   * Evict all expired entries from the in-memory cache and persist to disk.
+   * Called automatically by `startSweep()` at the configured interval.
+   *
+   * @returns Number of entries evicted.
+   */
+  purgeExpired(): number {
+    let evicted = 0;
+    for (const [key, entry] of Array.from(this.cache.entries())) {
+      if (this.isExpired(entry)) {
+        this.cache.delete(key);
+        evicted++;
+      }
+    }
+    if (evicted > 0) {
+      this.persistToDisk();
+    }
+    return evicted;
+  }
+
+  /**
+   * Start a background sweep timer that calls `purgeExpired()` periodically.
+   * Safe to call multiple times — stops any existing timer first.
+   *
+   * The timer is unref'd so it does not prevent process exit.
+   *
+   * @param intervalMs Sweep interval in milliseconds (default 60 000 = 1 min).
+   */
+  startSweep(intervalMs = 60_000): void {
+    this.stopSweep();
+    this.sweepTimer = setInterval(() => { this.purgeExpired(); }, Math.max(1, intervalMs));
+    // Don't prevent process exit
+    if (typeof this.sweepTimer.unref === 'function') this.sweepTimer.unref();
+  }
+
+  /**
+   * Stop the background sweep timer started by `startSweep()`.
+   * Safe to call even if no sweep is running.
+   */
+  stopSweep(): void {
+    if (this.sweepTimer !== null) {
+      clearInterval(this.sweepTimer);
+      this.sweepTimer = null;
+    }
+  }
+
+  // ==========================================================================
+  // WRITE-AHEAD LOG (WAL)
+  // ==========================================================================
+
+  /**
+   * Append a WAL record for crash recovery.
+   * Failures are logged but never propagate — WAL writes must not block ops.
+   * @internal
+   */
+  private appendToWAL(record: Omit<WALRecord, 'ts'>): void {
+    try {
+      const line = JSON.stringify({ ...record, ts: new Date().toISOString() } as WALRecord) + '\n';
+      appendFileSync(this.walPath, line, { encoding: 'utf-8', mode: 0o600 });
+    } catch (err) {
+      log.warn('WAL append failed', { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  /**
+   * Append a checkpoint record — signals that the matching op reached disk.
+   * @internal
+   */
+  private checkpointWAL(opId: string): void {
+    try {
+      const line = JSON.stringify({ op: 'checkpoint', opId, ts: new Date().toISOString() } as WALRecord) + '\n';
+      appendFileSync(this.walPath, line, { encoding: 'utf-8', mode: 0o600 });
+    } catch (err) {
+      log.warn('WAL checkpoint failed', { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  /**
+   * Replay uncommitted WAL entries after a crash.
+   *
+   * Called automatically during construction (after `loadFromDisk()`).
+   * Any WAL record without a matching `checkpoint` is replayed into the cache,
+   * then the full state is persisted and the WAL is compacted.
+   *
+   * Malformed tail lines are silently skipped — partial writes at crash time
+   * leave incomplete JSON that we must tolerate.
+   */
+  replayWAL(): void {
+    if (!existsSync(this.walPath)) return;
+
+    try {
+      const raw = readFileSync(this.walPath, 'utf-8');
+      const lines = raw.split('\n').filter(l => l.trim().length > 0);
+
+      const checkpointed = new Set<string>();
+      const pending = new Map<string, WALRecord>();
+
+      for (const line of lines) {
+        try {
+          const record: WALRecord = JSON.parse(line);
+          if (record.op === 'checkpoint') {
+            if (record.opId) checkpointed.add(record.opId);
+          } else if (record.op === 'write' || record.op === 'delete') {
+            pending.set(record.opId, record);
+          }
+        } catch {
+          // Skip malformed / truncated tail lines — expected on crash
+        }
+      }
+
+      let replayed = 0;
+      for (const [opId, record] of pending.entries()) {
+        if (checkpointed.has(opId)) continue;
+        if (record.op === 'write' && record.entry && record.key) {
+          this.cache.set(record.key, record.entry);
+          replayed++;
+        } else if (record.op === 'delete' && record.key) {
+          this.cache.delete(record.key);
+          replayed++;
+        }
+      }
+
+      if (replayed > 0) {
+        log.warn(`WAL replay: recovered ${replayed} uncommitted operation(s) after crash`, { replayed });
+        this.persistToDiskInternal();
+        this.compactWAL();
+      }
+    } catch (err) {
+      log.error('WAL replay failed', { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  /**
+   * Truncate the WAL file.
+   *
+   * Call after a full-state snapshot has been flushed to disk to prevent
+   * unbounded WAL growth during long-running processes.
+   */
+  compactWAL(): void {
+    try {
+      if (existsSync(this.walPath)) {
+        writeFileSync(this.walPath, '', { encoding: 'utf-8', mode: 0o600 });
+      }
+    } catch (err) {
+      log.warn('WAL compact failed', { error: err instanceof Error ? err.message : String(err) });
     }
   }
 }

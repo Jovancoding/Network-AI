@@ -238,7 +238,10 @@ export type AdapterEventType =
   | 'agent:execution:retry'
   | 'agent:execution:fallback'
   | 'agent:discovered'
-  | 'agent:unavailable';
+  | 'agent:unavailable'
+  | 'circuit:open'
+  | 'circuit:half-open'
+  | 'circuit:close';
 
 export interface AdapterEvent {
   type: AdapterEventType;

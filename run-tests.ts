@@ -35,6 +35,7 @@ const SUITES = [
   'test-phase8.ts',
   'test-phase9.ts',
   'test-phase10.ts',
+  'test-phase11.ts',
   'test-topology.ts',
   'test-rlm-phases.ts',
   'test-phase12.ts',

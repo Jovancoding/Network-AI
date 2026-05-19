@@ -5,6 +5,30 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.0] - 2026-05-19
+
+### Features
+- **`ITelemetryProvider` — BYOT OTel interface** (`lib/telemetry-provider.ts`) — Zero-dependency telemetry abstraction: `ITelemetryProvider` interface with `startSpan()`, `endSpan()`, `recordEvent()`; `NullTelemetryProvider` (no-op default, zero overhead); `CapturingTelemetryProvider` (in-memory for testing). `createOtelHooks(provider)` factory returns three `ExecutionHook[]` objects that wire `beforeExecute` / `afterExecute` / `onError` adapter lifecycle events as named spans into `AdapterHookManager`. Drop in any OTel SDK (OpenTelemetry, Datadog, Honeycomb) without changing a single adapter line — BYOT (bring your own telemetry). SpanId propagated via `ctx.metadata['_otelSpanId']`. 16 new tests.
+- Version bump to 5.7.0 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all 12 doc/config files.
+
+## [5.6.1] - 2026-05-19
+
+### Features
+- **Circuit Breaker on `AdapterRegistry`** (`lib/circuit-breaker.ts`) — New standalone `CircuitBreaker` class with `CLOSED → OPEN → HALF_OPEN` state machine; configurable `failureThreshold` (default 3), `recoveryTimeoutMs` (default 30 s), `successThreshold` (default 1), and `onStateChange` callback. `CircuitOpenError` thrown when circuit is `OPEN`. `AdapterRegistry` now accepts `circuitBreaker?: CircuitBreakerConfig` and `fallbackChain?: string[]` constructor options. Public API: `getCircuitState(adapterName)`, `resetCircuit(adapterName)`, `setCircuitBreakerConfig(config)`. Per-adapter breakers are created lazily on first use. When a circuit trips, the fallback chain is tried in order before returning a `CIRCUIT_OPEN` error code. Circuit events (`circuit:open`, `circuit:half-open`, `circuit:close`) added to `AdapterEventType`. Zero new runtime dependencies — BYOC principle maintained. 13 new tests.
+- Version bump to 5.6.1 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all 12 doc/config files.
+
+## [5.6.0] - 2026-05-19
+
+### Features
+- **WAL crash recovery on `LockedBlackboard`** (`lib/locked-blackboard.ts`) — Write-Ahead Log (`.wal.jsonl`) records every `write()`, `commit()`, and `delete()` operation **before** the file write, then appends a checkpoint **after**. On construction, `replayWAL()` is called after `loadFromDisk()` — it replays any op whose checkpoint is missing (= uncommitted at crash time), then compacts the WAL. `compactWAL()` public method for manual truncation after a full-state snapshot. WAL files are co-located with the blackboard directory (env-scoped: `<env>/.wal.jsonl`; legacy: `data/.wal.jsonl`). Malformed tail lines from partial crash writes are silently skipped. 7 new tests.
+- Version bump to 5.6.0 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all 12 doc/config files.
+
+## [5.5.9] - 2026-05-19
+
+### Features
+- **`LockedBlackboard` TTL background sweep** (`lib/locked-blackboard.ts`) — Added `purgeExpired(): number` that evicts all expired entries from the in-memory cache on demand and returns the eviction count. Added `startSweep(intervalMs?: number)` (default 60,000 ms) / `stopSweep()` to run `purgeExpired()` on a background `setInterval`; the timer is `unref()`'d so it never blocks process exit. Existing `read()` and `persistToDisk()` already filtered expired entries; the sweep closes the gap for keys that are written but never read again. 8 new tests.
+- Version bump to 5.5.9 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all 12 doc/config files.
+
 ## [5.5.8] - 2026-05-18
 
 ### Features

@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.5.8 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,093 tests, 66+ modules.
+Network-AI v5.5.9 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,136 tests, 70+ modules.
 
 ## The Multi-Agent Race Condition Problem
 
@@ -85,6 +85,9 @@ The coordination core. Uses file-system mutexes so any number of agents can writ
 - `validate(changeId, validatorId)` — confirms no race occurred since propose
 - `commit(changeId)` — atomic write
 - Conflict strategies: `first-commit-wins`, `priority-wins`, `last-write-wins`
+- `purgeExpired()` — evicts expired TTL entries on demand; returns eviction count
+- `startSweep(intervalMs?)` / `stopSweep()` — background timer (default 60 s, unref'd) that calls `purgeExpired()` automatically
+- **WAL crash recovery** — every write appends to `.wal.jsonl` before the file write and a checkpoint after; on startup `replayWAL()` recovers any uncommitted ops; `compactWAL()` truncates after a snapshot
 
 ### AuthGuardian
 
@@ -135,6 +138,27 @@ const registry = new AdapterRegistry();
 registry.register('my-langchain-agent', langchainAdapter);
 registry.register('my-autogen-agent',   autogenAdapter);
 ```
+
+Each adapter gets its own **Circuit Breaker** (CLOSED → OPEN → HALF_OPEN). If an adapter exceeds `failureThreshold` consecutive failures, the breaker opens and calls are rerouted through `fallbackChain` instead of hitting the failing adapter. The breaker transitions to HALF_OPEN after `recoveryTimeoutMs` and closes again after `successThreshold` successes.
+
+```typescript
+const registry = new AdapterRegistry({ circuitBreaker: { failureThreshold: 3, recoveryTimeoutMs: 30_000 }, fallbackChain: ['backup-agent'] });
+```
+
+### AdapterHookManager & OTel Telemetry
+
+`beforeExecute` / `afterExecute` / `onError` lifecycle hooks fire around every adapter call. Use `createOtelHooks(provider)` to wire an `ITelemetryProvider` into the hook manager for zero-code span collection:
+
+```typescript
+import { createOtelHooks, CapturingTelemetryProvider } from 'network-ai';
+
+const provider = new CapturingTelemetryProvider();
+hookManager.register(...createOtelHooks(provider));
+// Every adapter.executeAgent() call now emits a span
+console.log(provider.spans);
+```
+
+Bring your own OTel SDK — `ITelemetryProvider` is a pure interface with zero runtime dependencies.
 
 ---
 
