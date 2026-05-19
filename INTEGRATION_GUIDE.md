@@ -564,4 +564,4 @@ Run these before declaring the integration production-ready:
 
 ---
 
-*Network-AI v5.6.1 · MIT License · https://github.com/Jovancoding/Network-AI*
+*Network-AI v5.7.0 · MIT License · https://github.com/Jovancoding/Network-AI*
