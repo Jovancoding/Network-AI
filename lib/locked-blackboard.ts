@@ -1419,9 +1419,10 @@ ${cacheContent}
    */
   compactWAL(): void {
     try {
-      if (existsSync(this.walPath)) {
-        writeFileSync(this.walPath, '', { encoding: 'utf-8', mode: 0o600 });
-      }
+      // Use a file descriptor to avoid TOCTOU (js/file-system-race).
+      // openSync 'w' = O_WRONLY | O_CREAT | O_TRUNC — atomically truncates or creates.
+      const fd = openSync(this.walPath, 'w', 0o600);
+      closeSync(fd);
     } catch (err) {
       log.warn('WAL compact failed', { error: err instanceof Error ? err.message : String(err) });
     }

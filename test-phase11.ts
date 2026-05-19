@@ -5,7 +5,7 @@
  */
 
 import { LockedBlackboard } from './lib/locked-blackboard';
-import { CircuitBreaker, CircuitOpenError } from './lib/circuit-breaker';
+import { CircuitBreaker } from './lib/circuit-breaker';
 import type { CircuitBreakerConfig } from './lib/circuit-breaker';
 import {
   NullTelemetryProvider,
@@ -16,7 +16,7 @@ import { AdapterRegistry } from './adapters/adapter-registry';
 import { BaseAdapter } from './adapters/base-adapter';
 import { AdapterHookManager } from './lib/adapter-hooks';
 import type { AgentPayload, AgentContext, AgentResult, AdapterConfig } from './types/agent-adapter';
-import { mkdirSync, rmSync, existsSync, readFileSync } from 'fs';
+import { mkdirSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 
@@ -381,7 +381,7 @@ async function testTelemetry() {
   assert(cap3.spans[0].name === 'adapter.execute', 'span name is adapter.execute');
 
   c.result = { success: true, data: 'ok' };
-  c = await hookMgr.runAfter(c);
+  await hookMgr.runAfter(c);
   assert(cap3.spans[0].status === 'ok', 'afterExecute closes span with ok');
 
   // 6. onError sets status to 'error'

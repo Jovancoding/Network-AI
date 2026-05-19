@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.1] - 2026-05-19
+
+### Security / Bug Fixes
+- **`compactWAL()` race condition** (`lib/locked-blackboard.ts`) — Replaced `existsSync` + `writeFileSync` TOCTOU pattern with a single `openSync('w', 0o600)` + `closeSync` call using a file descriptor, eliminating the CWE-367 file system race condition (CodeQL `js/file-system-race` #160). `openSync 'w'` atomically truncates an existing WAL or creates a new empty one — no intermediate existence check.
+- **Unused imports removed from `test-phase11.ts`** — `CircuitOpenError` (CodeQL `js/unused-local-variable` #161) and `existsSync` (CodeQL `js/unused-local-variable` #162) imports removed; both were dead code introduced during Phase 11 development.
+- **Useless assignment removed from `test-phase11.ts`** — `c = await hookMgr.runAfter(c)` on line 384 reassigned `c` but the value was never read; changed to a plain `await hookMgr.runAfter(c)` (CodeQL `js/useless-assignment-to-local` #163).
+- Version bump to 5.7.1 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all 14 doc/config files.
+
 ## [5.7.0] - 2026-05-19
 
 ### Features
