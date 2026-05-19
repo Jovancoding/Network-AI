@@ -2,7 +2,7 @@
 
 ## Overview
 
-The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.5.7, 29 adapters are included.
+The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.5.8, 29 adapters are included.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

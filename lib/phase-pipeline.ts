@@ -103,10 +103,15 @@ export interface CompactionOptions {
   summarize: (completedPhases: PhaseResult[]) => Promise<string>;
   /**
    * Optional callback fired after every successful compaction.
+   * Receives the summary text, the running compaction count (1-based), and a
+   * **read-only snapshot of all phase results before they were replaced**.  Use
+   * this to archive full phase history before the stub overwrites it.
+   *
    * @param summary         The summary produced by `summarize`.
    * @param compactionCount Running count of compactions (1-based).
+   * @param archivedPhases  Full phase results that were compacted away.
    */
-  onCompact?: (summary: string, compactionCount: number) => void;
+  onCompact?: (summary: string, compactionCount: number, archivedPhases: ReadonlyArray<PhaseResult>) => void;
 }
 
 /**
@@ -117,6 +122,13 @@ export interface PhasePipelineOptions {
   phases: PhaseDefinition[];
   /** Called when a phase requires approval */
   onApproval?: ApprovalCallback;
+  /**
+   * Maximum milliseconds to wait for an `onApproval` callback to resolve.
+   * If the callback does not settle within this window the phase is **denied**
+   * (fail-closed) and the pipeline stops with `stopReason: 'Approval timeout'`.
+   * Defaults to **300 000 ms (5 minutes)**.
+   */
+  approvalTimeoutMs?: number;
   /** Called when each phase starts */
   onPhaseStart?: (phaseName: string, index: number) => void;
   /** Called when each phase completes */
@@ -296,7 +308,15 @@ export class PhasePipeline {
         if (this.options.autoApprove) {
           approval = { approved: true, approvedBy: 'auto' };
         } else if (this.options.onApproval) {
-          approval = await this.options.onApproval(phaseDef.name, phaseResult, pipelineCtx);
+          const timeoutMs = this.options.approvalTimeoutMs ?? 300_000;
+          const timeoutError = new Error(`Approval timeout: phase "${phaseDef.name}" did not receive a decision within ${timeoutMs}ms`);
+          approval = await Promise.race([
+            this.options.onApproval(phaseDef.name, phaseResult, pipelineCtx),
+            new Promise<never>((_, reject) => setTimeout(() => reject(timeoutError), timeoutMs)),
+          ]).catch((err: unknown) => ({
+            approved: false as const,
+            reason: err instanceof Error ? err.message : 'Approval callback failed',
+          }));
         } else {
           // No approval handler and not auto-approved → reject by default
           approval = { approved: false, reason: 'No approval callback configured' };
@@ -387,6 +407,9 @@ export class PhasePipeline {
     this._compactionCount++;
     this._lastCompactionSummary = summary;
 
+    // Capture full history before it is replaced so callers can archive it
+    const archivedPhases: ReadonlyArray<PhaseResult> = [...this.phaseResults];
+
     // Replace the full history with a single compact stub phase
     const stub: PhaseResult = {
       phaseName: `__compacted_${this._compactionCount}`,
@@ -398,7 +421,7 @@ export class PhasePipeline {
     };
     this.phaseResults = [stub];
 
-    opts.onCompact?.(summary, this._compactionCount);
+    opts.onCompact?.(summary, this._compactionCount, archivedPhases);
   }
 
   private buildPayload(agentId: string, phase: PhaseDefinition, defaultPayload?: AgentPayload): AgentPayload {

@@ -5,7 +5,7 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.5.7-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.5.8-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![Tests](https://img.shields.io/badge/tests-3093%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-29%20supported-blueviolet.svg)](#adapter-system)
@@ -99,7 +99,7 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | ✅ Flow control | Pause / resume / throttle writes on the blackboard |
 | ✅ Skill composition | `chain()` / `batch()` / `loop()` / `verify()` meta-operations over agent calls |
 | ✅ Semantic memory search | BYOE vector store with cosine similarity over blackboard data |
-| ✅ Phase pipeline | Multi-phase workflows with human-in-the-loop approval gates |
+| ✅ Phase pipeline | Multi-phase workflows with human-in-the-loop approval gates; `approvalTimeoutMs` fail-closed timeout prevents indefinite hangs |
 | ✅ Confidence filtering | Multi-agent result scoring, threshold validation, and consensus aggregation |
 | ✅ Matcher-based hooks | Glob patterns on agent/action/tool for targeted hook filtering |
 | ✅ Fan-out / fan-in | Parallel agent spawning with pluggable aggregation strategies |

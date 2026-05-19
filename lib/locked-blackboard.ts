@@ -50,6 +50,7 @@ export interface LockedBlackboardOptions {
   /** How to resolve conflicts when multiple agents write to the same key.
    *  - `'first-commit-wins'` (default): The first validated+committed change wins; later ones are aborted.
    *  - `'priority-wins'`: Higher-priority changes preempt lower-priority pending/committed writes on the same key.
+   *    Equal-priority conflicts resolve in favor of the most recent proposal by arrival order (last-writer-wins).
    */
   conflictResolution?: ConflictResolutionStrategy;
   /** Minimum milliseconds between consecutive write/commit operations (0 = no throttle) */
@@ -58,6 +59,13 @@ export interface LockedBlackboardOptions {
    * Environment name (e.g. `'dev'`, `'prod'`).  When set, all data is scoped
    * to `<basePath>/<env>/` keeping environments completely isolated.
    * Falls back to the `NETWORK_AI_ENV` environment variable when not provided.
+   * The value is captured once at construction time — runtime changes to
+   * `NETWORK_AI_ENV` after the instance is created have no effect.
+   *
+   * **Read isolation:** The mutex protects the `commit` step only.
+   * Between `propose()` and `validate()`, other agents can read stale data.
+   * For read-then-write safety, use `propose()` optimistically and handle
+   * `CONFLICT` rejections from `validateChange()` by re-reading and re-proposing.
    */
   env?: string;
 }

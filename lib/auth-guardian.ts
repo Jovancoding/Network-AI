@@ -34,6 +34,13 @@ import type {
  * Resource types, risk profiles, trust levels, and restrictions are all
  * configurable — works for coding, finance, DevOps, or any domain.
  *
+ * **Advisory tokens notice:** Grant tokens produced by `requestPermission()`
+ * are **advisory scoring outputs only**. The caller-supplied `agentId` is not
+ * cryptographically verified — any caller can claim any identity. Do **not**
+ * treat these tokens as authenticated credentials for PAYMENTS, DATABASE, or
+ * FILE_EXPORT operations without adding a separate identity-verification step
+ * (e.g. a platform auth layer or human approval gate).
+ *
  * @example
  * ```typescript
  * const guardian = new AuthGuardian({

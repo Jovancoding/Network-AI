@@ -5,6 +5,26 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.8] - 2026-05-18
+
+### Features
+- **`approvalTimeoutMs` option in `PhasePipeline`** — Approval gates now support a configurable timeout (default 300,000 ms / 5 min) via `PhasePipelineOptions.approvalTimeoutMs`. If the `onApproval` callback does not settle within the deadline, the gate fails closed (`{ approved: false }`), preventing indefinite hangs in automated pipelines.
+- **`enforcePromotionChain` option in `EnvironmentManager`** — New opt-in constructor flag (`enforcePromotionChain: true`) that enforces the full `dev → st → sit → qa → preprod → prod` promotion chain. When enabled, `promote()` checks for a `.promotion-record.json` in the source environment directory and throws if it is missing, preventing skipped-stage deployments. A record is written to the destination after every successful promotion regardless of flag state, so existing deployments accumulate records incrementally.
+- **`onCompact` callback receives archived phases** — `CompactionOptions.onCompact` now receives a third `archivedPhases: ReadonlyArray<PhaseResult>` argument containing the phases that were compacted. Existing two-argument callbacks continue to work without changes.
+
+### Improvements
+- **CLI `--json` error output** (`bin/cli.ts`) — When `--json` is present, fatal errors are now emitted as `{"error":"..."}` JSON to `stdout` instead of plain text to `stderr`, enabling consistent machine-readable pipeline consumption.
+- **Adapter discovery warning** (`adapters/adapter-registry.ts`) — `discoverAgents()` now logs a `console.warn` for each adapter that fails during discovery rather than silently dropping it, making misconfigured adapters visible in logs.
+- **`FederatedBudget` persist failure warning** (`lib/federated-budget.ts`) — Blackboard persistence errors in `_persist()` now emit a `console.warn` instead of being silently swallowed, surfacing disk / mutex issues early.
+
+### Documentation
+- **`AuthGuardian` advisory token notice** — Class-level JSDoc clarifies that grant tokens from `requestPermission()` are advisory scoring outputs only; the `agentId` is not cryptographically verified, and callers must add a separate identity-verification step before using tokens to gate PAYMENTS, DATABASE, or FILE_EXPORT operations.
+- **`FileAccessor` error contract** — JSDoc documents that `read`, `write`, and `list` never throw; all access-denied paths (traversal, out-of-scope, policy-blocked, `SourceProtectionError`) are caught at the method boundary and returned as `{ success: false, error: <message> }`.
+- **`LockedBlackboard` read-isolation and tie-break semantics** — Options JSDoc documents (a) dirty-read window between `propose()` and `validate()` with recommended optimistic-retry pattern, (b) equal-priority last-writer-wins tie-break, and (c) `env` value frozen at construction time.
+- **`SandboxPolicyConfig.env` freeze notice** — JSDoc states that `NETWORK_AI_ENV` is captured at construction; runtime changes have no effect.
+- **`StreamingBaseAdapter` auth once-at-start notice** — `executeAgentStream()` JSDoc documents that the permission check fires once at stream start, not per-chunk, and advises keeping stream lifetimes short.
+- Version bump to 5.5.8 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all 12 doc/config files.
+
 ## [5.5.7] - 2026-05-18
 
 ### Chore

@@ -120,6 +120,8 @@ export interface SandboxPolicyConfig {
   /**
    * Active environment name. When set, file access is further restricted
    * to `data/<env>/` when sourceProtection is enabled.
+   * Set this at construction time. Runtime changes to `NETWORK_AI_ENV` after
+   * `SandboxPolicy` is created have no effect.
    */
   env?: string;
 }
@@ -492,6 +494,13 @@ export class ShellExecutor {
 /**
  * Policy-scoped file system accessor. All paths are validated against
  * the sandbox policy before any I/O.
+ *
+ * **Error contract:** All public methods (`read`, `write`, `list`) return a
+ * `{success: boolean, ...}` result object — they never throw. All access-denied
+ * paths (path traversal, out-of-scope under `sourceProtection`, policy-blocked
+ * reads/writes, and `SourceProtectionError`) are caught at the method boundary
+ * and converted to `{success: false, error: <message>}`. The `error` field
+ * contains a short description without leaking internal path details.
  *
  * @example
  * ```typescript

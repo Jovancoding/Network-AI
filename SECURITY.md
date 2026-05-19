@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------||
-| 5.5.x   | ✅ Yes — full support (current, latest: 5.5.7) |
+| 5.5.x   | ✅ Yes — full support (current, latest: 5.5.8) |
 | 5.4.x   | ✅ Security fixes only |
 | 5.3.x   | ✅ Security fixes only |
 | 5.2.x   | ✅ Security fixes only |
@@ -55,6 +55,7 @@ Network-AI includes built-in security features:
 - **Flow Control** (v4.12.0) -- `pause()` / `resume()` / `setThrottle()` on the blackboard; prevents write floods and enables coordinated maintenance windows
 - **Matcher-Based Hook Filtering** (v4.13.0) -- `HookMatcher` with `agentPattern`, `actionPattern`, `toolPattern` globs, and custom `condition` functions; hooks only fire when all conditions pass, enabling fine-grained security policies per tool or agent pattern
 - **Phase Pipeline with Approval Gates** (v4.13.0) -- `PhasePipeline` orchestrates multi-phase workflows; `requiresApproval` boolean halts execution until explicit human approval is granted, enforcing human-in-the-loop for sensitive operations
+- **Fail-Closed Approval Timeout** (v5.5.8) -- `PhasePipelineOptions.approvalTimeoutMs` (default 300,000 ms / 5 min) ensures approval gates never block indefinitely; if the `onApproval` callback does not settle within the deadline, the gate automatically denies — `{ approved: false }` — preventing hung pipelines in automated deployments
 - **Confidence-Based Filtering** (v4.13.0) -- `ConfidenceFilter` rejects low-confidence agent findings below configurable thresholds and validates rejected results with secondary agents; aggregation strategies (unanimous, majority) enforce consensus before accepting multi-agent results
 - **Agent Runtime Sandbox** (v4.14.0) -- `SandboxPolicy` enforces command allowlists/blocklists, path scoping with traversal protection, and risk assessment; `ShellExecutor` sandboxes child processes with timeout/output limits; `FileAccessor` restricts file I/O to scoped base paths
 - **Approval Gates** (v4.14.0) -- `ApprovalGate` requires explicit human or callback approval for high-risk operations (writes, shell commands, budget spend); auto-approve mode for trusted environments; full approval history with audit trail
@@ -71,6 +72,7 @@ Network-AI includes built-in security features:
 - **Advisory Token Enforcement** (v5.3.1) -- `check_permission.py` marks all grant tokens `advisory: true`; unknown agent identities receive a reduced trust score of 0.3 and an explicit warning flag; `PAYMENTS` / `DATABASE` resources require `--confirm-high-risk` acknowledgment before a token is issued
 - **Context Injection Validation** (v5.3.1) -- `context_manager.py` runs `_validate_context()` before every `inject` / `show` command: schema checks (type enforcement on all fields) plus injection-pattern detection on free-text fields (`goals`, `decisions`, `banned_approaches`) using the same 16-pattern set from justification hardening; warnings printed to stderr before execution proceeds
 - **Environment Isolation** (v5.4.0) -- `EnvironmentManager` enforces a promotion chain (dev→st→sit→qa→preprod→prod) with gate types: `auto`, `confirm`, and `approval`; config files promote, live state (`audit_log.jsonl`, `active_grants.json`) never does; auto-backup before each promotion
+- **Strict Promotion Chain Enforcement** (v5.5.8) -- `EnvironmentManager` constructor accepts `enforcePromotionChain: true` to require a `.promotion-record.json` in the source environment directory before any promotion proceeds; prevents skipped-stage deployments (e.g., direct dev→prod bypassing sit/qa/preprod); a promotion record is written after every successful promotion regardless of flag state so records accumulate incrementally
 - **Source Protection** (v5.4.0) -- `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any out-of-scope access throws `SourceProtectionError` and returns `{success: false}` to the agent without leaking path details
 
 ## Security Scan Results

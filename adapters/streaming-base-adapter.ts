@@ -32,6 +32,12 @@ export abstract class StreamingBaseAdapter extends BaseAdapter implements IStrea
    * The overriding implementation should:
    *  1. yield partial text chunks as they arrive
    *  2. yield a final chunk with `done: true` and `text: ''`
+   *
+   * **Permission-check semantics:** Permission is checked once at the start of
+   * the stream (when `executeAgent` / the overriding implementation begins),
+   * not per-chunk. A stream is treated as a single logical operation. Keep
+   * stream lifetimes short and request the narrowest permission scope possible
+   * to minimise the window between the initial check and stream completion.
    */
   async *executeAgentStream(
     agentId: string,

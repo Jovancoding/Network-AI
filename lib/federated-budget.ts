@@ -427,8 +427,9 @@ export class FederatedBudget {
     };
     try {
       this._blackboard.write(this._budgetKey, JSON.stringify(snapshot), this._bbAgent);
-    } catch {
-      // Swallow persistence errors — the in-memory state remains authoritative.
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[FederatedBudget] Blackboard persist failed — in-memory state is ahead of disk: ${msg}`);
     }
   }
 }

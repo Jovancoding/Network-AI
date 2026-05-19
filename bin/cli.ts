@@ -42,7 +42,11 @@ function print(obj: unknown, asJson: boolean): void {
 }
 
 function die(msg: string): never {
-  console.error(`error: ${msg}`);
+  if (process.argv.includes('--json')) {
+    process.stdout.write(JSON.stringify({ error: msg }) + '\n');
+  } else {
+    process.stderr.write(`error: ${msg}\n`);
+  }
   process.exit(1);
 }
 

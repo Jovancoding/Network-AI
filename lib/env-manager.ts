@@ -171,13 +171,15 @@ const PROMOTE_EXCLUDE = [
 export class EnvironmentManager {
   private readonly baseDir: string;
   private readonly config: EnvConfig;
+  private readonly _enforcePromotionChain: boolean;
 
   /**
    * @param baseDir - Root data directory (e.g. `path.join(process.cwd(), 'data')`).
-   * @param config - Optional overrides for chain, gates, and backup retention.
+   * @param config - Optional overrides for chain, gates, backup retention, and strict mode.
    */
-  constructor(baseDir: string, config?: Partial<EnvConfig>) {
+  constructor(baseDir: string, config?: Partial<EnvConfig> & { enforcePromotionChain?: boolean }) {
     this.baseDir = resolve(baseDir);
+    this._enforcePromotionChain = config?.enforcePromotionChain ?? false;
     this.config = {
       chain: config?.chain ?? DEFAULT_CHAIN,
       gates: { ...DEFAULT_GATES, ...(config?.gates ?? {}) },
@@ -248,6 +250,11 @@ export class EnvironmentManager {
    * Live state (audit log, active grants, pending changes, blackboard entries)
    * is never promoted.
    *
+   * When `enforcePromotionChain: true` was passed at construction, each environment
+   * (except the first in the chain) must have a `.promotion-record.json` proving it
+   * was previously promoted to via this manager before it can be promoted from.
+   * This creates a verifiable chain-of-custody for config artefacts.
+   *
    * @throws {Error} If gate requirements are not met, or sandbox is the source.
    */
   promote(from: EnvName, to: EnvName, options: PromoteOptions = {}): PromotionResult {
@@ -262,6 +269,17 @@ export class EnvironmentManager {
     if (toIdx === -1) throw new Error(`Environment '${to}' is not in the promotion chain`);
     if (toIdx !== fromIdx + 1) {
       throw new Error(`Can only promote one step at a time (${from} → ${chain[fromIdx + 1]}, not ${to})`);
+    }
+
+    // Strict chain enforcement: environments beyond the first must have a promotion record
+    if (this._enforcePromotionChain && fromIdx > 0) {
+      const recordPath = join(this.getDataDir(from), '.promotion-record.json');
+      if (!existsSync(recordPath)) {
+        throw new Error(
+          `enforcePromotionChain: environment '${from}' has no promotion record. ` +
+          `Promote from '${chain[fromIdx - 1]}' to '${from}' first, or disable enforcePromotionChain.`,
+        );
+      }
     }
 
     // Gate enforcement
@@ -306,6 +324,10 @@ export class EnvironmentManager {
     };
     if (options.approvedBy) result.approvedBy = options.approvedBy;
     if (options.confirmedBy) result.confirmedBy = options.confirmedBy;
+
+    // Write promotion record so enforcePromotionChain can verify this hop later
+    const record = { from, to, timestamp: result.timestamp, approvedBy: options.approvedBy, confirmedBy: options.confirmedBy };
+    writeFileSync(join(toDir, '.promotion-record.json'), JSON.stringify(record, null, 2));
 
     return result;
   }

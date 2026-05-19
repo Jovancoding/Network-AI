@@ -516,8 +516,9 @@ export class AdapterRegistry {
           this.agentCache.set(agent.id, adapter.name);
           this.emit('agent:discovered', adapter.name, { agent });
         }
-      } catch {
-        // Skip adapters that fail discovery
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[AdapterRegistry] Adapter "${adapter.name}" dropped during agent discovery: ${msg}`);
       }
     }
 
