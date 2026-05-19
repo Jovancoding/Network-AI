@@ -88,7 +88,8 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 
 | Version | Policy |
 |---|---|
-| 5.5.x (current) | Full support — bugs + security fixes |
+| 5.6.x (current) | Full support — bugs + security fixes |
+| 5.5.x | Security fixes only |
 | 5.4.x | Security fixes only |
 | 5.1.x | Security fixes only |
 | 5.0.x | Security fixes only |
