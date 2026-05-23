@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------||
-| 5.7.x   | ✅ Yes — full support (current, latest: 5.7.2) |
+| 5.8.x   | ✅ Yes — full support (current, latest: 5.8.0) |
+| 5.7.x   | ✅ Security fixes only |
 | 5.6.x   | ✅ Security fixes only |
 | 5.5.x   | ✅ Security fixes only |
 | 5.4.x   | ✅ Security fixes only |
@@ -35,6 +36,20 @@ Instead, please report security issues privately:
 3. Provide a clear description, reproduction steps, and impact assessment
 
 You will receive an acknowledgment within 48 hours and a detailed response within 7 days.
+
+## Disclosure SLA
+
+| Milestone | Target |
+|-----------|--------|
+| Acknowledgment | 48 hours |
+| Triage + severity assessment | 5 business days |
+| Patch available (Critical / High) | 14 days from triage |
+| Patch available (Medium) | 30 days from triage |
+| Patch available (Low) | 90 days from triage |
+| Public disclosure (after patch ships) | 7 days (coordinated) |
+
+If a patch cannot be delivered within the target window, we will notify the reporter
+with a revised timeline and provide any available workaround.
 
 ## Security Measures in Network-AI
 

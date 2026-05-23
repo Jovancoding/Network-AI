@@ -65,7 +65,8 @@ program
   .enablePositionalOptions()
   .addOption(new Option('--data <path>', 'path to data directory').default('./data'))
   .addOption(new Option('--env <name>', 'target environment (dev|st|sit|qa|sandbox|preprod|prod)'))
-  .addOption(new Option('--json', 'output raw JSON (useful for piping)'));
+  .addOption(new Option('--json', 'output raw JSON (useful for piping)'))
+  .addOption(new Option('--minimal', 'disable WAL, TTL sweep, and telemetry hooks (CI/test mode); also set via NETWORK_AI_MINIMAL=1'));
 
 // ── bb (blackboard) ───────────────────────────────────────────────────────────
 
@@ -165,11 +166,27 @@ auth.command('token <agentId>')
   .option('--resource <type>', 'resource type to grant', 'blackboard')
   .option('--justification <text>', 'justification text', 'CLI-issued token')
   .option('--scope <scope>', 'permission scope')
-  .action(async (agentId: string, opts: { resource: string; justification: string; scope?: string }, cmd: Command) => {
+  .option('--why', 'show scoring breakdown (justification/trust/risk) before issuing')
+  .action(async (agentId: string, opts: { resource: string; justification: string; scope?: string; why?: boolean }, cmd: Command) => {
     const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
     const auditPath = path.join(resolveData(g), 'audit_log.jsonl');
     const guardian = new AuthGuardian({ auditLogPath: auditPath });
     guardian.registerAgentTrust({ agentId, trustLevel: 1, allowedResources: [opts.resource] });
+
+    if (opts.why) {
+      const scoring = guardian.scoreRequest(agentId, opts.resource, opts.justification, opts.scope);
+      if (g.json) {
+        print(scoring, true);
+      } else {
+        console.log(`justification score (40%): ${(scoring.justificationScore * 100).toFixed(1)}%`);
+        console.log(`trust score        (30%): ${(scoring.trustScore * 100).toFixed(1)}%`);
+        console.log(`risk score         (30%): ${(scoring.riskScore * 100).toFixed(1)}% risk → ${((1 - scoring.riskScore) * 100).toFixed(1)}% contribution`);
+        console.log(`weighted score:           ${(scoring.weightedScore * 100).toFixed(1)}%`);
+        console.log(`verdict:                  ${scoring.approved ? 'APPROVED' : 'DENIED'}${scoring.reason ? ` — ${scoring.reason}` : ''}`);
+        console.log('');
+      }
+    }
+
     const grant = await guardian.requestPermission(agentId, opts.resource, opts.justification, opts.scope);
     if (g.json) {
       print(grant, true);
@@ -455,12 +472,270 @@ envBackup.command('prune')
     print(g.json ? { deleted } : `✓ pruned ${deleted} backup(s), keeping ${opts.keep}`, g.json);
   });
 
+// ── doctor ────────────────────────────────────────────────────────────────────
+
+program.command('doctor')
+  .description('Validate the Network-AI environment and configuration')
+  .action((_opts: Record<string, unknown>, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; env?: string; json: boolean }>();
+    const dataDir = resolveData(g);
+
+    const results: Array<{ check: string; status: 'pass' | 'warn' | 'fail'; detail: string }> = [];
+    let exitCode = 0;
+
+    function check(name: string, fn: () => { status: 'pass' | 'warn' | 'fail'; detail: string }): void {
+      try {
+        results.push({ check: name, ...fn() });
+      } catch (err) {
+        results.push({ check: name, status: 'fail', detail: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    // 1 — Data directory exists and is writable
+    check('data-dir', () => {
+      if (!fs.existsSync(dataDir)) {
+        return { status: 'warn', detail: `data dir does not exist: ${dataDir} (will be created on first write)` };
+      }
+      try {
+        fs.accessSync(dataDir, fs.constants.W_OK);
+        return { status: 'pass', detail: dataDir };
+      } catch {
+        return { status: 'fail', detail: `data dir is not writable: ${dataDir}` };
+      }
+    });
+
+    // 2 — NETWORK_AI_ENV routing
+    check('env-routing', () => {
+      const envVar = process.env['NETWORK_AI_ENV'];
+      if (g.env) {
+        return { status: 'pass', detail: `--env ${g.env} (CLI flag)` };
+      }
+      if (envVar) {
+        return { status: 'pass', detail: `NETWORK_AI_ENV=${envVar}` };
+      }
+      return { status: 'warn', detail: 'no --env or NETWORK_AI_ENV set; using root data dir' };
+    });
+
+    // 3 — Audit log integrity (valid JSONL)
+    check('audit-log', () => {
+      const logFile = getAuditLogPath(dataDir);
+      if (!fs.existsSync(logFile)) {
+        return { status: 'warn', detail: 'audit log does not exist yet' };
+      }
+      const lines = fs.readFileSync(logFile, 'utf8').split('\n').filter(l => l.trim());
+      let badLines = 0;
+      for (const line of lines) {
+        try { JSON.parse(line); } catch { badLines++; }
+      }
+      if (badLines > 0) {
+        return { status: 'fail', detail: `${badLines} of ${lines.length} lines are not valid JSON` };
+      }
+      return { status: 'pass', detail: `${lines.length} entries, all valid JSONL` };
+    });
+
+    // 4 — Pending changes (stale WAL entries)
+    check('pending-changes', () => {
+      const pendingDir = path.join(dataDir, 'pending_changes');
+      if (!fs.existsSync(pendingDir)) {
+        return { status: 'pass', detail: 'no pending_changes dir' };
+      }
+      const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.json'));
+      if (files.length === 0) {
+        return { status: 'pass', detail: 'no pending changes' };
+      }
+      // Flag as warn if any are older than 5 minutes
+      const stale = files.filter(f => {
+        try {
+          const st = fs.statSync(path.join(pendingDir, f));
+          return (Date.now() - st.mtimeMs) > 5 * 60 * 1000;
+        } catch { return false; }
+      });
+      if (stale.length > 0) {
+        return { status: 'warn', detail: `${stale.length} stale pending change(s) (>5 min old)` };
+      }
+      return { status: 'pass', detail: `${files.length} in-flight pending change(s)` };
+    });
+
+    // 5 — System paused?
+    check('kill-switch', () => {
+      const sentinel = path.join(dataDir, 'SYSTEM_PAUSED');
+      if (fs.existsSync(sentinel)) {
+        return { status: 'warn', detail: 'system is PAUSED (run "network-ai resume" to unpause)' };
+      }
+      return { status: 'pass', detail: 'system is running' };
+    });
+
+    // 6 — MCP secret configured (env var)
+    check('mcp-secret', () => {
+      const secret = process.env['NETWORK_AI_MCP_SECRET'];
+      if (!secret) {
+        return { status: 'warn', detail: 'NETWORK_AI_MCP_SECRET not set; McpSseServer will refuse to start without a secret' };
+      }
+      return { status: 'pass', detail: 'NETWORK_AI_MCP_SECRET is set' };
+    });
+
+    // 7 — Blackboard file is valid JSON (if it exists)
+    check('blackboard-schema', () => {
+      const bbFile = path.join(dataDir, 'blackboard.json');
+      if (!fs.existsSync(bbFile)) {
+        return { status: 'pass', detail: 'blackboard file does not exist yet' };
+      }
+      try {
+        const raw = fs.readFileSync(bbFile, 'utf8');
+        const parsed = JSON.parse(raw) as unknown;
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          return { status: 'fail', detail: 'blackboard.json is not a JSON object' };
+        }
+        return { status: 'pass', detail: `blackboard.json OK (${Object.keys(parsed as Record<string, unknown>).length} keys)` };
+      } catch (e) {
+        return { status: 'fail', detail: `blackboard.json parse error: ${e instanceof Error ? e.message : String(e)}` };
+      }
+    });
+
+    // Determine exit code
+    for (const r of results) {
+      if (r.status === 'fail') exitCode = 1;
+    }
+
+    if (g.json) {
+      print({ checks: results, ok: exitCode === 0 }, true);
+    } else {
+      for (const r of results) {
+        const icon = r.status === 'pass' ? '✓' : r.status === 'warn' ? '⚠' : '✗';
+        console.log(`${icon} [${r.status.toUpperCase().padEnd(4)}] ${r.check}: ${r.detail}`);
+      }
+      if (exitCode === 0) {
+        console.log('\nAll checks passed.');
+      } else {
+        console.log('\nOne or more checks failed.');
+      }
+    }
+
+    process.exit(exitCode);
+  });
+
+// ── inspect ───────────────────────────────────────────────────────────────────
+
+program.command('inspect <key>')
+  .description('Inspect a blackboard key: value, metadata, audit trail')
+  .option('--history', 'show WAL/pending version history')
+  .option('--audit', 'show audit log entries for this key')
+  .action((key: string, opts: { history?: boolean; audit?: boolean }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; env?: string; json: boolean }>();
+    const dataDir = resolveData(g);
+
+    const bb = new LockedBlackboard(dataDir);
+    const entry = bb.read(key);
+
+    const result: Record<string, unknown> = {
+      key,
+      exists: entry !== null,
+      value: entry?.value ?? null,
+      metadata: entry ? {
+        source_agent: entry.source_agent,
+        timestamp: entry.timestamp,
+        ttl: entry.ttl,
+        version: entry.version,
+      } : null,
+    };
+
+    if (opts.history) {
+      const pendingDir = path.join(dataDir, 'pending_changes');
+      const history: unknown[] = [];
+      if (fs.existsSync(pendingDir)) {
+        const files = fs.readdirSync(pendingDir)
+          .filter(f => f.endsWith('.json'))
+          .sort();
+        for (const f of files) {
+          try {
+            const raw = JSON.parse(fs.readFileSync(path.join(pendingDir, f), 'utf8')) as Record<string, unknown>;
+            if (raw['key'] === key) history.push(raw);
+          } catch { /* skip malformed */ }
+        }
+      }
+      result['pendingHistory'] = history;
+    }
+
+    if (opts.audit) {
+      const logFile = getAuditLogPath(dataDir);
+      const auditEntries: unknown[] = [];
+      if (fs.existsSync(logFile)) {
+        const lines = fs.readFileSync(logFile, 'utf8').split('\n').filter(l => l.trim());
+        for (const line of lines) {
+          try {
+            const entry2 = JSON.parse(line) as Record<string, unknown>;
+            if (entry2['key'] === key) auditEntries.push(entry2);
+          } catch { /* skip */ }
+        }
+      }
+      result['auditTrail'] = auditEntries;
+    }
+
+    if (g.json) {
+      print(result, true);
+    } else {
+      console.log(`key:    ${key}`);
+      console.log(`exists: ${result['exists']}`);
+      if (result['exists']) {
+        console.log(`value:  ${JSON.stringify(result['value'], null, 2)}`);
+        if (result['metadata']) {
+          console.log(`meta:   ${JSON.stringify(result['metadata'], null, 2)}`);
+        }
+      }
+      if (opts.history && Array.isArray(result['pendingHistory'])) {
+        const h = result['pendingHistory'] as unknown[];
+        console.log(`\npending history (${h.length} entries):`);
+        h.forEach((e, i) => console.log(`  [${i + 1}] ${JSON.stringify(e)}`));
+      }
+      if (opts.audit && Array.isArray(result['auditTrail'])) {
+        const a = result['auditTrail'] as unknown[];
+        console.log(`\naudit trail (${a.length} entries):`);
+        a.forEach((e, i) => console.log(`  [${i + 1}] ${JSON.stringify(e)}`));
+      }
+    }
+  });
+
+// ── pause / resume (kill switch) ──────────────────────────────────────────────
+
+program.command('pause')
+  .description('Pause all orchestrator activity (writes SYSTEM_PAUSED sentinel)')
+  .action((_opts: Record<string, unknown>, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const dataDir = resolveData(g);
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    const sentinel = path.join(dataDir, 'SYSTEM_PAUSED');
+    const ts = new Date().toISOString();
+    fs.writeFileSync(sentinel, `paused at ${ts}\n`, 'utf8');
+    print(g.json ? { paused: true, at: ts, sentinel } : `✓ system paused at ${ts}`, g.json);
+  });
+
+program.command('resume')
+  .description('Resume orchestrator activity (removes SYSTEM_PAUSED sentinel)')
+  .action((_opts: Record<string, unknown>, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const dataDir = resolveData(g);
+    const sentinel = path.join(dataDir, 'SYSTEM_PAUSED');
+    if (!fs.existsSync(sentinel)) {
+      print(g.json ? { paused: false, detail: 'system was not paused' } : '✓ system is not paused', g.json);
+      return;
+    }
+    fs.unlinkSync(sentinel);
+    print(g.json ? { paused: false, resumed: true } : '✓ system resumed', g.json);
+  });
+
 // ── parse ─────────────────────────────────────────────────────────────────────
 
 // Auto-detect MCP stdio mode: when stdin is piped (not a TTY) and no
 // subcommand was given, start the MCP server in stdio transport mode.
 // This is the convention used by Glama, Claude Desktop, Cursor, etc.
 const userArgs = process.argv.slice(2);
+
+// Propagate --minimal flag to env var before any commands run so that
+// LockedBlackboard and other components can check it in their constructors.
+if (userArgs.includes('--minimal') || process.env['NETWORK_AI_MINIMAL'] === '1') {
+  process.env['NETWORK_AI_MINIMAL'] = '1';
+}
+
 if (!process.stdin.isTTY && userArgs.length === 0) {
   // Set --stdio before importing so the server module picks it up
   process.argv.push('--stdio');

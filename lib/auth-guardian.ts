@@ -358,6 +358,52 @@ export class AuthGuardian {
     this.log('permission_revoked', { token });
   }
 
+  /**
+   * Return the scoring breakdown for a hypothetical permission request without
+   * issuing a token. Useful for `--why` diagnostics in the CLI.
+   *
+   * @param agentId - The agent requesting the permission
+   * @param resourceType - The resource type being requested
+   * @param justification - The justification text
+   * @param scope - Optional scope string
+   * @returns Scoring breakdown and approval verdict
+   */
+  scoreRequest(
+    agentId: string,
+    resourceType: string,
+    justification: string,
+    scope?: string
+  ): {
+    justificationScore: number;
+    trustScore: number;
+    riskScore: number;
+    weightedScore: number;
+    approved: boolean;
+    reason?: string;
+  } {
+    const justificationScore = this.scoreJustification(justification, resourceType);
+    const trustScore = this.agentTrustLevels.get(agentId) ?? 0.5;
+    const riskScore = this.assessRisk(resourceType, scope);
+    const weightedScore = (justificationScore * 0.4) + (trustScore * 0.3) + ((1 - riskScore) * 0.3);
+    let approved = weightedScore >= 0.5;
+    let reason: string | undefined;
+
+    if (justificationScore < 0.3) {
+      approved = false;
+      reason = 'Justification is insufficient. Please provide specific task context.';
+    } else if (trustScore < 0.4) {
+      approved = false;
+      reason = 'Agent trust level is below threshold. Escalate to human operator.';
+    } else if (riskScore > 0.8) {
+      approved = false;
+      reason = 'Risk assessment exceeds acceptable threshold. Narrow the requested scope.';
+    } else if (!approved) {
+      reason = 'Combined evaluation score below threshold.';
+    }
+
+    return { justificationScore, trustScore, riskScore, weightedScore, approved, reason };
+  }
+
   private evaluateRequest(
     agentId: string,
     resourceType: string,

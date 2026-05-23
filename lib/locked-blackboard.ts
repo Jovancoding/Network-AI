@@ -69,6 +69,12 @@ export interface LockedBlackboardOptions {
    * `CONFLICT` rejections from `validateChange()` by re-reading and re-proposing.
    */
   env?: string;
+  /**
+   * When `true` (or when `NETWORK_AI_MINIMAL=1` env var is set), skip WAL
+   * replay on startup and disable TTL sweep.  Useful for CI and test
+   * environments where fast startup is more important than crash recovery.
+   */
+  disableWal?: boolean;
 }
 
 export interface BlackboardEntry {
@@ -361,6 +367,7 @@ export class LockedBlackboard {
   private walPath: string = '';
   private walOpCounter = 0;
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
+  private disableWal = false;
 
   constructor(basePath: string = '.', auditLoggerOrOptions?: SecureAuditLogger | LockedBlackboardOptions, options?: LockedBlackboardOptions) {
     // Resolve to an absolute path to prevent insecure relative/temp-dir path propagation
@@ -371,16 +378,23 @@ export class LockedBlackboard {
     //   new LockedBlackboard(path, auditLogger, options)
     //   new LockedBlackboard(path, options)
     let env: string | undefined;
-    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && ('conflictResolution' in auditLoggerOrOptions || 'throttleMs' in auditLoggerOrOptions || 'env' in auditLoggerOrOptions)) {
+    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && ('conflictResolution' in auditLoggerOrOptions || 'throttleMs' in auditLoggerOrOptions || 'env' in auditLoggerOrOptions || 'disableWal' in auditLoggerOrOptions)) {
       const opts = auditLoggerOrOptions as LockedBlackboardOptions;
       this.conflictResolution = opts.conflictResolution ?? 'first-commit-wins';
       this.throttleMs = opts.throttleMs ?? 0;
       env = opts.env;
+      this.disableWal = opts.disableWal ?? false;
     } else {
       this.auditLogger = auditLoggerOrOptions as SecureAuditLogger | undefined;
       this.conflictResolution = options?.conflictResolution ?? 'first-commit-wins';
       this.throttleMs = options?.throttleMs ?? 0;
       env = options?.env;
+      this.disableWal = options?.disableWal ?? false;
+    }
+
+    // Respect NETWORK_AI_MINIMAL env var for CI/test fast startup
+    if (process.env['NETWORK_AI_MINIMAL'] === '1') {
+      this.disableWal = true;
     }
 
     // Fall back to NETWORK_AI_ENV environment variable when env not supplied
@@ -426,7 +440,9 @@ export class LockedBlackboard {
 
     // Load existing data
     this.loadFromDisk();
-    this.replayWAL();
+    if (!this.disableWal) {
+      this.replayWAL();
+    }
     this.loadPendingChanges();
   }
 
