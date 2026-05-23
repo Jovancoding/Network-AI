@@ -70,27 +70,6 @@ function httpGet(url: string): Promise<{ status: number; body: string }> {
   });
 }
 
-function httpPostRaw(url: string, rawBody: string): Promise<{ status: number; body: string }> {
-  return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const options: http.RequestOptions = {
-      hostname: parsed.hostname,
-      port: parseInt(parsed.port, 10),
-      path: parsed.pathname,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(rawBody) },
-    };
-    const req = http.request(options, res => {
-      let data = '';
-      res.on('data', (c: Buffer) => { data += c.toString(); });
-      res.on('end', () => resolve({ status: res.statusCode ?? 0, body: data }));
-    });
-    req.on('error', reject);
-    req.write(rawBody);
-    req.end();
-  });
-}
-
 function httpPostRawWithAuth(url: string, rawBody: string, secret: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
