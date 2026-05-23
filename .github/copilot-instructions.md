@@ -1,4 +1,4 @@
-﻿# GitHub Copilot Instructions for Network-AI
+# GitHub Copilot Instructions for Network-AI
 
 ## Project Overview
 

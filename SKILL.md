@@ -1,4 +1,4 @@
-﻿---
+---
 name: network-ai
 description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. All bundled scripts run locally with zero network calls and zero third-party dependencies."
 metadata:

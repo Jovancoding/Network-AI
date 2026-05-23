@@ -1,4 +1,4 @@
-﻿# Adapter System — 29 Plug-and-Play Agent Framework Adapters
+# Adapter System — 29 Plug-and-Play Agent Framework Adapters
 
 ## Overview
 

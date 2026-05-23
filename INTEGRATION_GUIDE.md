@@ -1,4 +1,4 @@
-﻿# Network-AI Integration Guide
+# Network-AI Integration Guide
 
 **For technical leads, solutions architects, and engineering teams evaluating or deploying Network-AI in a production environment.**
 

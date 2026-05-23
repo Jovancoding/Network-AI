@@ -1,4 +1,4 @@
-﻿# CLAUDE.md — Project Instructions for Claude Code
+# CLAUDE.md — Project Instructions for Claude Code
 
 This file is read automatically by Claude Code when working in this repository.
 
