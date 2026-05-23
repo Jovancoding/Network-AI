@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.7.2 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,136 tests, 70+ modules.
+Network-AI v5.8.0 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,136 tests, 70+ modules.
 
 ## The Multi-Agent Race Condition Problem
 
@@ -380,7 +380,7 @@ Network-AI/
 │   ├── aps-adapter.ts
 │   └── openclaw-adapter.ts
 ├── lib/
-│   ├── locked-blackboard.ts      # Atomic commits with file-system mutexes
+│   ├── locked-blackboard.ts      # Atomic commits with file-system mutexes; disableWal/minimal mode (v5.8)
 │   ├── blackboard-validator.ts   # Content quality gate (Layer 1 + Layer 2)
 │   ├── qa-orchestrator.ts        # QA orchestrator (scenario replay, regression, contradictions)
 │   ├── fsm-journey.ts            # FSM state machine and compliance monitor
@@ -398,7 +398,11 @@ Network-AI/
 │   ├── route-classifier.ts        # Goal routing + FACTUAL_LOOKUP short-circuit (v5.3)
 │   ├── partition-planner.ts       # Non-overlapping agent focus areas (v5.3)
 │   ├── coverage-gate.ts           # Recursive completeness refinement loop (v5.3)
-│   └── goal-decomposer.ts        # LLM-powered goal → task DAG → parallel execution (v4.15)
+│   ├── goal-decomposer.ts        # LLM-powered goal → task DAG → parallel execution (v4.15)
+│   ├── env-manager.ts            # Promotion chain dev→…→prod, backup/restore (v5.4)
+│   ├── circuit-breaker.ts        # CLOSED/OPEN/HALF_OPEN per-adapter; fallbackChain (v5.6.1)
+│   ├── telemetry-provider.ts     # ITelemetryProvider BYOT; NullTelemetryProvider; createOtelHooks (v5.7)
+│   └── auth-guardian.ts          # Permission wall; scoreRequest() diagnostic API (v5.8)
 ├── scripts/                      # Python helper scripts (local orchestration only)
 │   ├── blackboard.py             # Shared state management with atomic commits
 │   ├── swarm_guard.py            # Handoff tax prevention, budget tracking
@@ -423,5 +427,6 @@ Network-AI/
 │   └── 05-code-review-swarm.ts
 └── data/
     ├── audit_log.jsonl           # HMAC / Ed25519-signed audit trail (local only)
-    └── pending_changes/          # In-flight atomic change records
+    ├── SYSTEM_PAUSED             # Kill-switch sentinel (pause/resume CLI) — optional
+    └── pending_changes/          # In-flight atomic change records (WAL)
 ```

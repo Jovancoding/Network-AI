@@ -229,6 +229,75 @@ When permission is denied:
 3. If still denied, escalate to human operator
 4. Human can manually create grant in `data/active_grants.json`
 
+## Diagnostic API — `scoreRequest()` (v5.8.0)
+
+`AuthGuardian.scoreRequest()` is a **read-only** method that returns the full scoring breakdown for a hypothetical request, without issuing a token or writing to the audit log. Use it for pre-flight checks, dashboards, and the `--why` CLI flag.
+
+### Signature
+
+```typescript
+scoreRequest(
+  agentId: string,
+  resourceType: string,
+  justification: string,
+  scope?: string
+): {
+  justificationScore: number;   // 0.0–1.0, weight 40 %
+  trustScore: number;           // 0.0–1.0, weight 30 %
+  riskScore: number;            // 0.0–1.0 raw risk (lower is safer), weight 30 %
+  weightedScore: number;        // combined approval score (threshold 0.5)
+  approved: boolean;            // true if weightedScore ≥ 0.5 and no hard deny
+  reason?: string;              // populated when approved === false
+}
+```
+
+### Usage
+
+```typescript
+import { AuthGuardian } from 'network-ai';
+
+const guardian = new AuthGuardian();
+
+const result = guardian.scoreRequest(
+  'data_analyst',
+  'DATABASE',
+  'Fetch Q4 invoices for year-end report',
+  'read:invoices'
+);
+
+console.log(result);
+// {
+//   justificationScore: 0.8,
+//   trustScore:         1.0,
+//   riskScore:          0.5,
+//   weightedScore:      0.74,
+//   approved:           true
+// }
+```
+
+### Differences from `requestPermission()`
+
+| Aspect | `requestPermission()` | `scoreRequest()` |
+|---|---|---|
+| Issues token | ✅ Yes | ❌ No |
+| Writes audit log | ✅ Yes | ❌ No |
+| Side effects | ✅ Yes | ❌ None |
+| Returns token | ✅ Yes | ❌ No |
+| Returns score breakdown | ❌ No | ✅ Yes |
+| Intended use | Production gating | Diagnostics / `--why` |
+
+### CLI equivalent
+
+```bash
+network-ai auth token my-bot --resource DATABASE \
+  --justification "Fetch Q4 invoices for year-end report" --why
+# justification score (40%): 80.0%
+# trust score        (30%): 100.0%
+# risk score         (30%): 50.0% risk → 50.0% contribution
+# weighted score:           74.0%
+# verdict:                  APPROVED
+```
+
 ## CLI Usage
 
 The `auth` command group exposes AuthGuardian directly from the terminal — no server required.

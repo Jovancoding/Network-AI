@@ -387,16 +387,86 @@ network-ai audit tail
 network-ai audit clear
 ```
 
+### Diagnostics (`doctor`)
+
+```bash
+# Validate the full environment — data dir, env routing, audit log, WAL, kill-switch, MCP secret
+network-ai doctor
+network-ai doctor --json   # machine-readable
+
+# ✓ [PASS] data-dir: /path/to/data
+# ✓ [PASS] env-routing: no --env or NETWORK_AI_ENV set; using root data dir
+# ✓ [PASS] audit-log: 42 entries, all valid JSONL
+# ✓ [PASS] pending-changes: no pending changes
+# ✓ [PASS] kill-switch: system is running
+# ⚠ [WARN] mcp-secret: NETWORK_AI_MCP_SECRET not set
+# ✓ [PASS] blackboard-schema: blackboard.json OK (7 keys)
+```
+
+Exits with code `0` if all checks pass, `1` if any fail — safe for CI gates.
+
+### Inspect a key (`inspect`)
+
+```bash
+# Show current value and metadata
+network-ai inspect agent:status
+
+# Include pending WAL history
+network-ai inspect agent:status --history
+
+# Include audit trail entries for this key
+network-ai inspect agent:status --audit
+
+# All together, machine-readable
+network-ai inspect agent:status --history --audit --json
+```
+
+### Kill switch (`pause` / `resume`)
+
+```bash
+# Pause all orchestrator activity
+network-ai pause
+# ✓ system paused at 2026-05-23T15:00:00.000Z
+
+# Resume
+network-ai resume
+# ✓ system resumed
+
+# Check state
+network-ai doctor   # ⚠ [WARN] kill-switch: system is PAUSED
+```
+
+Creates/removes a `data/SYSTEM_PAUSED` sentinel file. Agents should check for this file before performing writes.
+
+### `--why` on `auth token`
+
+```bash
+# See the full scoring breakdown before the token is issued
+network-ai auth token my-bot --resource DATABASE \
+  --justification "Fetch Q4 invoices for year-end report" --why
+
+# justification score (40%): 80.0%
+# trust score        (30%): 100.0%
+# risk score         (30%): 50.0% risk → 50.0% contribution
+# weighted score:           74.0%
+# verdict:                  APPROVED
+```
+
 ### Global flags
 
 | Flag | Default | Purpose |
 |---|---|---|
 | `--data <path>` | `./data` | Override the data directory |
+| `--env <name>` | — | Target environment (dev/st/sit/qa/preprod/prod) |
 | `--json` | off | Machine-readable JSON output on every command |
+| `--minimal` | off | Skip WAL replay + TTL sweep (CI/test fast startup). Also set via `NETWORK_AI_MINIMAL=1` |
 
 ```bash
 # Example: point at a non-default data dir and get JSON output
 network-ai --data /var/swarm/data --json bb list
+
+# CI mode — skip WAL replay for fast startup
+NETWORK_AI_MINIMAL=1 network-ai doctor --json
 ```
 
 ---

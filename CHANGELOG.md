@@ -5,6 +5,28 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.0] - 2026-05-23
+
+### Features
+- **`network-ai doctor` CLI command** (`bin/cli.ts`) — Self-diagnostic command that validates the Network-AI environment: data directory existence and write access, `NETWORK_AI_ENV` routing, audit log JSONL integrity (counts malformed lines), stale pending WAL entries (flags entries older than 5 min), kill-switch state (`SYSTEM_PAUSED` sentinel), `NETWORK_AI_MCP_SECRET` presence, and blackboard schema validity. Exits with code 0 if all checks pass, 1 if any fail. Supports `--json` for machine-readable output.
+- **`network-ai inspect <key>` CLI command** (`bin/cli.ts`) — Inspect any blackboard key: current value, full metadata (source agent, timestamp, TTL, version), pending WAL history (`--history`), and audit trail entries for that key (`--audit`). Supports `--json`.
+- **`network-ai pause` / `network-ai resume` CLI commands** (`bin/cli.ts`) — Kill switch: `pause` writes a `data/SYSTEM_PAUSED` sentinel file and `resume` removes it. `doctor` reports the pause state. Agents and integration layers can check for this sentinel before performing writes. Supports `--json`.
+- **`--why` flag on `network-ai auth token`** (`bin/cli.ts`) — Prints the full scoring breakdown before issuing a token: justification score (40 % weight), trust score (30 %), risk score (30 %), weighted total, and approval verdict with denial reason. Useful for debugging permission configuration without modifying code.
+- **`--minimal` global CLI flag** (`bin/cli.ts`) — Disables WAL replay and TTL sweep on `LockedBlackboard` for fast CI/test startup. Also triggered via `NETWORK_AI_MINIMAL=1` env var. Propagated early in the parse phase so all sub-commands see the flag before constructing any objects.
+- **`AuthGuardian.scoreRequest()`** (`lib/auth-guardian.ts`) — New public method that computes and returns the full scoring breakdown (`justificationScore`, `trustScore`, `riskScore`, `weightedScore`, `approved`, `reason`) without issuing a token. Used by `--why` flag; also callable directly for pre-flight checks.
+- **`LockedBlackboard` minimal / `disableWal` option** (`lib/locked-blackboard.ts`) — New `disableWal?: boolean` field on `LockedBlackboardOptions`. When set (or when `NETWORK_AI_MINIMAL=1`), skips `replayWAL()` on construction, cutting startup time in CI and test environments that don't need crash recovery.
+
+### Documentation
+- **`THREAT_MODEL.md`** — New file: adversary profiles (unauthenticated network caller, malicious agent, blackboard poisoning, supply chain, insider/CLI operator), trust boundaries diagram, explicit non-goals table, and security controls summary with file-level cross-references.
+- **`DATA_LOCATIONS.md`** — New file: every file and directory Network-AI creates at runtime — path, created-by, purpose, data classification (Critical / Sensitive / Internal / Public), contains-secrets flag, and operator responsibilities.
+- **`SUPPLY_CHAIN.md`** — New file: one runtime dependency (`commander`), no install-time scripts, what writes to disk, what calls over the network (nothing in core — BYOC), npm provenance / SLSA Build Level 2 verification instructions, CodeQL scanning, dependency update policy.
+- **`SECURITY.md` Disclosure SLA table** — Formal response-time commitments added: acknowledgment (48 h), triage (5 business days), patch for Critical/High (14 days), Medium (30 days), Low (90 days), public disclosure after patch (7 days coordinated).
+- **`SECURITY.md` supported versions** — 5.8.x is the new fully supported release; 5.7.x receives security fixes only.
+- Version bump to 5.8.0 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, `SECURITY.md`, `QUICKSTART.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `references/auth-guardian.md`, and all doc/config files.
+
+### Fixes
+- **Removed unused `httpPostRaw` function** (`test-phase6.ts`) — Dead function removed (CodeQL `js/unused-local-variable` alert #164). The active helper is `httpPostRawWithAuth`.
+
 ## [5.7.2] - 2026-05-19
 
 ### Security
