@@ -1,4 +1,4 @@
-# Network-AI Integration Guide
+﻿# Network-AI Integration Guide
 
 **For technical leads, solutions architects, and engineering teams evaluating or deploying Network-AI in a production environment.**
 
@@ -564,4 +564,4 @@ Run these before declaring the integration production-ready:
 
 ---
 
-*Network-AI v5.7.1 · MIT License · https://github.com/Jovancoding/Network-AI*
+*Network-AI v5.7.2 · MIT License · https://github.com/Jovancoding/Network-AI*

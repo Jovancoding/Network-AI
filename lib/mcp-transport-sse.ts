@@ -89,7 +89,7 @@ export interface McpToolProvider {
  * combined.register(new ExtendedMcpTools({ budget }));
  * combined.register(new ControlMcpTools({ config, orchestrator }));
  *
- * const server = new McpSseServer(combined, { port: 3001 });
+ * const server = new McpSseServer(combined, { port: 3001, secret: process.env['NETWORK_AI_MCP_SECRET']! });
  * await server.listen();
  * ```
  */
@@ -278,15 +278,25 @@ export class McpSseServer {
 
   /** Start listening. Resolves when the server is ready. */
   listen(): Promise<void> {
+    // Fail closed: refuse to bind if no secret is configured.
+    // An empty secret would allow every unauthenticated request through
+    // (CWE-306/CWE-862). Callers must supply a non-empty secret for SSE
+    // mode; for local stdio use McpStdioTransport instead.
+    if (!this._opts.secret) {
+      return Promise.reject(new Error(
+        'McpSseServer requires a non-empty secret. ' +
+        'Set McpSseServerOptions.secret or the NETWORK_AI_MCP_SECRET env var. ' +
+        'For stdio mode (Claude Desktop / Cursor / Glama) use --stdio instead.'
+      ));
+    }
     this._server = requireHttp().createServer((req, res) => this._handleRequest(req, res));
-    // Warn when binding to a non-loopback address — defense-in-depth notice
+    // Warn when binding to a non-loopback address — defence-in-depth notice
     const isLoopback = this._opts.host === '127.0.0.1' || this._opts.host === 'localhost' || this._opts.host === '::1';
-    if (!isLoopback && !this._opts.secret) {
+    if (!isLoopback) {
       process.stderr.write(
         '[network-ai] WARNING: MCP server is binding to ' + this._opts.host +
-        ' with no authentication secret. Set McpSseServerOptions.secret (or' +
-        ' NETWORK_AI_MCP_SECRET env var) to gate access. Unauthenticated' +
-        ' callers can read and mutate live orchestrator state.\n'
+        ' (non-loopback). Ensure your network perimeter restricts access to' +
+        ' this port. Bearer token authentication is enforced on all tool calls.\n'
       );
     }
     return new Promise(resolve => {
@@ -328,10 +338,11 @@ export class McpSseServer {
 
   /**
    * Returns true when the request carries a valid `Authorization: Bearer <secret>`
-   * header, or when no secret is configured (open access).
+   * header. Fails closed: an empty or missing secret always returns false.
+   * (CWE-306 / CWE-862 — incomplete fix guard: empty secret must never grant access.)
    */
   private _isAuthorized(req: http.IncomingMessage): boolean {
-    if (!this._opts.secret) return true;
+    if (!this._opts.secret) return false; // fail closed — no secret → deny all
     const authHeader = req.headers['authorization'];
     if (typeof authHeader !== 'string') return false;
     const parts = authHeader.split(' ');
@@ -499,7 +510,7 @@ export class McpSseServer {
  * import { McpBridgeClient } from 'network-ai';
  * import { McpSseTransport } from 'network-ai';
  *
- * const transport = new McpSseTransport('http://localhost:3001');
+ * const transport = new McpSseTransport('http://localhost:3001', process.env['NETWORK_AI_MCP_SECRET']!);
  * const client = new McpBridgeClient(transport);
  *
  * const tools = await client.listTools();
@@ -508,17 +519,22 @@ export class McpSseServer {
  */
 export class McpSseTransport implements McpTransport {
   private readonly _postUrl: string;
+  private readonly _secret: string;
   private _idCounter = 0;
 
   /**
    * @param baseUrl  Base URL of the `McpSseServer`, e.g. `'http://localhost:3001'`.
    *                 The transport will POST to `<baseUrl>/mcp`.
+   * @param secret   Bearer token matching `McpSseServerOptions.secret`. Required
+   *                 because `McpSseServer` now rejects all requests when no secret
+   *                 is configured. Pass the same value set on the server.
    */
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, secret = '') {
     // Strip trailing slashes without regex to avoid ReDoS on adversarial input.
     let clean = baseUrl;
     while (clean.endsWith('/')) clean = clean.slice(0, -1);
     this._postUrl = clean.endsWith('/mcp') ? clean : `${clean}/mcp`;
+    this._secret = secret;
   }
 
   /** Send a JSON-RPC request and wait for the response. */
@@ -529,15 +545,18 @@ export class McpSseTransport implements McpTransport {
     const lib = isHttps ? requireHttps() : requireHttp();
 
     return new Promise((resolve, reject) => {
+      const headers: http.OutgoingHttpHeaders = {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      };
+      if (this._secret) headers['Authorization'] = `Bearer ${this._secret}`;
+
       const options: http.RequestOptions = {
         hostname: parsed.hostname,
         port: parseInt(parsed.port || (isHttps ? '443' : '80'), 10),
         path: parsed.pathname + (parsed.search || ''),
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
+        headers,
       };
 
       const req = lib.request(options, resp => {

@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.2] - 2026-05-19
+
+### Security
+- **GHSA-r78r-rwrf-rjwp / CVE-2026-46701 — `McpSseServer` fail-closed on empty secret** (`lib/mcp-transport-sse.ts`) — Completed fix for CWE-306 / CWE-862 (Missing Authentication — incomplete fix). `_isAuthorized()` previously returned `true` when no secret was configured, granting unauthenticated callers access to all 22 MCP tools (blackboard read/write, agent spawn, config mutation, token management). Fix: `_isAuthorized()` now returns `false` (fail closed) when `secret` is empty — requests are denied regardless of bind address. `listen()` now rejects with a hard error rather than warning if `McpSseServerOptions.secret` is empty, preventing accidental deployment of an open server. `McpSseTransport` updated to accept an optional `secret` parameter and send `Authorization: Bearer <secret>` headers automatically. Affects all callers that instantiate `McpSseServer` directly with an empty or absent secret; the `bin/mcp-server.ts` CLI path already exited on missing secret (added in an earlier patch) but the library-level class itself was still open. **Upgrade immediately — no workaround exists for direct `lib/` usage.** Credit: @SnailSploit.
+- Version bump to 5.7.2 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all 14 doc/config files.
+
 ## [5.7.1] - 2026-05-19
 
 ### Security / Bug Fixes

@@ -1,8 +1,8 @@
-# Adapter System — 29 Plug-and-Play Agent Framework Adapters
+﻿# Adapter System — 29 Plug-and-Play Agent Framework Adapters
 
 ## Overview
 
-The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.7.1, 29 adapters are included.
+The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.7.2, 29 adapters are included.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

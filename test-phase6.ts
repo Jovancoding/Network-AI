@@ -91,6 +91,31 @@ function httpPostRaw(url: string, rawBody: string): Promise<{ status: number; bo
   });
 }
 
+function httpPostRawWithAuth(url: string, rawBody: string, secret: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const options: http.RequestOptions = {
+      hostname: parsed.hostname,
+      port: parseInt(parsed.port, 10),
+      path: parsed.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(rawBody),
+        'Authorization': `Bearer ${secret}`,
+      },
+    };
+    const req = http.request(options, res => {
+      let data = '';
+      res.on('data', (c: Buffer) => { data += c.toString(); });
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, body: data }));
+    });
+    req.on('error', reject);
+    req.write(rawBody);
+    req.end();
+  });
+}
+
 function httpPost(url: string, body: unknown): Promise<{ status: number; body: string }> {
   return httpPostWithHeaders(url, body, {});
 }
@@ -492,6 +517,7 @@ async function testControlTools(): Promise<void> {
 // ============================================================================
 
 const TEST_PORT = 3099;
+const SSE_TEST_SECRET = 'test-server-secret-xyz789';
 
 async function testSseServer(): Promise<void> {
   suite('McpSseServer + McpSseTransport (real HTTP on port 3099)');
@@ -503,7 +529,7 @@ async function testSseServer(): Promise<void> {
   combined.register(new McpBlackboardBridgeAdapter(bridge));
   combined.register(new ExtendedMcpTools({ budget }));
 
-  const server = new McpSseServer(combined, { port: TEST_PORT, host: '127.0.0.1', heartbeatMs: 0 });
+  const server = new McpSseServer(combined, { port: TEST_PORT, host: '127.0.0.1', heartbeatMs: 0, secret: SSE_TEST_SECRET });
   await server.listen();
 
   try {
@@ -524,27 +550,27 @@ async function testSseServer(): Promise<void> {
     assert(notFound.status === 404, `GET /unknown returns 404 (got ${notFound.status})`);
 
     // POST /mcp — tools/list
-    const listPost = await httpPost(`http://127.0.0.1:${TEST_PORT}/mcp`, {
+    const listPost = await httpPostWithAuth(`http://127.0.0.1:${TEST_PORT}/mcp`, {
       jsonrpc: '2.0', id: 1, method: 'tools/list',
-    });
+    }, SSE_TEST_SECRET);
     assert(listPost.status === 200, `POST /mcp tools/list returns 200 (got ${listPost.status})`);
     const listBody = JSON.parse(listPost.body) as { result: { tools: unknown[] } };
     assert(Array.isArray(listBody.result?.tools), 'POST /mcp tools/list result.tools is array');
 
     // POST /mcp — blackboard_write
-    const writePost = await httpPost(`http://127.0.0.1:${TEST_PORT}/mcp`, {
+    const writePost = await httpPostWithAuth(`http://127.0.0.1:${TEST_PORT}/mcp`, {
       jsonrpc: '2.0', id: 2, method: 'tools/call',
       params: { name: 'blackboard_write', arguments: { key: 'net:status', value: '"online"', agent_id: 'srv-test' } },
-    });
+    }, SSE_TEST_SECRET);
     assert(writePost.status === 200, `POST /mcp blackboard_write returns 200`);
     const writeBody = JSON.parse(writePost.body) as { result: { isError: boolean } };
     assert(writeBody.result?.isError === false, 'blackboard_write isError === false');
 
     // POST /mcp — blackboard_read
-    const readPost = await httpPost(`http://127.0.0.1:${TEST_PORT}/mcp`, {
+    const readPost = await httpPostWithAuth(`http://127.0.0.1:${TEST_PORT}/mcp`, {
       jsonrpc: '2.0', id: 3, method: 'tools/call',
       params: { name: 'blackboard_read', arguments: { key: 'net:status', agent_id: 'srv-test' } },
-    });
+    }, SSE_TEST_SECRET);
     assert(readPost.status === 200, 'POST /mcp blackboard_read returns 200');
     const readBody = JSON.parse(readPost.body) as { result: { content: Array<{ text: string }> } };
     const readResult = JSON.parse(readBody.result?.content?.[0]?.text ?? '{}') as { ok: boolean; data: { value: string } };
@@ -552,22 +578,22 @@ async function testSseServer(): Promise<void> {
     assert(readResult.data?.value === 'online', `blackboard_read via HTTP: value === "online" (got "${readResult.data?.value}")`);
 
     // POST /mcp — budget_status
-    const budgetPost = await httpPost(`http://127.0.0.1:${TEST_PORT}/mcp`, {
+    const budgetPost = await httpPostWithAuth(`http://127.0.0.1:${TEST_PORT}/mcp`, {
       jsonrpc: '2.0', id: 4, method: 'tools/call',
       params: { name: 'budget_status', arguments: { agent_id: 'srv-test' } },
-    });
+    }, SSE_TEST_SECRET);
     assert(budgetPost.status === 200, 'POST /mcp budget_status returns 200');
     const budgetBodyParsed = JSON.parse(budgetPost.body) as { result: { content: Array<{ text: string }> } };
     const budgetResult = JSON.parse(budgetBodyParsed.result?.content?.[0]?.text ?? '{}') as { ok: boolean; data: { ceiling: number } };
     assert(budgetResult.ok, 'budget_status via HTTP: ok === true');
     assert(budgetResult.data?.ceiling === 50000, `budget_status via HTTP: ceiling === 50000 (got ${budgetResult.data?.ceiling})`);
 
-    // POST /mcp — invalid JSON
-    const badJson = await httpPostRaw(`http://127.0.0.1:${TEST_PORT}/mcp`, '{bad json');
+    // POST /mcp — invalid JSON (with valid auth — expects 400 body parse error)
+    const badJson = await httpPostRawWithAuth(`http://127.0.0.1:${TEST_PORT}/mcp`, '{bad json', SSE_TEST_SECRET);
     assert(badJson.status === 400, 'POST /mcp invalid JSON returns 400');
 
-    // McpSseTransport — send via transport class
-    const transport = new McpSseTransport(`http://127.0.0.1:${TEST_PORT}`);
+    // McpSseTransport — send via transport class (pass secret so auth header is included)
+    const transport = new McpSseTransport(`http://127.0.0.1:${TEST_PORT}`, SSE_TEST_SECRET);
     const transportResp = await transport.send({ jsonrpc: '2.0', id: 10, method: 'tools/list' });
     assert(!transportResp.error, 'McpSseTransport.send() tools/list: no error');
     assert(Array.isArray((transportResp.result as { tools: unknown[] })?.tools), 'McpSseTransport result.tools is array');

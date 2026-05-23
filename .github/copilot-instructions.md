@@ -1,8 +1,8 @@
-# GitHub Copilot Instructions for Network-AI
+﻿# GitHub Copilot Instructions for Network-AI
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.7.1). 3,136 tests across 31 suites.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.7.2). 3,136 tests across 31 suites.
 
 ## Architecture
 

@@ -1,10 +1,10 @@
-# CLAUDE.md — Project Instructions for Claude Code
+﻿# CLAUDE.md — Project Instructions for Claude Code
 
 This file is read automatically by Claude Code when working in this repository.
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.7.1.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.7.2.
 
 ## Build & Test Commands
 
