@@ -30,7 +30,7 @@ metadata:
         path: data/audit_log.jsonl
         scope: local-only
         description: "Local append-only JSONL file recording operation metadata. No data leaves the machine."
-        pii_warning: "Do not include PII, secrets, or credentials in justification fields. Log entries persist on disk. Grant tokens are masked to a short prefix in all listing outputs; full tokens appear only at issuance time."
+        pii_warning: "Justification strings are truncated to 200 characters before being written to the audit log. Audit summary output (--audit-summary --json) omits justification text from returned entries. Do not include PII, credentials, or secrets in justification fields — the truncated text still persists on disk. Grant tokens are masked to a short prefix in all listing outputs; full tokens appear only at issuance time."
       data_directory:
         path: data/
         scope: local-only
@@ -754,7 +754,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.8.4"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.8.5"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |

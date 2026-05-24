@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.5] - 2026-05-24
+
+### Security
+- **`scripts/check_permission.py` — verbatim justification retention in audit log (Ssd3, 98%/99%)**: Justification strings are now truncated to 200 characters before being written to `audit_log.jsonl` (adds `[truncated]` suffix when clipped). The full in-memory value is still used for `score_justification()` scoring; only the logged copy is limited. `_JUSTIFICATION_MAX_LOG_LEN = 200` constant added.
+- **`scripts/check_permission.py` — justification re-exposure via audit summary (Ssd3, 99%)**: `audit_summary --json` previously included raw log entries in the `recent` array, re-exposing any earlier justification text. The `justification` key is now stripped from each entry's `details` dict in summary JSON output via `_redact_entry()`. Human-readable output is unaffected.
+- Header comment updated to describe truncation and summary-output redaction. `SKILL.md` `privacy.audit_log.pii_warning` updated to match.
+- Version bump to 5.8.5 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.8.4] - 2026-05-24
 
 ### Security

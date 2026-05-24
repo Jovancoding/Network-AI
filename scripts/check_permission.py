@@ -8,11 +8,13 @@
 # Imports used: argparse, json, re, sys, uuid, hmac, hashlib, datetime, pathlib, typing
 # No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
 #
-# SECURITY: Justification strings supplied via --justification are logged verbatim
-# to data/audit_log.jsonl. Do NOT include PII, credentials, secret names, API keys,
-# or other sensitive business data in justification fields. Treat justifications as
-# permanently visible log entries. Grant tokens are only shown at issuance time;
-# listing commands (--active-grants) always mask tokens to a short prefix.
+# SECURITY: Justification strings supplied via --justification are truncated to
+# _JUSTIFICATION_MAX_LOG_LEN characters before being written to audit_log.jsonl.
+# Do NOT include PII, credentials, secret names, API keys, or sensitive business
+# data in justification fields. Audit summary output (--audit-summary --json)
+# omits justification text entirely from returned entries. Grant tokens are only
+# shown at issuance time; listing commands (--active-grants) always mask tokens
+# to a short prefix.
 """
 AuthGuardian Permission Checker
 
@@ -87,6 +89,11 @@ DEFAULT_TRUST_LEVELS = {
 # Agents whose identity is pre-registered. Any agent_id NOT in this set
 # receives a reduced trust score (0.3) and triggers an advisory warning.
 KNOWN_AGENTS: set[str] = set(DEFAULT_TRUST_LEVELS.keys())
+
+# Maximum characters of a justification string stored in the audit log.
+# Content beyond this limit is dropped before writing to prevent unbounded
+# sensitive-data retention (SkillSpector Ssd3).
+_JUSTIFICATION_MAX_LOG_LEN: int = 200
 
 # Resource types that require --confirm-high-risk before a grant is issued
 HIGH_RISK_RESOURCES: set[str] = {"PAYMENTS", "DATABASE"}
@@ -369,11 +376,17 @@ def evaluate_permission(
     # Warn if agent_id is not in the pre-registered known-agents list
     unknown_agent = agent_id not in KNOWN_AGENTS
 
-    # Log the request
+    # Log the request — justification is truncated before writing to limit
+    # sensitive-data retention in audit_log.jsonl.
+    _justification_log = (
+        justification[:_JUSTIFICATION_MAX_LOG_LEN] + " [truncated]"
+        if len(justification) > _JUSTIFICATION_MAX_LOG_LEN
+        else justification
+    )
     log_audit("permission_request", {
         "agent_id": agent_id,
         "resource_type": resource_type,
-        "justification": justification,
+        "justification": _justification_log,
         "scope": scope,
         "unknown_agent": unknown_agent,
     })
@@ -675,6 +688,13 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
     last_ts = entries[-1].get("timestamp", "unknown")
 
     if as_json:
+        # Omit justification text from summary output to avoid re-exposing
+        # sensitive content that was logged earlier (SkillSpector Ssd3).
+        def _redact_entry(e: dict[str, Any]) -> dict[str, Any]:
+            if "details" not in e or "justification" not in e["details"]:
+                return e
+            return {**e, "details": {k: v for k, v in e["details"].items() if k != "justification"}}
+
         output: dict[str, Any] = {
             "total_entries": len(entries),
             "total_requests": total_requests,
@@ -683,7 +703,7 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
             "time_range": {"first": first_ts, "last": last_ts},
             "by_agent": by_agent,
             "by_resource": by_resource,
-            "recent": recent[-last_n:],
+            "recent": [_redact_entry(e) for e in recent[-last_n:]],
         }
         print(json.dumps(output, indent=2))
     else:
