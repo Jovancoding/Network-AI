@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.1] - 2026-05-24
+
+### Fixed
+- **`SKILL.md` frontmatter accuracy** — `bundle_scope` and `network_calls` fields now accurately describe the full package: Python scripts are local-only / zero network calls; the full npm package also includes TypeScript modules, CLI, and an optional self-hosted MCP SSE server that binds a TCP port when explicitly started and requires a non-empty bearer-token secret. Resolves ClawHub SkillSpector High findings (Intent-Code Divergence, Description-Behavior Mismatch).
+- **`SKILL.md` security table rows** — Two inline table rows that repeated the now-inaccurate "Python scripts only / zero network calls" claims updated to reflect the accurate split between Python-scripts scope and full-package scope.
+- **`THREAT_MODEL.md` hosted-service wording** — "There is no hosted service" replaced with "There is no SaaS or cloud-hosted service" and an explicit callout that the optional MCP SSE server is a network-reachable service boundary when started by the operator. Resolves SkillSpector Medium finding (Intent-Code Divergence).
+- **`scripts/swarm_guard.py` I/O header** — READS/WRITES comment updated to include all files actually written (`task_tracking.json`, `agent_health.json`, `budget_tracking.json`) and to document that the base data directory is `data/` or `data/<env>/` when `NETWORK_AI_ENV` / `--env` is set. Resolves SkillSpector Medium findings (Description-Behavior Mismatch, Intent-Code Divergence).
+- Version bump to 5.8.1 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.8.0] - 2026-05-23
 
 ### Features

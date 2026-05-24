@@ -5,8 +5,8 @@ metadata:
   openclaw:
     emoji: "\U0001F41D"
     homepage: https://network-ai.org
-    bundle_scope: "Python scripts only (scripts/*.py). All execution is local. Only Python stdlib — no other runtimes, adapters, or CLI tools are included."
-    network_calls: "none — bundled scripts make zero network calls and spawn no subprocesses."
+    bundle_scope: "Python scripts (scripts/*.py) — local only, Python stdlib only, no network calls, no subprocesses. The full npm package additionally includes TypeScript library modules, a CLI (bin/cli.ts), and an optional self-hosted MCP SSE server (bin/mcp-server.ts) that binds a TCP port when started by the operator. Install the npm package only if you intend to run the full orchestrator."
+    network_calls: "bundled Python scripts: none — zero network calls, zero subprocesses. MCP SSE server (bin/mcp-server.ts, optional): binds a TCP port (default 127.0.0.1) when explicitly started by the operator; requires a non-empty secret (bearer token). Core TypeScript library: zero outbound network calls — all LLM/API clients are BYOC (bring your own client)."
     inter_agent_comms: "none — this skill does not implement, invoke, or control inter-agent messaging or sessions_send. All coordination is via local file-based blackboard only."
     sessions_send: "NOT implemented or invoked by this skill. sessions_send is a host-platform built-in entirely outside this skill's control. See data-flow notice below."
     sessions_ops: "platform-provided — outside this skill's control"
@@ -713,7 +713,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Permission manifest** | `metadata.openclaw` in SKILL.md frontmatter explicitly declares `bundle_scope: "Python scripts only"`, `network_calls: none`, `requires.bins: [python3]` — no shell tools, no API credentials, no external services |
+| **Permission manifest** | `metadata.openclaw` in SKILL.md frontmatter explicitly declares `bundle_scope` (Python scripts: local-only; full npm package: includes optional MCP SSE server), `network_calls` (Python scripts: none; MCP SSE server: TCP, operator-started, bearer-token required), `requires.bins: [python3]` — no API credentials, no external services in core |
 | **Least-privilege resource gating** | `check_permission.py` uses a weighted scoring model (justification 40 %, trust 30 %, risk 30 %); PAYMENTS and FILE_EXPORT require `--confirm-high-risk` acknowledgment before any token is issued; `--scope` limits every grant to minimum required access |
 | **Abstract resource labels only** | PAYMENTS, DATABASE, EMAIL, FILE_EXPORT are local scoring labels — no external credentials exist in the skill; there is nothing to leak to an external service |
 | **HMAC-signed grant tokens** | Since v5.5.2, every grant record carries `_sig` (HMAC-SHA256 over canonical fields); `validate_token.py` rejects tampered records — privilege escalation via forged grants is detected at validation time |
@@ -726,7 +726,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Zero network calls, zero subprocesses** | All bundled Python scripts use Python stdlib only, spawn no subprocesses, and make no network calls — declared in `metadata.openclaw.network_calls: none` and `bundle_scope`; enforceable by platform inspection |
+| **Zero network calls (Python scripts)** | All bundled Python scripts use Python stdlib only, spawn no subprocesses, and make no network calls — declared in `metadata.openclaw.network_calls` and `bundle_scope`. The optional MCP SSE server (`bin/mcp-server.ts`) binds a TCP port only when explicitly started by the operator and requires a non-empty bearer-token secret. |
 | **AgentRuntime sandbox** | `ShellExecutor` enforces per-command timeout and output-size limits; `SandboxPolicy` allowlist/blocklist prevents unapproved shell commands from running at all |
 | **Source protection** | `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any attempt to read outside that boundary throws `SourceProtectionError` — the agent receives `{success: false}`, no path details leak |
 | **Environment isolation** | `NETWORK_AI_ENV` / `--env` routes all state to `data/<env>/`; dev, staging, and production state are fully separated; live state (`audit_log.jsonl`, `active_grants.json`) never promotes across environments |
@@ -739,7 +739,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.8.0"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.8.1"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |

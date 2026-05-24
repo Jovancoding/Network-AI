@@ -1,15 +1,12 @@
 # Network-AI Threat Model
 
-Version: 5.8.0 — updated with each release that changes a trust boundary or auth mechanism.
+Version: 5.8.1 — updated with each release that changes a trust boundary or auth mechanism.
 
 ---
 
 ## 1. Overview
 
-Network-AI is an in-process multi-agent orchestrator. There is no hosted service; the
-operator installs it and runs it inside their own infrastructure. This document describes
-the adversaries we design against, the trust boundaries we enforce, and the explicit
-non-goals that bound the threat model.
+Network-AI is an in-process multi-agent orchestrator. There is no SaaS or cloud-hosted service — the operator installs it and runs it inside their own infrastructure. The package includes an optional MCP SSE server (`bin/mcp-server.ts`) that, when explicitly started by the operator, binds a TCP port and becomes a network-reachable service boundary. This document describes the adversaries we design against, the trust boundaries we enforce, and the explicit non-goals that bound the threat model.
 
 ---
 
