@@ -6,12 +6,12 @@ metadata:
     emoji: "\U0001F41D"
     homepage: https://network-ai.org
     capabilities:
-      filesystem: "read/write — data/ directory only (blackboard state, audit log, active_grants.json, project-context.json). No access outside the data/ subtree."
+      filesystem: "read/write — project root `swarm-blackboard.md` (blackboard state), `data/pending_changes/<id>.json` (WAL entries), `data/audit_log.jsonl`, `data/active_grants.json`, `data/.signing_key`, `data/project-context.json`, `data/task_tracking.json`, `data/agent_health.json`, `data/budget_tracking.json`. All paths are local; nothing is transmitted over the network. When NETWORK_AI_ENV is set, data paths are rooted at `data/<env>/` instead of `data/`."
       env_vars: "read — NETWORK_AI_ENV (environment routing), NETWORK_AI_MCP_SECRET (MCP bearer auth), NETWORK_AI_MINIMAL (minimal-mode flag). No env vars are written."
       shell_exec: "optional — AgentRuntime (lib/agent-runtime.ts) with SandboxPolicy and ApprovalGate; disabled by default. Never auto-enabled by this skill. auto_approve must NOT be set in production (see auto_approve_warning below)."
       tcp_port: "optional — MCP SSE server (bin/mcp-server.ts) binds 127.0.0.1 only when explicitly started by the operator. Requires a non-empty bearer-token secret. Never auto-started by this skill or any bundled Python script."
     bundle_scope:
-      clawhub_python_scripts: "Python stdlib only — scripts/*.py (blackboard.py, check_permission.py, context_manager.py, swarm_guard.py, token_manager.py, check_context.py). Zero network calls, zero subprocesses, zero third-party packages. This is the scope scanned by SkillSpector."
+      clawhub_python_scripts: "Python stdlib only — scripts/*.py (blackboard.py, check_permission.py, context_manager.py, swarm_guard.py, validate_token.py, revoke_token.py). Zero network calls, zero subprocesses, zero third-party packages. This is the scope scanned by SkillSpector."
       npm_full_package: "The npm package (npm install network-ai) adds: TypeScript library modules, CLI (bin/cli.ts), and optional MCP SSE server (bin/mcp-server.ts). The MCP SSE server exposes a TCP port and is NOT activated by installing or importing the package — it must be explicitly started by the operator."
     network_calls:
       python_scripts: none
@@ -34,8 +34,12 @@ metadata:
       data_directory:
         path: data/
         scope: local-only
-        files: ["audit_log.jsonl", "active_grants.json", "project-context.json"]
+        files: ["audit_log.jsonl", "active_grants.json", ".signing_key", "project-context.json", "task_tracking.json", "agent_health.json", "budget_tracking.json", "pending_changes/<id>.json"]
         description: "All persistent state is local-only. No files are transmitted over the network."
+      blackboard_file:
+        path: swarm-blackboard.md
+        scope: local-only
+        description: "Shared coordination state written by scripts/blackboard.py (project root). Contains task results, grant tokens, status flags, and TTL-scoped cache entries. Access should be restricted to the local user running the swarm."
       auto_approve_warning: "ApprovalGate.auto_approve (lib/agent-runtime.ts) must NOT be enabled in production or untrusted environments. It is only appropriate in explicitly isolated CI/dev sandboxes where all commands executed by the runtime are known and trusted in advance."
 ---
 
@@ -750,7 +754,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.8.2"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.8.3"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |

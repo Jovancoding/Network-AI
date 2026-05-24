@@ -5,6 +5,13 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.3] - 2026-05-24
+
+### Fixed
+- **`SKILL.md` frontmatter — `capabilities.filesystem` understates file access (Description-Behavior Mismatch, 84%)**: The field previously said "data/ directory only" but `scripts/blackboard.py` reads and writes `swarm-blackboard.md` in the project root and `data/pending_changes/<id>.json` WAL entries. Updated to list every path actually touched: `swarm-blackboard.md`, `data/pending_changes/`, `data/audit_log.jsonl`, `data/active_grants.json`, `data/.signing_key`, `data/project-context.json`, `data/task_tracking.json`, `data/agent_health.json`, `data/budget_tracking.json`. Also added separate `privacy.blackboard_file` entry for `swarm-blackboard.md`.
+- **`SKILL.md` frontmatter — `clawhub_python_scripts` lists phantom scripts (Intent-Code Divergence, 90%)**: The field listed `token_manager.py` and `check_context.py` (neither exists) and omitted `validate_token.py` and `revoke_token.py` (both exist and are referenced in docs). Corrected to: `blackboard.py, check_permission.py, context_manager.py, swarm_guard.py, validate_token.py, revoke_token.py`.
+- Version bump to 5.8.3 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.8.2] - 2026-05-25
 
 ### Security
