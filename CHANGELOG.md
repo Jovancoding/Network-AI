@@ -5,6 +5,20 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.2] - 2026-05-25
+
+### Security
+- **`scripts/check_permission.py` — token exposure in grant listings** (Ssd3, 98% confidence) — Removed `token_full` field from `--active-grants --json` output. Full live tokens now appear only at issuance time; all listing commands emit a masked prefix (`token[:16] + "..."`) only. Updated header comment documenting that justification strings are logged verbatim — do not include PII, credentials, or secrets in justification text. Grant tokens are masked in all listing outputs.
+- **`scripts/context_manager.py` — prompt injection no-block** (Missing User Warnings, 93%) — `cmd_inject` now exits with code 1 (injection blocked) when `_validate_context()` returns warnings, preventing adversarially-crafted context entries from being injected into agent system prompts. Added `--force` flag to override in explicitly trusted/CI environments. Usage docs updated.
+
+### Fixed
+- **`SKILL.md` frontmatter — explicit capabilities manifest** (Lp3, 90%) — Added machine-readable `capabilities` block under `metadata.openclaw` declaring: `filesystem` (data/ read/write), `env_vars` (read), `shell_exec` (optional, requires SandboxPolicy + ApprovalGate), `tcp_port` (optional, MCP SSE server, never auto-started).
+- **`SKILL.md` frontmatter — scope ambiguity** (Description-Behavior Mismatch, 92% / 89%) — Split `bundle_scope` and `network_calls` from single prose strings into structured sub-fields: `clawhub_python_scripts` (local-only, zero network) and `npm_full_package` (TypeScript library + CLI + optional MCP SSE server). Eliminates ambiguity about what ClawHub bundles vs what `npm install` delivers.
+- **`claude-tools.json` — vague trigger conditions** (Vague Triggers, 83%) — Added explicit `DENY` conditions and scoping rules to `delegate_task` (requires AuthGuardian grant for sensitive resource access) and `spawn_parallel_agents` (SandboxPolicy must be active; auto-approve must be disabled; sensitive resource access requires prior grant per agent).
+- **`SECURITY.md` / `.github/SECURITY.md` — auto-approve documentation** (Excessive Agency, 78%) — `ApprovalGate` description updated to explicitly warn that `auto_approve: true` must never be used in production or untrusted environments. Added `auto_approve_warning` to SKILL.md `privacy` section.
+- **`SECURITY.md` / `.github/SECURITY.md` — justification field sensitivity** (Ssd3, 94%) — `SecureAuditLogger` table entry updated to note that justification fields are stored verbatim and must not contain PII, credentials, or secrets.
+- Version bump to 5.8.2 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.8.1] - 2026-05-24
 
 ### Fixed

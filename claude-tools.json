@@ -1,7 +1,7 @@
 [
   {
     "name": "delegate_task",
-    "description": "Delegate a task to a specialized sub-agent within the Network-AI swarm. The swarm uses a shared blackboard for coordination. Use this to route work to agents like data_analyst, strategy_advisor, or risk_assessor.",
+    "description": "Delegate a task to a specialized sub-agent within the Network-AI swarm. The swarm uses a shared blackboard for coordination. Use this to route work to agents like data_analyst, strategy_advisor, or risk_assessor. DENY: Do not delegate tasks that access PAYMENTS, DATABASE, or FILE_EXPORT resources unless a valid AuthGuardian grant token has been obtained for the target agent and resource. Do not delegate tasks outside the current swarm context or to agent IDs not registered in the active swarm. Do not forward raw user input as taskPayload without sanitization.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -55,7 +55,7 @@
   },
   {
     "name": "spawn_parallel_agents",
-    "description": "Spawn multiple sub-agents in parallel for complex task decomposition. Results are combined using a synthesis strategy.",
+    "description": "Spawn multiple sub-agents in parallel for complex task decomposition. Results are combined using a synthesis strategy. DENY: Do not spawn more than the swarm's configured concurrency limit. Do not spawn agents with shell_exec capabilities unless AgentRuntime SandboxPolicy is active and auto_approve is explicitly disabled. Spawning agents that access sensitive resource types (PAYMENTS, DATABASE, EMAIL, FILE_EXPORT) requires a prior AuthGuardian permission grant per agent.",
     "input_schema": {
       "type": "object",
       "properties": {

@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 5.8.x   | ✅ Yes — full support (current, latest: 5.8.1) |
+| 5.8.x   | ✅ Yes — full support (current, latest: 5.8.2) |
 | 5.7.x   | ✅ Security fixes only |
 | 5.6.x   | ✅ Security fixes only |
 | 5.5.x   | ✅ Security fixes only |
@@ -60,7 +60,7 @@ Network-AI includes built-in security features:
 - **Fail-Closed Approval Timeout** (v5.5.8) -- `PhasePipelineOptions.approvalTimeoutMs` (default 300,000 ms / 5 min) ensures approval gates never block indefinitely; if the `onApproval` callback does not settle within the deadline, the gate automatically denies — preventing hung pipelines in automated deployments
 - **Confidence-Based Filtering** (v4.13.0) -- `ConfidenceFilter` rejects low-confidence agent findings below configurable thresholds and validates rejected results with secondary agents; aggregation strategies (unanimous, majority) enforce consensus before accepting multi-agent results
 - **Agent Runtime Sandbox** (v4.14.0) -- `SandboxPolicy` enforces command allowlists/blocklists, path scoping with traversal protection, and risk assessment; `ShellExecutor` sandboxes child processes with timeout/output limits; `FileAccessor` restricts file I/O to scoped base paths
-- **Approval Gates** (v4.14.0) -- `ApprovalGate` requires explicit human or callback approval for high-risk operations (writes, shell commands, budget spend); auto-approve mode for trusted environments; full approval history with audit trail
+- **Approval Gates** (v4.14.0) -- `ApprovalGate` requires explicit human or callback approval for high-risk operations (writes, shell commands, budget spend); full approval history with audit trail. **WARNING:** `auto_approve: true` must only be used in explicitly isolated CI/dev sandboxes where all commands are known and trusted in advance — never in production, shared, or untrusted environments. Default is `auto_approve: false`.
 - **Pipe Mode Authentication** (v4.14.0) -- JSON stdin/stdout protocol for programmatic agent control; commands processed one-at-a-time with structured responses; no shell injection surface
 - **Strategy Agent Pool Isolation** (v4.14.0) -- `AgentPool` enforces per-pool capacity ceilings; `WorkloadPartitioner` routes tasks by priority class; adaptive scaling respects budget constraints before spawning agents
 - **Goal Decomposer DAG Validation** (v4.15.0) -- `validateDAG()` enforces acyclicity (Kahn's algorithm), rejects self-dependencies and unknown task references; task graphs are validated before execution to prevent infinite loops or orphaned tasks
@@ -109,7 +109,7 @@ The security module (`security.ts`) provides defense-in-depth protections:
 | Rate Limiter | `RateLimiter` | Per-agent request throttling + lockout |
 | Encryptor | `DataEncryptor` | AES-256-GCM encryption for sensitive data |
 | Permission Hardener | `PermissionHardener` | Trust-ceiling & privilege escalation prevention |
-| Audit Logger | `SecureAuditLogger` | Cryptographically signed audit entries |
+| Audit Logger | `SecureAuditLogger` | Cryptographically signed audit entries. **Note:** Permission `justification` fields are stored verbatim — never include PII, credentials, or secrets in justification text. |
 | Gateway | `SecureSwarmGateway` | Integrated security layer wrapping all ops |
 
 ---

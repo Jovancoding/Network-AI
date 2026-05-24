@@ -21,7 +21,7 @@ THE 3-LAYER MEMORY MODEL
 Usage:
     python context_manager.py init --name "MyProject" [--description "..."] [--version "1.0.0"]
     python context_manager.py show
-    python context_manager.py inject
+    python context_manager.py inject [--force]
     python context_manager.py update --section decisions  --add '{"decision": "...", "rationale": "..."}'
     python context_manager.py update --section milestones --complete "task name"
     python context_manager.py update --section milestones --add '{"planned": "task name"}'
@@ -33,7 +33,8 @@ Examples:
     python context_manager.py init --name "Network-AI" --description "Multi-agent swarm framework" --version "4.5.0"
     python context_manager.py update --section decisions --add '{"decision": "Use atomic blackboard commits", "rationale": "Prevent race conditions"}'
     python context_manager.py update --section milestones --complete "v4.4.3 ClawHub clean-scan"
-    python context_manager.py inject
+    python context_manager.py inject                          # blocked if context has prompt-injection patterns
+    python context_manager.py inject --force                  # override block (trusted/CI environments only)
 """
 
 import argparse
@@ -214,7 +215,7 @@ def cmd_show(args: argparse.Namespace) -> int:  # noqa: ARG001
     return 0
 
 
-def cmd_inject(args: argparse.Namespace) -> int:  # noqa: ARG001
+def cmd_inject(args: argparse.Namespace) -> int:
     """Print a formatted block suitable for injection into an agent system prompt."""
     ctx = _load()
     warnings = _validate_context(ctx)
@@ -222,7 +223,14 @@ def cmd_inject(args: argparse.Namespace) -> int:  # noqa: ARG001
         print("[context_manager] VALIDATION WARNINGS \u2014 context has potential issues:", file=sys.stderr)
         for w in warnings:
             print(f"  ! {w}", file=sys.stderr)
-        print("[context_manager] Proceeding with inject, but review warnings above.", file=sys.stderr)
+        if not getattr(args, "force", False):
+            print(
+                "[context_manager] ERROR: Injection blocked. Context contains potential prompt-injection "
+                "content. Use --force to override (only in trusted, controlled environments).",
+                file=sys.stderr,
+            )
+            return 1
+        print("[context_manager] --force: proceeding with inject despite warnings.", file=sys.stderr)
     p = ctx.get("project", {})
 
     lines: list[str] = []
@@ -390,7 +398,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("show", help="Print the full context as JSON")
 
     # inject
-    sub.add_parser("inject", help="Print formatted context for agent system-prompt injection")
+    p_inject = sub.add_parser("inject", help="Print formatted context for agent system-prompt injection")
+    p_inject.add_argument(
+        "--force",
+        action="store_true",
+        help="Proceed with injection even when validation warnings are present (prompt-injection risk — only use in trusted environments)",
+    )
 
     # update
     p_update = sub.add_parser("update", help="Update a specific context section")

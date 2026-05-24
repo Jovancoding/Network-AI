@@ -1,12 +1,22 @@
 ---
 name: network-ai
-description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. All bundled scripts run locally with zero network calls and zero third-party dependencies."
+description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. All bundled Python scripts run locally with zero network calls. The full npm package (npm install network-ai) additionally ships a TypeScript library, CLI, and an optional operator-started MCP SSE server that binds a TCP port."
 metadata:
   openclaw:
     emoji: "\U0001F41D"
     homepage: https://network-ai.org
-    bundle_scope: "Python scripts (scripts/*.py) — local only, Python stdlib only, no network calls, no subprocesses. The full npm package additionally includes TypeScript library modules, a CLI (bin/cli.ts), and an optional self-hosted MCP SSE server (bin/mcp-server.ts) that binds a TCP port when started by the operator. Install the npm package only if you intend to run the full orchestrator."
-    network_calls: "bundled Python scripts: none — zero network calls, zero subprocesses. MCP SSE server (bin/mcp-server.ts, optional): binds a TCP port (default 127.0.0.1) when explicitly started by the operator; requires a non-empty secret (bearer token). Core TypeScript library: zero outbound network calls — all LLM/API clients are BYOC (bring your own client)."
+    capabilities:
+      filesystem: "read/write — data/ directory only (blackboard state, audit log, active_grants.json, project-context.json). No access outside the data/ subtree."
+      env_vars: "read — NETWORK_AI_ENV (environment routing), NETWORK_AI_MCP_SECRET (MCP bearer auth), NETWORK_AI_MINIMAL (minimal-mode flag). No env vars are written."
+      shell_exec: "optional — AgentRuntime (lib/agent-runtime.ts) with SandboxPolicy and ApprovalGate; disabled by default. Never auto-enabled by this skill. auto_approve must NOT be set in production (see auto_approve_warning below)."
+      tcp_port: "optional — MCP SSE server (bin/mcp-server.ts) binds 127.0.0.1 only when explicitly started by the operator. Requires a non-empty bearer-token secret. Never auto-started by this skill or any bundled Python script."
+    bundle_scope:
+      clawhub_python_scripts: "Python stdlib only — scripts/*.py (blackboard.py, check_permission.py, context_manager.py, swarm_guard.py, token_manager.py, check_context.py). Zero network calls, zero subprocesses, zero third-party packages. This is the scope scanned by SkillSpector."
+      npm_full_package: "The npm package (npm install network-ai) adds: TypeScript library modules, CLI (bin/cli.ts), and optional MCP SSE server (bin/mcp-server.ts). The MCP SSE server exposes a TCP port and is NOT activated by installing or importing the package — it must be explicitly started by the operator."
+    network_calls:
+      python_scripts: none
+      typescript_library: "none — BYOC (bring your own client); zero outbound calls from library code; all LLM/API clients are injected by the caller"
+      mcp_sse_server: "optional — binds 127.0.0.1:<port> when explicitly started by the operator; all connections require a bearer-token secret (NETWORK_AI_MCP_SECRET); never auto-started"
     inter_agent_comms: "none — this skill does not implement, invoke, or control inter-agent messaging or sessions_send. All coordination is via local file-based blackboard only."
     sessions_send: "NOT implemented or invoked by this skill. sessions_send is a host-platform built-in entirely outside this skill's control. See data-flow notice below."
     sessions_ops: "platform-provided — outside this skill's control"
@@ -20,12 +30,13 @@ metadata:
         path: data/audit_log.jsonl
         scope: local-only
         description: "Local append-only JSONL file recording operation metadata. No data leaves the machine."
-        pii_warning: "Do not include PII, secrets, or credentials in justification fields. Log entries persist on disk."
+        pii_warning: "Do not include PII, secrets, or credentials in justification fields. Log entries persist on disk. Grant tokens are masked to a short prefix in all listing outputs; full tokens appear only at issuance time."
       data_directory:
         path: data/
         scope: local-only
         files: ["audit_log.jsonl", "active_grants.json", "project-context.json"]
         description: "All persistent state is local-only. No files are transmitted over the network."
+      auto_approve_warning: "ApprovalGate.auto_approve (lib/agent-runtime.ts) must NOT be enabled in production or untrusted environments. It is only appropriate in explicitly isolated CI/dev sandboxes where all commands executed by the runtime are known and trusted in advance."
 ---
 
 # Swarm Orchestrator Skill
@@ -739,7 +750,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.8.1"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.8.2"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |

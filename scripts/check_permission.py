@@ -7,6 +7,12 @@
 #           data[/<env>]/.signing_key (on first run only; chmod 0o600)
 # Imports used: argparse, json, re, sys, uuid, hmac, hashlib, datetime, pathlib, typing
 # No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
+#
+# SECURITY: Justification strings supplied via --justification are logged verbatim
+# to data/audit_log.jsonl. Do NOT include PII, credentials, secret names, API keys,
+# or other sensitive business data in justification fields. Treat justifications as
+# permanently visible log entries. Grant tokens are only shown at issuance time;
+# listing commands (--active-grants) always mask tokens to a short prefix.
 """
 AuthGuardian Permission Checker
 
@@ -551,7 +557,6 @@ def list_active_grants(agent_filter: Optional[str] = None, as_json: bool = False
 
         active.append({
             "token": token[:16] + "..." if len(token) > 16 else token,
-            "token_full": token,
             "agent_id": grant.get("agent_id", "unknown"),
             "resource_type": grant.get("resource_type", "unknown"),
             "scope": grant.get("scope"),
@@ -565,7 +570,7 @@ def list_active_grants(agent_filter: Optional[str] = None, as_json: bool = False
     active.sort(key=lambda g: g["expires_at"])
 
     if as_json:
-        # In JSON mode, include full tokens
+        # Token values are masked (prefix only) — never emit full live tokens in output.
         output: dict[str, Any] = {
             "grants": active,
             "total": len(active),
