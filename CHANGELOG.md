@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.4] - 2026-05-24
+
+### Security
+- **`scripts/blackboard.py` — arbitrary file read/write via `--path` (Description-Behavior Mismatch, 96% confidence)**: The `--path` CLI argument was passed directly to `SharedBlackboard` without boundary validation, allowing reads and writes to any local path despite documentation stating writes are confined to the project directory. Added runtime path-traversal check: `args.path.resolve()` is validated against the project root via `relative_to()`; any path outside the project directory exits with an error (CWE-22). The `--path` help text updated to document the restriction. Script header comment updated to describe the enforcement. `SKILL.md` `capabilities.filesystem` updated to reflect this protection.
+- Version bump to 5.8.4 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.8.3] - 2026-05-24
 
 ### Fixed

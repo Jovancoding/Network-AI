@@ -3,6 +3,8 @@
 # All I/O is local file operations only:
 #   READS:  swarm-blackboard.md, data/pending_changes/<id>.json
 #   WRITES: swarm-blackboard.md, data/pending_changes/<id>.json
+# --path is accepted for environment routing but is validated against the project
+# root directory; paths outside the project directory are rejected (CWE-22).
 # Imports used: argparse, json, os, re, sys, time, hashlib, datetime, pathlib,
 #               typing, contextlib, fcntl (Unix file-lock only, no network use)
 # No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
@@ -677,7 +679,7 @@ Examples:
         "--path",
         type=Path,
         default=BLACKBOARD_PATH,
-        help="Path to blackboard file"
+        help="Path to blackboard file (must be inside the project directory)",
     )
     parser.add_argument(
         "--env",
@@ -690,6 +692,20 @@ Examples:
     if args.env:
         _data = _resolve_data_dir(args.env)
         args.path = _data / "swarm-blackboard.md"
+
+    # Validate --path against the project root to prevent path traversal (CWE-22).
+    # Resolving symlinks before comparison ensures traversal via symlinks is also blocked.
+    _project_root = Path(__file__).parent.parent.resolve()
+    try:
+        args.path.resolve().relative_to(_project_root)
+    except ValueError:
+        print(
+            f"Error: --path must be inside the project directory ({_project_root}). "
+            f"Got: {args.path.resolve()}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     bb = SharedBlackboard(args.path)
     
     try:
