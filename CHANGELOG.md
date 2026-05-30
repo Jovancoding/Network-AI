@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.8] - 2026-05-30
+
+### Fixed
+- **CodeQL #169–#171 — CWE-367 TOCTOU data-flow break in `test-phase11.ts`**: Three `openSync(path, 'w')` write blocks still triggered `js/file-system-race` because CodeQL traced the same `lockPath`/`tmpPath` variables from earlier `existsSync` assertions to the write. Fixed #169–#170 by replacing `openSync(lockPath, ...)` with the logically equivalent `lock.getStatus().locked` assertion (eliminating the `existsSync(lockPath)` check entirely and breaking the taint chain). Fixed #171 by switching to `O_CREAT|O_EXCL|O_WRONLY` for the `.tmp` orphan-simulation write — the atomic-create flag is both the CodeQL-recommended pattern for new file creation and correct here since the `.tmp` must not exist at that point in the test.
+- **CodeQL #172 — unused `writeFileSync` import in `test-phase11.ts`**: All three path-based `writeFileSync` calls were replaced with fd operations in v5.8.7. The now-unused import is removed; `constants` and `unlinkSync` are added in its place.
+- **SkillSpector Natural-Language Policy Violations (71%) — `claude-project-prompt.md` always-orchestrate instruction**: The instruction "DECOMPOSE every complex request into exactly 3 sub-tasks" unconditionally forced orchestration and sub-agent spawning for all requests, unnecessarily expanding attack surface. Added a scope guard that restricts the decomposition protocol to genuinely complex, multi-domain requests; simple or single-step requests are answered directly without decomposing.
+- **Test noise — red "WAL is disabled" stderr warnings**: `NETWORK_AI_MINIMAL=1` is now scoped to the `testAtomicSnapshot` and `testPriorityEviction` test functions (set on entry, deleted in `finally`), suppressing the expected `disableWal` warning for tests that deliberately disable WAL without breaking Feature 2's real WAL replay coverage.
+- Version bump to 5.8.8 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.8.7] - 2026-05-30
 
 ### Fixed

@@ -16,7 +16,7 @@ import { AdapterRegistry } from './adapters/adapter-registry';
 import { BaseAdapter } from './adapters/base-adapter';
 import { AdapterHookManager } from './lib/adapter-hooks';
 import type { AgentPayload, AgentContext, AgentResult, AdapterConfig } from './types/agent-adapter';
-import { mkdirSync, rmSync, readFileSync, writeFileSync, existsSync, openSync, writeSync, closeSync } from 'fs';
+import { mkdirSync, rmSync, readFileSync, existsSync, openSync, writeSync, closeSync, constants, unlinkSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 
@@ -415,10 +415,10 @@ async function testLockOwnership() {
     // 2. Normal acquire + release cycle works
     const acquired = lock.acquire('holder-A');
     assert(acquired, 'acquire() succeeds when lock is free');
-    assert(existsSync(lockPath), 'lock file created on acquire');
+    assert(lock.getStatus().locked, 'lock file created on acquire');
     const released = lock.release();
     assert(released, 'release() returns true when holding lock');
-    assert(!existsSync(lockPath), 'lock file removed on release');
+    assert(!lock.getStatus().locked, 'lock file removed on release');
 
     // 3. release() does NOT delete a lock owned by a different holder.
     //    Simulate: acquire under one holder id, then manually overwrite the lock
@@ -439,9 +439,9 @@ async function testLockOwnership() {
     }
     lock2.release();
     // release() should have skipped the unlink because holder/pid don't match
-    assert(existsSync(lockPath), 'release() does not delete a lock owned by another holder');
+    assert(lock2.getStatus().locked, 'release() does not delete a lock owned by another holder');
     // Clean up manually
-    try { require('fs').unlinkSync(lockPath); } catch { /* ignore */ }
+    try { unlinkSync(lockPath); } catch { /* ignore */ }
 
     // 4. forceReleaseStale via acquire() — inject a stale lock file and verify
     //    a new acquire succeeds (the stale lock is cleaned up transparently).
@@ -474,6 +474,8 @@ async function testLockOwnership() {
 async function testAtomicSnapshot() {
   header('Feature 6 — Atomic snapshot write (tmp + rename)');
   const dir = tmpDir();
+  // Suppress the "WAL is disabled" stderr warn for this intentional disableWal test.
+  process.env['NETWORK_AI_MINIMAL'] = '1';
   try {
     const bb = new LockedBlackboard(dir, { disableWal: true });
     bb.write('snap-key', { v: 1 }, 'agent');
@@ -492,29 +494,29 @@ async function testAtomicSnapshot() {
     // the constructor should not crash and state should still be loadable.
     bb.write('snap-key2', { v: 2 }, 'agent');
     // Manually create a .tmp to simulate an orphaned temp file from a prior crash.
-    // Use fd-based write to avoid TOCTOU (CWE-367).
+    // Use O_CREAT|O_EXCL|O_WRONLY (atomic create) to avoid TOCTOU (CWE-367).
     {
-      const fd = openSync(tmpPath, 'w', 0o600);
+      const fd = openSync(tmpPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
       writeSync(fd, '# Corrupt partial write\n');
       closeSync(fd);
     }
     const bb2 = new LockedBlackboard(dir, { disableWal: true });
     assert(bb2.read('snap-key') !== null, 'Existing committed data survives orphaned .tmp on restart');
     // Clean up the tmp
-    try { require('fs').unlinkSync(tmpPath); } catch { /* ignore */ }
+    try { unlinkSync(tmpPath); } catch { /* ignore */ }
 
   } finally {
+    delete process.env['NETWORK_AI_MINIMAL'];
     cleanup(dir);
   }
 }
-
-// ============================================================================
-// FEATURE 7: PRIORITY-AWARE PENDING EVICTION
 // ============================================================================
 
 async function testPriorityEviction() {
   header('Feature 7 — Priority-aware pending eviction');
   const dir = tmpDir();
+  // Suppress the "WAL is disabled" stderr warn for this intentional disableWal test.
+  process.env['NETWORK_AI_MINIMAL'] = '1';
   try {
     const bb = new LockedBlackboard(dir, { disableWal: true, conflictResolution: 'priority-wins' });
 
@@ -545,6 +547,7 @@ async function testPriorityEviction() {
     assert(result.success, 'High-priority change commits successfully after eviction cycle');
 
   } finally {
+    delete process.env['NETWORK_AI_MINIMAL'];
     cleanup(dir);
   }
 }

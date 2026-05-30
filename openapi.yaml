@@ -1,4 +1,4 @@
-openapi: 3.1.0
+﻿openapi: 3.1.0
 info:
   title: Network-AI Swarm Orchestrator
   description: >
@@ -6,7 +6,7 @@ info:
     blackboard coordination, parallel agent spawning, and permission gating
     via AuthGuardian. Requires the companion MCP server:
     `npm install -g network-ai && npx network-ai-server --port 3001`
-  version: 5.8.7
+  version: 5.8.8
   license:
     name: MIT
     url: https://github.com/Jovancoding/Network-AI/blob/main/LICENSE

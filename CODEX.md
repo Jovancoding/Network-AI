@@ -1,10 +1,10 @@
-# CODEX.md — Project Instructions for OpenAI Codex
+﻿# CODEX.md — Project Instructions for OpenAI Codex
 
 This file is read automatically by OpenAI Codex CLI when working in this repository.
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.8.7.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.8.8.
 
 ## Build & Test Commands
 

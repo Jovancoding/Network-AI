@@ -1,10 +1,10 @@
-# Security Policy
+﻿# Security Policy
 
 ## Supported Versions
 
 | Version | Supported |
 |---------|-----------|
-| 5.8.x   | ✅ Yes — full support (current, latest: 5.8.7) |
+| 5.8.x   | ✅ Yes — full support (current, latest: 5.8.8) |
 | 5.7.x   | ✅ Security fixes only |
 | 5.6.x   | ✅ Security fixes only |
 | 5.5.x   | ✅ Security fixes only |
