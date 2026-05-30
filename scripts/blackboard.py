@@ -3,8 +3,10 @@
 # All I/O is local file operations only:
 #   READS:  swarm-blackboard.md, data/pending_changes/<id>.json
 #   WRITES: swarm-blackboard.md, data/pending_changes/<id>.json
-# --path is accepted for environment routing but is validated against the project
+# --path controls the blackboard file path only and is validated against the project
 # root directory; paths outside the project directory are rejected (CWE-22).
+# Lock files and pending-change files always resolve from the global data/ directory
+# regardless of --path; only the main blackboard file path is affected by --path.
 # Imports used: argparse, json, os, re, sys, time, hashlib, datetime, pathlib,
 #               typing, contextlib, fcntl (Unix file-lock only, no network use)
 # No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib

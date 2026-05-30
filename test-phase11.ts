@@ -16,7 +16,7 @@ import { AdapterRegistry } from './adapters/adapter-registry';
 import { BaseAdapter } from './adapters/base-adapter';
 import { AdapterHookManager } from './lib/adapter-hooks';
 import type { AgentPayload, AgentContext, AgentResult, AdapterConfig } from './types/agent-adapter';
-import { mkdirSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs';
+import { mkdirSync, rmSync, readFileSync, writeFileSync, existsSync, openSync, writeSync, closeSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 
@@ -425,14 +425,19 @@ async function testLockOwnership() {
     //    file with a different holder/pid so release() thinks it was stolen.
     const lock2 = new FileLock(lockPath);
     lock2.acquire('holder-B');
-    // Overwrite lock file contents to simulate another process having taken it
-    writeFileSync(lockPath, JSON.stringify({
-      holder: 'holder-C',
-      acquired_at: new Date().toISOString(),
-      timeout_at: new Date(Date.now() + 10000).toISOString(),
-      pid: process.pid + 999  // different pid
-    }), 'utf-8');
-    const staleRelease = lock2.release();
+    // Overwrite lock file contents to simulate another process having taken it.
+    // Use fd-based write (open → write → close) to avoid TOCTOU (CWE-367).
+    {
+      const fd = openSync(lockPath, 'w', 0o600);
+      writeSync(fd, JSON.stringify({
+        holder: 'holder-C',
+        acquired_at: new Date().toISOString(),
+        timeout_at: new Date(Date.now() + 10000).toISOString(),
+        pid: process.pid + 999  // different pid
+      }));
+      closeSync(fd);
+    }
+    lock2.release();
     // release() should have skipped the unlink because holder/pid don't match
     assert(existsSync(lockPath), 'release() does not delete a lock owned by another holder');
     // Clean up manually
@@ -441,12 +446,17 @@ async function testLockOwnership() {
     // 4. forceReleaseStale via acquire() — inject a stale lock file and verify
     //    a new acquire succeeds (the stale lock is cleaned up transparently).
     const staleAcquiredAt = new Date(Date.now() - 60000).toISOString(); // 60s ago
-    writeFileSync(lockPath, JSON.stringify({
-      holder: 'stale-holder',
-      acquired_at: staleAcquiredAt,
-      timeout_at: new Date(Date.now() - 50000).toISOString(),
-      pid: process.pid + 1
-    }), 'utf-8');
+    // Use fd-based write to avoid TOCTOU (CWE-367).
+    {
+      const fd = openSync(lockPath, 'w', 0o600);
+      writeSync(fd, JSON.stringify({
+        holder: 'stale-holder',
+        acquired_at: staleAcquiredAt,
+        timeout_at: new Date(Date.now() - 50000).toISOString(),
+        pid: process.pid + 1
+      }));
+      closeSync(fd);
+    }
     const lock3 = new FileLock(lockPath);
     const acquiredAfterStale = lock3.acquire('holder-D', 5000);
     assert(acquiredAfterStale, 'acquire() succeeds after stale lock is cleaned up');
@@ -481,8 +491,13 @@ async function testAtomicSnapshot() {
     // Simulate recovery: if a .tmp exists on next load (crash mid-rename),
     // the constructor should not crash and state should still be loadable.
     bb.write('snap-key2', { v: 2 }, 'agent');
-    // Manually create a .tmp to simulate an orphaned temp file from a prior crash
-    writeFileSync(tmpPath, '# Corrupt partial write\n', 'utf-8');
+    // Manually create a .tmp to simulate an orphaned temp file from a prior crash.
+    // Use fd-based write to avoid TOCTOU (CWE-367).
+    {
+      const fd = openSync(tmpPath, 'w', 0o600);
+      writeSync(fd, '# Corrupt partial write\n');
+      closeSync(fd);
+    }
     const bb2 = new LockedBlackboard(dir, { disableWal: true });
     assert(bb2.read('snap-key') !== null, 'Existing committed data survives orphaned .tmp on restart');
     // Clean up the tmp

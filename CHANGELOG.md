@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.7] - 2026-05-30
+
+### Fixed
+- **CodeQL #165–#167 — CWE-367 TOCTOU in `test-phase11.ts` test helpers**: Three `writeFileSync(path, ...)` calls in the new lock-ownership and atomic-snapshot test helpers were flagged as potential file-system race conditions because the file path is resolved separately from the write. Replaced all three with fd-based writes (`openSync` → `writeSync` → `closeSync`) that operate on a single file descriptor, eliminating the TOCTOU window. These are test-only helpers with no concurrent writer in practice, but the pattern is now consistent with production code.
+- **CodeQL #168 — unused variable `staleRelease` in `test-phase11.ts`**: The return value of `lock2.release()` was captured but never read. Removed the assignment; the assertion on `existsSync(lockPath)` following it is the actual check.
+- **SkillSpector Intent-Code Divergence (94%) — `scripts/blackboard.py` `--path` comment**: The header comment claimed `--path` was validated against the project root for environment routing, which SkillSpector correctly identified as diverging from actual behavior: only the main blackboard file path is derived from `--path`; lock files and pending-change files always resolve from the global `data/` directory. Comment rewritten to accurately describe the `--path` scope.
+- Version bump to 5.8.7 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.8.6] - 2026-05-30
 
 ### Fixed
