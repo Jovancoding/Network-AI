@@ -1,4 +1,4 @@
-﻿# Architecture
+# Architecture
 
 Network-AI v5.8.8 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,148 tests, 70+ modules.
 

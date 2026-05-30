@@ -1,4 +1,4 @@
-﻿# CODEX.md — Project Instructions for OpenAI Codex
+# CODEX.md — Project Instructions for OpenAI Codex
 
 This file is read automatically by OpenAI Codex CLI when working in this repository.
 

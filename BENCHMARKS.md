@@ -1,4 +1,4 @@
-﻿# Benchmarks & Performance
+# Benchmarks & Performance
 
 > Performance data for Network-AI v5.8.8 deployments. Your swarm is only as fast as the backend it calls — this page helps you choose the right setup.
 

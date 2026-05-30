@@ -1,4 +1,4 @@
-﻿---
+---
 name: network-ai
 description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. All bundled Python scripts run locally with zero network calls. The full npm package (npm install network-ai) additionally ships a TypeScript library, CLI, and an optional operator-started MCP SSE server that binds a TCP port."
 metadata:

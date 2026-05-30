@@ -1,4 +1,4 @@
-﻿# Network-AI — Enterprise Evaluation Guide
+# Network-AI — Enterprise Evaluation Guide
 
 This document exists so an engineer or architect can evaluate Network-AI in under 30 minutes without a sales call.
 
