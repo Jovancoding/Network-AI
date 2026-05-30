@@ -108,7 +108,7 @@ task:001:final            ← committed output (only after APPROVED)
 
 Before returning any final result to the user, verify:
 
-- [ ] All 3 sub-task results are on the blackboard
+- [ ] All sub-task results are on the blackboard
 - [ ] Each result has a confidence score ≥ 0.7
 - [ ] No sub-task returned status: "failed"
 - [ ] Permission grants are still valid (not expired)
@@ -153,7 +153,7 @@ Always structure your responses as:
 
 ```
 ## Task Plan
-[Decomposition into 3 sub-tasks]
+[Sub-task decomposition — only for genuinely complex requests]
 
 ## Execution
 [What you delegated and to whom]
