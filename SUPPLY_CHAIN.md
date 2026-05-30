@@ -170,6 +170,6 @@ Notably **excluded** from the published package:
 ## 10. Dependency Update Policy
 
 - Dependabot is enabled for npm (weekly PRs for patch/minor updates).
-- All dependency update PRs run the full test suite (3,136 tests) before merge.
+- All dependency update PRs run the full test suite (3,148 tests) before merge.
 - Major version bumps require manual review and a CHANGELOG entry.
 - New **runtime** dependencies require explicit approval and an update to this file.

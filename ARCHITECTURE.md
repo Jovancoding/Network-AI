@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.8.5 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,136 tests, 70+ modules.
+Network-AI v5.8.6 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,148 tests, 70+ modules.
 
 ## The Multi-Agent Race Condition Problem
 
@@ -87,7 +87,9 @@ The coordination core. Uses file-system mutexes so any number of agents can writ
 - Conflict strategies: `first-commit-wins`, `priority-wins`, `last-write-wins`
 - `purgeExpired()` — evicts expired TTL entries on demand; returns eviction count
 - `startSweep(intervalMs?)` / `stopSweep()` — background timer (default 60 s, unref'd) that calls `purgeExpired()` automatically
-- **WAL crash recovery** — every write appends to `.wal.jsonl` before the file write and a checkpoint after; on startup `replayWAL()` recovers any uncommitted ops; `compactWAL()` truncates after a snapshot
+- **WAL crash recovery** — every write appends to `.wal.jsonl` before the file write and a checkpoint after; on startup `replayWAL()` recovers any uncommitted ops; `compactWAL()` truncates after a snapshot. **Durability scope:** WAL protects against *process crashes* (SIGKILL, uncaught exceptions). It does not guarantee durability against power loss or kernel OOM-kill because no `fsync` barrier is issued. Snapshots are written via atomic tmp+rename to prevent partial writes from corrupting committed state.
+- **Filesystem scope:** The mutex relies on `O_EXCL`/atomic create which is guaranteed on local POSIX filesystems and NTFS. **NFS (v2/v3) is not supported** — `O_EXCL` is not atomic over NFS and will silently lose the mutual-exclusion guarantee.
+- **`disableWal` / `NETWORK_AI_MINIMAL=1`** — skips WAL replay and disables crash recovery. Intended for CI/test fast startup only. A warning is logged at startup if this flag is active outside the `NETWORK_AI_MINIMAL` env var path.
 
 ### AuthGuardian
 

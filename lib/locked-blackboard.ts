@@ -23,6 +23,7 @@ import {
   existsSync,
   mkdirSync,
   unlinkSync,
+  renameSync,
   openSync,
   closeSync,
   writeSync,
@@ -200,10 +201,11 @@ export class FileLock {
         const lockData = JSON.parse(readFileSync(this.lockPath, 'utf-8'));
         const lockAge = Date.now() - new Date(lockData.acquired_at).getTime();
         
-        // If lock is stale, force release it
+        // If lock is stale, use compare-and-delete to avoid racing another waiter
+        // that may have already cleaned up this stale lock and created a fresh one.
         if (lockAge > CONFIG.staleLockThresholdMs) {
           log.warn('Stale lock detected, force releasing', { lockAgeMs: lockAge });
-          this.forceRelease();
+          this.forceReleaseStale(lockData.acquired_at, lockData.pid);
         } else {
           // Lock is held by someone else, wait and retry with backoff
           this.sleep(retryMs);
@@ -212,7 +214,8 @@ export class FileLock {
         }
       } catch (e: any) {
         if (e.code !== 'ENOENT') {
-          // Corrupted lock file, remove it
+          // Corrupted lock file (cannot parse) — unconditional remove is safe here
+          // because no valid holder can read their own identity back from corrupted JSON.
           this.forceRelease();
         }
         // ENOENT: no lock file yet, fall through to create
@@ -251,6 +254,8 @@ export class FileLock {
 
   /**
    * Release the lock if we hold it.
+   * Verifies ownership before unlinking to prevent deleting a lock acquired by
+   * another process after ours was force-released as stale.
    */
   release(): boolean {
     if (!this.lockHolder) {
@@ -262,11 +267,27 @@ export class FileLock {
         closeSync(this.lockFd);
         this.lockFd = null;
       }
-      
-      if (existsSync(this.lockPath)) {
-        unlinkSync(this.lockPath);
+
+      // Verify we still own the lock before deleting it.
+      // If another process force-released our stale lock and created its own,
+      // we must not delete theirs.
+      try {
+        const current = JSON.parse(readFileSync(this.lockPath, 'utf-8'));
+        if (current.holder === this.lockHolder && current.pid === process.pid) {
+          unlinkSync(this.lockPath);
+        } else {
+          log.warn('Release skipped: lock is owned by another holder', {
+            expected: this.lockHolder, found: current.holder, foundPid: current.pid
+          });
+        }
+      } catch (e: any) {
+        if (e.code !== 'ENOENT') {
+          // File exists but unreadable — attempt removal as a best-effort
+          try { unlinkSync(this.lockPath); } catch { /* ignore */ }
+        }
+        // ENOENT: already removed (race with another force-release) — that's fine
       }
-      
+
       this.lockHolder = null;
       return true;
     } catch (error) {
@@ -277,6 +298,7 @@ export class FileLock {
 
   /**
    * Force release a stale lock (use with caution).
+   * Unconditional — only safe for corrupted lock files.
    */
   forceRelease(): void {
     try {
@@ -285,6 +307,26 @@ export class FileLock {
       }
     } catch {
       // Ignore errors during force release
+    }
+    this.lockHolder = null;
+    this.lockFd = null;
+  }
+
+  /**
+   * Compare-and-delete a stale lock: only unlinks if the file still has the
+   * exact same identity (acquired_at + pid) we observed when we decided it
+   * was stale.  Prevents deleting a valid lock that was freshly created by
+   * another waiter that beat us to the cleanup.
+   */
+  private forceReleaseStale(expectedAcquiredAt: string, expectedPid: number): void {
+    try {
+      const current = JSON.parse(readFileSync(this.lockPath, 'utf-8'));
+      if (current.acquired_at === expectedAcquiredAt && current.pid === expectedPid) {
+        unlinkSync(this.lockPath);
+      }
+      // Identity changed — another process already cleaned up and acquired; leave it alone.
+    } catch {
+      // ENOENT or parse error — file is gone or corrupt; nothing to do.
     }
     this.lockHolder = null;
     this.lockFd = null;
@@ -442,6 +484,11 @@ export class LockedBlackboard {
     this.loadFromDisk();
     if (!this.disableWal) {
       this.replayWAL();
+    } else if (process.env['NETWORK_AI_MINIMAL'] !== '1') {
+      // WAL was explicitly disabled via constructor option outside of the
+      // recognised CI/test fast-startup path.  Warn so operators who
+      // accidentally carry NETWORK_AI_MINIMAL=1 into production notice.
+      log.warn('WAL is disabled: crash recovery is not active. Set disableWal:false or unset NETWORK_AI_MINIMAL to re-enable.');
     }
     this.loadPendingChanges();
   }
@@ -464,7 +511,10 @@ Content Hash: ${this.computeHash('')}
 ## Execution History
 <!-- Chronological log of completed tasks -->
 `;
-    writeFileSync(this.blackboardPath, content, { encoding: 'utf-8', mode: 0o600 });
+    // Atomic write: tmp + rename prevents partial writes on initial creation.
+    const tmpPath = `${this.blackboardPath}.tmp`;
+    writeFileSync(tmpPath, content, { encoding: 'utf-8', mode: 0o600 });
+    renameSync(tmpPath, this.blackboardPath);
   }
 
   private computeHash(content: string): string {
@@ -507,6 +557,20 @@ Content Hash: ${this.computeHash('')}
           const content = readFileSync(join(this.pendingDir, file), 'utf-8');
           const change: PendingChange = JSON.parse(content);
           if (change.status === 'pending' || change.status === 'validated') {
+            // Reconcile against WAL-replayed cache: if the key was already
+            // committed (by WAL replay or a prior run), the current cache hash
+            // will differ from previous_hash.  Such a change will always fail
+            // the conflict check in commit() — archive it now rather than
+            // leaving a zombie validated entry in pendingChanges.
+            if (change.status === 'validated' && this.cache.has(change.key)) {
+              const currentEntry = this.cache.get(change.key)!;
+              const currentHash = this.computeHash(JSON.stringify(currentEntry));
+              if (currentHash !== change.previous_hash) {
+                change.status = 'committed';
+                this.archivePendingChange(change);
+                continue;
+              }
+            }
             this.pendingChanges.set(change.change_id, change);
           }
         } catch {
@@ -525,10 +589,16 @@ Content Hash: ${this.computeHash('')}
   }
 
   private cleanupOldPendingChanges(): void {
+    // Sort lowest-priority first, then oldest-first within the same priority,
+    // so high-priority proposals (e.g., those awaiting approval gates) are
+    // never evicted before low-priority ones.
     const sorted = Array.from(this.pendingChanges.entries())
-      .sort((a, b) => new Date(a[1].proposed_at).getTime() - new Date(b[1].proposed_at).getTime());
+      .sort((a, b) => {
+        if (a[1].priority !== b[1].priority) return a[1].priority - b[1].priority;
+        return new Date(a[1].proposed_at).getTime() - new Date(b[1].proposed_at).getTime();
+      });
     
-    // Keep only the newest half
+    // Keep only the newest/highest-priority half
     const toRemove = sorted.slice(0, Math.floor(sorted.length / 2));
     for (const [changeId] of toRemove) {
       this.abort(changeId);
@@ -1068,7 +1138,12 @@ ${cacheContent}
 ## Execution History
 <!-- Chronological log of completed tasks -->
 `;
-    writeFileSync(this.blackboardPath, content, { encoding: 'utf-8', mode: 0o600 });
+    // Write to a temp file then rename atomically to prevent a crash mid-write
+    // from leaving a truncated/corrupt blackboard (which would lose committed data
+    // if the WAL was already compacted).
+    const tmpPath = `${this.blackboardPath}.tmp`;
+    writeFileSync(tmpPath, content, { encoding: 'utf-8', mode: 0o600 });
+    renameSync(tmpPath, this.blackboardPath);
   }
 
   // ==========================================================================

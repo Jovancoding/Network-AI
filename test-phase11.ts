@@ -4,7 +4,7 @@
  * Run with: npx ts-node test-phase11.ts
  */
 
-import { LockedBlackboard } from './lib/locked-blackboard';
+import { LockedBlackboard, FileLock } from './lib/locked-blackboard';
 import { CircuitBreaker } from './lib/circuit-breaker';
 import type { CircuitBreakerConfig } from './lib/circuit-breaker';
 import {
@@ -16,7 +16,7 @@ import { AdapterRegistry } from './adapters/adapter-registry';
 import { BaseAdapter } from './adapters/base-adapter';
 import { AdapterHookManager } from './lib/adapter-hooks';
 import type { AgentPayload, AgentContext, AgentResult, AdapterConfig } from './types/agent-adapter';
-import { mkdirSync, rmSync, readFileSync } from 'fs';
+import { mkdirSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 
@@ -398,6 +398,143 @@ async function testTelemetry() {
 }
 
 // ============================================================================
+// FEATURE 5: LOCK OWNERSHIP & STALE-LOCK SAFETY
+// ============================================================================
+
+async function testLockOwnership() {
+  header('Feature 5 — Lock ownership verification & stale-lock safety');
+  const dir = tmpDir();
+  try {
+    const lockPath = join(dir, '.test.lock');
+    const lock = new FileLock(lockPath);
+
+    // 1. release() does nothing when lock is not held
+    const r0 = lock.release();
+    assert(r0 === false, 'release() returns false when not holding lock');
+
+    // 2. Normal acquire + release cycle works
+    const acquired = lock.acquire('holder-A');
+    assert(acquired, 'acquire() succeeds when lock is free');
+    assert(existsSync(lockPath), 'lock file created on acquire');
+    const released = lock.release();
+    assert(released, 'release() returns true when holding lock');
+    assert(!existsSync(lockPath), 'lock file removed on release');
+
+    // 3. release() does NOT delete a lock owned by a different holder.
+    //    Simulate: acquire under one holder id, then manually overwrite the lock
+    //    file with a different holder/pid so release() thinks it was stolen.
+    const lock2 = new FileLock(lockPath);
+    lock2.acquire('holder-B');
+    // Overwrite lock file contents to simulate another process having taken it
+    writeFileSync(lockPath, JSON.stringify({
+      holder: 'holder-C',
+      acquired_at: new Date().toISOString(),
+      timeout_at: new Date(Date.now() + 10000).toISOString(),
+      pid: process.pid + 999  // different pid
+    }), 'utf-8');
+    const staleRelease = lock2.release();
+    // release() should have skipped the unlink because holder/pid don't match
+    assert(existsSync(lockPath), 'release() does not delete a lock owned by another holder');
+    // Clean up manually
+    try { require('fs').unlinkSync(lockPath); } catch { /* ignore */ }
+
+    // 4. forceReleaseStale via acquire() — inject a stale lock file and verify
+    //    a new acquire succeeds (the stale lock is cleaned up transparently).
+    const staleAcquiredAt = new Date(Date.now() - 60000).toISOString(); // 60s ago
+    writeFileSync(lockPath, JSON.stringify({
+      holder: 'stale-holder',
+      acquired_at: staleAcquiredAt,
+      timeout_at: new Date(Date.now() - 50000).toISOString(),
+      pid: process.pid + 1
+    }), 'utf-8');
+    const lock3 = new FileLock(lockPath);
+    const acquiredAfterStale = lock3.acquire('holder-D', 5000);
+    assert(acquiredAfterStale, 'acquire() succeeds after stale lock is cleaned up');
+    lock3.release();
+
+  } finally {
+    cleanup(dir);
+  }
+}
+
+// ============================================================================
+// FEATURE 6: ATOMIC SNAPSHOT (tmp + rename)
+// ============================================================================
+
+async function testAtomicSnapshot() {
+  header('Feature 6 — Atomic snapshot write (tmp + rename)');
+  const dir = tmpDir();
+  try {
+    const bb = new LockedBlackboard(dir, { disableWal: true });
+    bb.write('snap-key', { v: 1 }, 'agent');
+
+    const bbPath = join(dir, 'swarm-blackboard.md');
+    const tmpPath = `${bbPath}.tmp`;
+
+    // After a successful write, the .tmp file must NOT remain (rename cleaned it up).
+    assert(!existsSync(tmpPath), 'No orphaned .tmp file after successful write');
+
+    // The blackboard file must be readable and contain the key
+    const content = readFileSync(bbPath, 'utf-8');
+    assert(content.includes('snap-key'), 'Blackboard file contains written key');
+
+    // Simulate recovery: if a .tmp exists on next load (crash mid-rename),
+    // the constructor should not crash and state should still be loadable.
+    bb.write('snap-key2', { v: 2 }, 'agent');
+    // Manually create a .tmp to simulate an orphaned temp file from a prior crash
+    writeFileSync(tmpPath, '# Corrupt partial write\n', 'utf-8');
+    const bb2 = new LockedBlackboard(dir, { disableWal: true });
+    assert(bb2.read('snap-key') !== null, 'Existing committed data survives orphaned .tmp on restart');
+    // Clean up the tmp
+    try { require('fs').unlinkSync(tmpPath); } catch { /* ignore */ }
+
+  } finally {
+    cleanup(dir);
+  }
+}
+
+// ============================================================================
+// FEATURE 7: PRIORITY-AWARE PENDING EVICTION
+// ============================================================================
+
+async function testPriorityEviction() {
+  header('Feature 7 — Priority-aware pending eviction');
+  const dir = tmpDir();
+  try {
+    const bb = new LockedBlackboard(dir, { disableWal: true, conflictResolution: 'priority-wins' });
+
+    // Propose many low-priority changes (they should be evicted first)
+    const lowIds: string[] = [];
+    for (let i = 0; i < 60; i++) {
+      lowIds.push(bb.propose(`low-key-${i}`, i, 'low-agent', undefined, 0));
+    }
+
+    // Propose a high-priority change
+    const highId = bb.propose('high-key', 'important', 'high-agent', undefined, 3);
+
+    // Validate the high-priority change so it is in 'validated' state
+    bb.validate(highId, 'orchestrator');
+
+    // Trigger cleanup by proposing enough to exceed the 100-change limit
+    for (let i = 60; i < 110; i++) {
+      bb.propose(`filler-${i}`, i, 'filler-agent', undefined, 0);
+    }
+
+    // After eviction, the high-priority validated change must still be present
+    const pending = bb.listPendingChanges();
+    const highStillPresent = pending.some(c => c.change_id === highId);
+    assert(highStillPresent, 'High-priority validated change survives pending eviction');
+
+    // Commit should still work
+    const result = bb.commit(highId);
+    assert(result.success, 'High-priority change commits successfully after eviction cycle');
+
+  } finally {
+    cleanup(dir);
+  }
+}
+
+// ============================================================================
 // MAIN
 // ============================================================================
 
@@ -406,10 +543,13 @@ async function testTelemetry() {
   log('  Phase 11 — TTL/Sweep, WAL, Circuit Breaker, OTel', 'bold');
   console.log('='.repeat(64));
 
-  try { await testTTL(); }         catch (e) { fail('TTL suite (uncaught)', String(e)); }
-  try { await testWAL(); }         catch (e) { fail('WAL suite (uncaught)', String(e)); }
-  try { await testCircuitBreaker(); } catch (e) { fail('Circuit Breaker suite (uncaught)', String(e)); }
-  try { await testTelemetry(); }   catch (e) { fail('Telemetry suite (uncaught)', String(e)); }
+  try { await testTTL(); }             catch (e) { fail('TTL suite (uncaught)', String(e)); }
+  try { await testWAL(); }             catch (e) { fail('WAL suite (uncaught)', String(e)); }
+  try { await testCircuitBreaker(); }  catch (e) { fail('Circuit Breaker suite (uncaught)', String(e)); }
+  try { await testTelemetry(); }       catch (e) { fail('Telemetry suite (uncaught)', String(e)); }
+  try { await testLockOwnership(); }   catch (e) { fail('Lock ownership suite (uncaught)', String(e)); }
+  try { await testAtomicSnapshot(); }  catch (e) { fail('Atomic snapshot suite (uncaught)', String(e)); }
+  try { await testPriorityEviction(); } catch (e) { fail('Priority eviction suite (uncaught)', String(e)); }
 
   console.log('\n' + '='.repeat(64));
   log(`  Results: ${passed} passed, ${failed} failed`, failed > 0 ? 'red' : 'green');

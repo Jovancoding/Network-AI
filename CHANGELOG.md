@@ -5,6 +5,25 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.6] - 2026-05-30
+
+### Fixed
+- **LockedBlackboard: stale-lock compare-and-delete race in `acquire()`** — new `forceReleaseStale()` method re-reads the lock file and only unlinks it when the `acquired_at` timestamp and `pid` still match the observed stale holder, preventing two concurrent processes from both deleting a freshly-acquired lock (finding #1).
+- **LockedBlackboard: ownership-blind `release()` unlink** — `release()` now reads the lock file and verifies `holder` + `pid` before calling `unlinkSync`, so a process cannot accidentally delete another process's lock (finding #2).
+- **LockedBlackboard: non-atomic snapshot write** — `persistToDiskInternal()` and `writeInitialBlackboard()` now write to a `.tmp` side-file and call `renameSync` to atomically replace the final path; a crash mid-write can no longer produce a truncated/empty blackboard after WAL compaction (finding #3).
+- **LockedBlackboard: WAL/pending reconciliation — zombie validated entries** — `loadPendingChanges()` now cross-checks each `validated` pending file against the in-memory cache after WAL replay; if the key is already at the expected post-commit hash, the pending file is immediately archived as `committed` rather than added to `pendingChanges` where it would loop as a hash-conflict forever (finding #4).
+- **LockedBlackboard: `cleanupOldPendingChanges()` priority-unaware eviction** — eviction now sorts by `priority ASC` first, then `proposed_at ASC`; lowest-priority and oldest changes are evicted first, protecting high-priority approval-gate proposals from being discarded (finding #5).
+- **LockedBlackboard: silent `disableWal` in production** — a `WARN` log is now emitted at startup whenever `disableWal` is `true` and the `NETWORK_AI_MINIMAL` env var is not set, so WAL being disabled is never a silent misconfiguration in production (finding #11).
+
+### Tests
+- Added `testLockOwnership()` — 7 assertions covering: release-without-hold, acquire/release cycle, ownership-verified release does not delete a foreign lock, and stale-lock cleanup allowing a fresh acquire.
+- Added `testAtomicSnapshot()` — 3 assertions covering: no orphaned `.tmp` after a successful write, blackboard content correctness, and graceful load with a pre-existing orphaned `.tmp` file.
+- Added `testPriorityEviction()` — 2 assertions covering: high-priority validated change survives a pending overflow eviction cycle, and the surviving change can still be committed. Phase 11 total: 55 assertions.
+
+### Documentation
+- `ARCHITECTURE.md` — added durability-scope note to the WAL section: WAL protects against process crashes only (no `fsync` barrier, no power-loss guarantee); atomic tmp+rename snapshot behaviour described; explicit **NFS v2/v3 unsupported** caveat added (O_EXCL non-atomic over NFS); `disableWal`/`NETWORK_AI_MINIMAL` usage scope clarified.
+- Version bump to 5.8.6 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files. Test count updated to 3,148 (was 3,136) across 31 suites.
+
 ## [5.8.5] - 2026-05-24
 
 ### Security
