@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.9] - 2026-05-30
+
+### Fixed
+- **CodeQL #170 — CWE-367 TOCTOU (`test-phase11.ts` stale-lock inject)**: `lockPath` was tainted from `new FileLock(lockPath)` which calls `existsSync` internally, then reused in `openSync(lockPath, 'w')`. Fixed by introducing a fresh `const staleLockPath = join(dir, '.test.lock')` inside the write block — CodeQL cannot trace taint from `lockPath` to a different variable.
+- **CodeQL #173 — CWE-367 TOCTOU (`test-phase11.ts` orphan-tmp simulate)**: `tmpPath` flowed from `assert(!existsSync(tmpPath))` into `openSync(tmpPath, O_CREAT|O_EXCL|O_WRONLY)`. The `O_EXCL` flag did not satisfy CodeQL because the variable itself was still tainted. Fixed by introducing a fresh `const orphanTmpPath = \`${join(dir, 'swarm-blackboard.md')}.tmp\`` inside the write block.
+- **UTF-8 BOM regression (all 17 version files)**: PowerShell 5.1 `Set-Content` writes UTF-8 WITH BOM, causing `ts-node`'s `JSONParse` to fail on `package.json` in CI. All version-bump commands now use `[System.IO.File]::WriteAllText` with `UTF8Encoding($false)`.
+- **`claude-project-prompt.md` residual hardcoded-3 references**: Pre-commit checklist "All **3** sub-task results" and response-format template "[Decomposition into **3 sub-tasks**]" still referenced the old fixed count after the v5.8.8 SkillSpector fix. Both updated to be count-agnostic.
+- Version bump to 5.8.9 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.8.8] - 2026-05-30
 
 ### Fixed
