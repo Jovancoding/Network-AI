@@ -754,7 +754,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.8.9"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.9.0"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |
@@ -767,7 +767,7 @@ This skill is scanned on every publish. The following Notes are flagged by desig
 
 | Finding | Severity | Why it recurs | Documented control |
 |---------|----------|---------------|--------------------|  
-| **ASI01** Agent Goal Hijack | High | Orchestrator skill forces 3-sub-task decomposition by design | Use this skill only when multi-agent orchestration is desired; disable for simple one-shot tasks |
+| **ASI01** Agent Goal Hijack | High | Orchestrator skill performs multi-step decomposition and delegation by design | Use this skill only when multi-agent orchestration is desired; for simple requests the scope guard responds directly without decomposing |
 | **ASI03** Identity and Privilege Abuse (advisory tokens) | Medium | Grant tokens are advisory scoring outputs only — caller-supplied `--agent` identity is not cryptographically verified; skill explicitly warns tokens must not be used as real authorization for PAYMENTS, DATABASE, or FILE_EXPORT | Tokens are explicitly marked advisory in SKILL.md and source; require separate platform auth and human approval before any real database, payment, email, or export action |
 | **ASI03** Identity and Privilege Abuse (local grant state) | Low | The permission system creates persistent local state (`active_grants.json`, `audit_log.jsonl`, `.signing_key`) — security-relevant files that are purpose-aligned but accessible to anyone with `data/` access | Keep the skill directory private; back up or delete local grant state when no longer needed; do not share `data/` casually; restrict OS-level permissions on `data/` on shared machines |
 | **ASI03** Identity and Privilege Abuse (token integrity) | ~~High~~ Resolved | Token payload had no integrity protection — active_grants.json could be edited to forge elevated grants | Fixed in v5.5.2 — `check_permission.py` HMAC-SHA256 signs each grant (`_sig` field, stdlib `hmac`+`hashlib`, key at `data/.signing_key`); `validate_token.py` verifies before accepting; tampered tokens rejected with `"Token signature invalid"` |

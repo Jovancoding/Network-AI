@@ -1,6 +1,6 @@
 # Network-AI Threat Model
 
-Version: 5.8.9 — updated with each release that changes a trust boundary or auth mechanism.
+Version: 5.9.0 — updated with each release that changes a trust boundary or auth mechanism.
 
 ---
 

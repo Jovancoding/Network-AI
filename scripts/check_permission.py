@@ -620,7 +620,10 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
     Summarize recent permission requests, grants, and denials.
 
     Parses data/audit_log.jsonl and produces per-agent and per-resource
-    breakdowns plus recent activity.
+    breakdowns plus recent activity.  Denial counts are read directly from
+    ``permission_denied`` log entries — they are NOT inferred as
+    requests minus grants.  This preserves accuracy when log lines are
+    missing, replayed, or arrive out of order.
     """
     if not AUDIT_LOG.exists():
         if as_json:
@@ -656,29 +659,34 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
     # Aggregate stats
     total_requests = 0
     total_grants = 0
+    total_denials = 0
     by_agent: dict[str, dict[str, int]] = {}
     by_resource: dict[str, dict[str, int]] = {}
 
     for entry in entries:
         action = entry.get("action", "")
         details = entry.get("details", {})
-        agent_id = details.get("agent_id", "unknown")
-        resource_type = details.get("resource_type", "unknown")
+        agent_id = details.get("agent_id", details.get("agentId", "unknown"))
+        resource_type = details.get("resource_type", details.get("resourceType", "unknown"))
 
         if action == "permission_request":
             total_requests += 1
-            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0})
+            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0, "denials": 0})
             by_agent[agent_id]["requests"] += 1
-            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0})
+            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0, "denials": 0})
             by_resource[resource_type]["requests"] += 1
         elif action == "permission_granted":
             total_grants += 1
-            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0})
+            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0, "denials": 0})
             by_agent[agent_id]["grants"] += 1
-            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0})
+            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0, "denials": 0})
             by_resource[resource_type]["grants"] += 1
-
-    total_denials = total_requests - total_grants
+        elif action == "permission_denied":
+            total_denials += 1
+            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0, "denials": 0})
+            by_agent[agent_id]["denials"] += 1
+            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0, "denials": 0})
+            by_resource[resource_type]["denials"] += 1
 
     # Recent entries (last N)
     recent = entries[-last_n:]
@@ -700,6 +708,7 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
             "total_requests": total_requests,
             "total_grants": total_grants,
             "total_denials": total_denials,
+            "denial_source": "explicit_permission_denied_events",
             "time_range": {"first": first_ts, "last": last_ts},
             "by_agent": by_agent,
             "by_resource": by_resource,
@@ -725,7 +734,7 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
             print(f"  {'Agent':<20} {'Requests':>10} {'Grants':>10} {'Denials':>10}")
             print(f"  {'-'*50}")
             for agent_id, stats in sorted(by_agent.items()):
-                denials = stats["requests"] - stats["grants"]
+                denials = stats["denials"]
                 print(f"  {agent_id:<20} {stats['requests']:>10} {stats['grants']:>10} {denials:>10}")
 
         if by_resource:
@@ -734,7 +743,7 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
             print(f"  {'Resource':<20} {'Requests':>10} {'Grants':>10} {'Denials':>10}")
             print(f"  {'-'*50}")
             for resource_type, stats in sorted(by_resource.items()):
-                denials = stats["requests"] - stats["grants"]
+                denials = stats["denials"]
                 print(f"  {resource_type:<20} {stats['requests']:>10} {stats['grants']:>10} {denials:>10}")
 
         print(f"\n  Recent Activity (last {min(last_n, len(recent))}):")

@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.9.0] - 2026-06-01
+
+### Fixed
+- **SkillSpector Intent-Code Divergence (88%) — `scripts/check_permission.py` `audit_summary`**: The docstring claimed the function reports "denials" but denials were inferred as `total_requests - total_grants` rather than read from explicit `permission_denied` audit log entries. The AuthGuardian (`lib/auth-guardian.ts`) already logs a `permission_denied` event for every rejected request; the Python script simply ignored them. Fixed: `total_denials` and per-agent/per-resource denial counts are now accumulated by counting `action == "permission_denied"` entries directly. Added `"denial_source": "explicit_permission_denied_events"` to the JSON output so consumers can verify the counting method. Docstring updated to reflect the real behavior. Also handles both `agent_id`/`resource_type` and `agentId`/`resourceType` key variants for cross-compatibility with audit log entries from the TypeScript engine.
+- Version bump to 5.9.0 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.8.9] - 2026-05-30
 
 ### Fixed
