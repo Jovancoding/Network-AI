@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------||
-| 5.8.x   | ✅ Yes — full support (current, latest: 5.9.0) |
+| 5.8.x   | ✅ Yes — full support (current, latest: 5.9.1) |
 | 5.7.x   | ✅ Security fixes only |
 | 5.6.x   | ✅ Security fixes only |
 | 5.5.x   | ✅ Security fixes only |
@@ -68,6 +68,7 @@ Network-AI includes built-in security features:
 - **QA Orchestrator Agent** (v4.11.0) -- scenario replay through quality gates, cross-agent contradiction detection, feedback loop with retry limits, and regression tracking with historical snapshots
 - **Deferred Adapter Initialization** (v4.12.0) -- adapters are materialized only on first use via `registerDeferred()`, preventing untrusted adapter code from running at startup
 - **Adapter Hook Middleware** (v4.12.0) -- `beforeExecute` / `afterExecute` / `onError` lifecycle hooks; enables request-level logging, tracing, and custom security gates without modifying adapters
+- **Agent Sandbox — Shell-Free Command Execution** (v5.9.1, GHSA-qw6v-5fcf-5666, CWE-78, Critical) — `SandboxPolicy.isCommandAllowed` glob-matched the whole command string while `ShellExecutor` ran it through `/bin/sh -c`, so a scoped allowlist entry like `git *` also matched `git status; id` and executed the injected command. **Fixed**: `ShellExecutor` now runs `spawn(file, args, { shell: false })` with a quote-aware parsed argv (no shell is invoked); `isCommandAllowed()` and the new `tokenizeCommand()` reject any unquoted shell metacharacter (`; & | $ \` ( ) < > { }` newline) or unterminated quote before the allowlist match. Quoted metacharacters are preserved as literal argument data. Reported by lexdotdev.
 - **MCP HTTP Authentication — Fail-Closed** (v5.7.2, GHSA-r78r-rwrf-rjwp) — `McpSseServer._isAuthorized()` now returns `false` when no secret is configured (previously returned `true`, granting open access — CWE-306/CWE-862 incomplete fix). `listen()` rejects with a hard error if `McpSseServerOptions.secret` is empty. `McpSseTransport` accepts an optional `secret` parameter and automatically attaches `Authorization: Bearer` headers. All callers must supply a non-empty secret.
 - **MCP HTTP Authentication** (v5.1.3) — `McpSseServer` enforces bearer token auth on `POST /mcp` and `GET /sse` when a secret is configured via `McpSseServerOptions.secret` or `NETWORK_AI_MCP_SECRET` env var. Default bind address changed to `127.0.0.1`. `config_set` now rejects writes to non-allowlisted config keys.
 - **Flow Control** (v4.12.0) -- `pause()` / `resume()` / `setThrottle()` on the blackboard; prevents write floods and enables coordinated maintenance windows

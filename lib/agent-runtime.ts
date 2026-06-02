@@ -182,6 +182,87 @@ export interface AgentRuntimeOptions {
 }
 
 // ============================================================================
+// COMMAND PARSING
+// ============================================================================
+
+/**
+ * Shell metacharacters that enable command chaining, substitution, or
+ * redirection. Any of these appearing OUTSIDE of quotes turns a scoped
+ * allowlist entry (e.g. `git *`) into arbitrary execution and must be
+ * rejected (GHSA-qw6v-5fcf-5666).
+ */
+const SHELL_METACHARACTERS: ReadonlySet<string> = new Set([
+  ';', '&', '|', '$', '`', '(', ')', '<', '>', '{', '}', '\n', '\r',
+]);
+
+/**
+ * Tokenize a command string into an argv array, honoring single and double
+ * quotes, and report whether any shell metacharacter appears OUTSIDE of quotes.
+ *
+ * Commands are executed with `shell: false`, so no shell ever interprets the
+ * result — quoted metacharacters are therefore safe, literal data. Unquoted
+ * metacharacters indicate an attempt to chain, substitute, or redirect commands
+ * and cause the command to be rejected before it can run.
+ *
+ * @param command - Raw command string to parse.
+ * @returns Parsed argv plus flags for unquoted metacharacters and malformed quoting.
+ */
+function parseCommandLine(command: string): {
+  argv: string[];
+  hasUnquotedMetacharacter: boolean;
+  unterminatedQuote: boolean;
+} {
+  const argv: string[] = [];
+  let current = '';
+  let tokenOpen = false;
+  let quote: '"' | "'" | null = null;
+  let hasUnquotedMetacharacter = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i]!;
+
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else {
+        current += ch;
+      }
+      tokenOpen = true;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      tokenOpen = true;
+      continue;
+    }
+
+    if (ch === ' ' || ch === '\t') {
+      if (tokenOpen) {
+        argv.push(current);
+        current = '';
+        tokenOpen = false;
+      }
+      continue;
+    }
+
+    if (SHELL_METACHARACTERS.has(ch)) {
+      // Unquoted metacharacter — reject the whole command. Do not include it
+      // in argv so the result can never be silently executed.
+      hasUnquotedMetacharacter = true;
+      continue;
+    }
+
+    current += ch;
+    tokenOpen = true;
+  }
+
+  if (tokenOpen) argv.push(current);
+
+  return { argv, hasUnquotedMetacharacter, unterminatedQuote: quote !== null };
+}
+
+// ============================================================================
 // SANDBOX POLICY
 // ============================================================================
 
@@ -249,6 +330,15 @@ export class SandboxPolicy {
     const trimmed = command.trim();
     if (!trimmed) return false;
 
+    // Reject shell metacharacters and malformed quoting BEFORE pattern matching.
+    // Commands run with `shell: false`, but a scoped allowlist entry such as
+    // `git *` must never be escapable into arbitrary execution via `;`, `|`,
+    // `&&`, `$(...)`, backticks, redirection, or newlines (GHSA-qw6v-5fcf-5666).
+    const parsed = parseCommandLine(trimmed);
+    if (parsed.hasUnquotedMetacharacter || parsed.unterminatedQuote || parsed.argv.length === 0) {
+      return false;
+    }
+
     // Check blocked first (always wins)
     if (this.matchesAny(trimmed, this.config.blockedCommands)) return false;
 
@@ -257,6 +347,24 @@ export class SandboxPolicy {
 
     // Check allowed
     return this.matchesAny(trimmed, this.config.allowedCommands);
+  }
+
+  /**
+   * Tokenize a command into an argv array suitable for `shell: false`
+   * execution. Returns `null` for any command that contains unquoted shell
+   * metacharacters or malformed quoting — i.e. exactly the inputs that
+   * {@link isCommandAllowed} rejects. Quoted metacharacters are preserved as
+   * literal data within their token.
+   *
+   * @param command - Raw command string to tokenize.
+   * @returns The argv array, or `null` if the command is unsafe to execute.
+   */
+  tokenizeCommand(command: string): string[] | null {
+    const parsed = parseCommandLine(command.trim());
+    if (parsed.hasUnquotedMetacharacter || parsed.unterminatedQuote || parsed.argv.length === 0) {
+      return null;
+    }
+    return parsed.argv;
   }
 
   /** Check if a command requires human approval */
@@ -424,15 +532,26 @@ export class ShellExecutor {
     env?: Record<string, string>,
   ): Promise<ShellResult> {
     return new Promise((resolvePromise, reject) => {
-      const isWindows = process.platform === 'win32';
-      const shell = isWindows ? 'cmd.exe' : '/bin/sh';
-      const shellArgs = isWindows ? ['/c', command] : ['-c', command];
+      // Execute with `shell: false` using a parsed argv. The command was already
+      // validated by `isCommandAllowed`, but we re-tokenize here as the single
+      // source of truth for what actually runs — no string is ever handed to a
+      // shell, so metacharacters cannot be interpreted (GHSA-qw6v-5fcf-5666).
+      const argv = this.policy.tokenizeCommand(command);
+      if (!argv || argv.length === 0) {
+        reject(new RuntimePolicyError(
+          `Command rejected — shell metacharacters are not permitted: ${command}`,
+        ));
+        return;
+      }
+      const file = argv[0]!;
+      const args = argv.slice(1);
 
-      const child = spawn(shell, shellArgs, {
+      const child = spawn(file, args, {
         cwd,
         env: env ? { ...process.env, ...env } : process.env,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
+        shell: false,
       });
 
       let stdout = '';

@@ -1,6 +1,6 @@
 # Network-AI Threat Model
 
-Version: 5.9.0 — updated with each release that changes a trust boundary or auth mechanism.
+Version: 5.9.1 — updated with each release that changes a trust boundary or auth mechanism.
 
 ---
 
@@ -54,6 +54,7 @@ or hijack another agent's goal.
 - Justification hardening rejects prompt-injection patterns, keyword stuffing, repetition, and structural incoherence.
 - Agent trust levels are stored in `data/trust_levels.json`; modifications are audit-logged.
 - `ComplianceMonitor` detects behavioural anomalies in real time.
+- `ShellExecutor` runs commands with `spawn(shell: false)` using a parsed argv; `SandboxPolicy` rejects unquoted shell metacharacters before the allowlist match, so a scoped allow such as `git *` cannot be escaped into arbitrary execution (v5.9.1, GHSA-qw6v-5fcf-5666).
 
 ### 3.3 Blackboard Poisoning / Context Injection
 
@@ -156,6 +157,7 @@ operators must address them at the infrastructure layer:
 | Fail-closed MCP auth | `lib/mcp-transport-sse.ts` | Adversary 3.1 |
 | `propose → validate → commit` | `lib/locked-blackboard.ts` | Adversary 3.2 |
 | AuthGuardian weighted scoring | `lib/auth-guardian.ts` | Adversary 3.2 |
+| Shell-free command execution (`shell: false` + metacharacter rejection) | `lib/agent-runtime.ts` | Adversary 3.2 |
 | Justification hardening | `lib/auth-guardian.ts` | Adversary 3.2, 3.3 |
 | BlackboardValidator schema | `lib/blackboard-validator.ts` | Adversary 3.3 |
 | InputSanitizer | `security.ts` | Adversary 3.3 |

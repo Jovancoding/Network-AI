@@ -276,6 +276,35 @@ function testSandboxPolicy() {
     assert(policy.defaultMaxOutputBytes === 1_048_576, 'Default max output is 1MB');
     assert(policy.autoApproveReads === true, 'Auto-approve reads by default');
   }
+
+  // 21. Shell metacharacters cannot escape a scoped allowlist (GHSA-qw6v-5fcf-5666)
+  {
+    const policy = new SandboxPolicy({ basePath: '/test', allowedCommands: ['git *'] });
+    assert(!policy.isCommandAllowed('git status; id'), 'Command chaining with ; blocked');
+    assert(!policy.isCommandAllowed('git status && rm -rf /'), '&& chaining blocked');
+    assert(!policy.isCommandAllowed('git status | sh'), 'Pipe blocked');
+    assert(!policy.isCommandAllowed('git log $(whoami)'), 'Command substitution $() blocked');
+    assert(!policy.isCommandAllowed('git log `whoami`'), 'Backtick substitution blocked');
+    assert(!policy.isCommandAllowed('git status > /etc/passwd'), 'Output redirection blocked');
+    assert(!policy.isCommandAllowed('git status\nid'), 'Newline injection blocked');
+    assert(policy.isCommandAllowed('git status'), 'Plain scoped command still allowed');
+  }
+
+  // 22. Quoted metacharacters are treated as literal data, not injection
+  {
+    const policy = new SandboxPolicy({ basePath: '/test', allowedCommands: ['git *'] });
+    assert(policy.isCommandAllowed('git commit -m "fix: a; b"'), 'Quoted ; allowed as literal');
+    assert(!policy.isCommandAllowed('git commit -m "unterminated'), 'Unterminated quote blocked');
+  }
+
+  // 23. tokenizeCommand yields argv for safe commands, null for unsafe ones
+  {
+    const policy = new SandboxPolicy({ basePath: '/test', allowedCommands: ['*'] });
+    const argv = policy.tokenizeCommand('git commit -m "hello world"');
+    assert(argv !== null && argv.length === 4, 'Tokenizes quoted args into 4 tokens');
+    assert(argv![3] === 'hello world', 'Quoted argument preserved as a single token');
+    assert(policy.tokenizeCommand('git status; id') === null, 'Injection attempt returns null');
+  }
 }
 
 // ============================================================================
@@ -287,12 +316,12 @@ async function testShellExecutor() {
 
   const isWindows = process.platform === 'win32';
 
-  // 1. Execute a simple command
+  // 1. Execute a simple command (shell:false argv execution — no shell builtins)
   {
-    const policy = new SandboxPolicy({ basePath: process.cwd(), allowedCommands: ['echo *'] });
+    const policy = new SandboxPolicy({ basePath: process.cwd(), allowedCommands: ['node *'] });
     const executor = new ShellExecutor(policy);
-    const result = await executor.execute('echo hello');
-    assert(result.stdout.trim() === 'hello', 'Simple echo produces correct output');
+    const result = await executor.execute('node -e "process.stdout.write(\'hello\')"');
+    assert(result.stdout.trim() === 'hello', 'Simple command produces correct output');
     assert(result.exitCode === 0, 'Exit code is 0');
     assert(!result.timedOut, 'Not timed out');
     assert(!result.truncated, 'Not truncated');
@@ -310,18 +339,17 @@ async function testShellExecutor() {
 
   // 3. Command with non-zero exit
   {
-    const cmd = isWindows ? 'cmd /c exit 1' : 'exit 1';
     const policy = new SandboxPolicy({ basePath: process.cwd(), allowedCommands: ['*'] });
     const executor = new ShellExecutor(policy);
-    const result = await executor.execute(cmd);
+    const result = await executor.execute('node -e "process.exit(1)"');
     assert(result.exitCode !== 0, 'Non-zero exit code captured');
   }
 
   // 4. Duration tracking
   {
-    const policy = new SandboxPolicy({ basePath: process.cwd(), allowedCommands: ['echo *'] });
+    const policy = new SandboxPolicy({ basePath: process.cwd(), allowedCommands: ['node *'] });
     const executor = new ShellExecutor(policy);
-    const result = await executor.execute('echo timing');
+    const result = await executor.execute('node -e "process.stdout.write(\'timing\')"');
     assert(result.durationMs >= 0, 'Duration is non-negative');
   }
 
@@ -332,12 +360,11 @@ async function testShellExecutor() {
     assert(executor.running === 0, 'No running processes initially');
   }
 
-  // 6. Stderr captured
+  // 6. Stderr captured (written directly by the child, not via shell redirection)
   {
-    const cmd = isWindows ? 'echo error 1>&2' : 'echo error >&2';
-    const policy = new SandboxPolicy({ basePath: process.cwd(), allowedCommands: ['echo *'] });
+    const policy = new SandboxPolicy({ basePath: process.cwd(), allowedCommands: ['node *'] });
     const executor = new ShellExecutor(policy);
-    const result = await executor.execute(cmd);
+    const result = await executor.execute('node -e "process.stderr.write(\'error\')"');
     assert(result.stderr.includes('error'), 'Stderr captured');
   }
 
@@ -355,14 +382,14 @@ async function testShellExecutor() {
   {
     const policy = new SandboxPolicy({
       basePath: process.cwd(),
-      allowedCommands: ['echo *'],
+      allowedCommands: ['node *'],
       maxConcurrentProcesses: 1,
     });
     const executor = new ShellExecutor(policy);
     // Start one process
-    const p1 = executor.execute('echo first');
+    const p1 = executor.execute('node -e "process.stdout.write(\'first\')"');
     // Try to start another while first is likely still active
-    // Since echo is so fast, we just verify the executor tracks count correctly
+    // Since the command is so fast, we just verify the executor tracks count correctly
     await p1;
     assert(executor.running === 0, 'After completion, running count is 0');
   }
@@ -606,10 +633,10 @@ async function testAgentRuntime() {
     // 2. exec runs allowed command
     {
       const rt = new AgentRuntime({
-        policy: { basePath: tmpDir, allowedCommands: ['echo *'] },
+        policy: { basePath: tmpDir, allowedCommands: ['node *'] },
         autoApproveAll: true,
       });
-      const result = await rt.exec('echo runtime test', 'agent-a');
+      const result = await rt.exec('node -e "process.stdout.write(\'runtime test\')"', 'agent-a');
       assert(result.stdout.trim() === 'runtime test', 'Exec runs and captures output');
     }
 
@@ -640,10 +667,10 @@ async function testAgentRuntime() {
     // 5. exec with approval required — approved
     {
       const rt = new AgentRuntime({
-        policy: { basePath: tmpDir, allowedCommands: ['echo *'], approvalRequired: ['echo *'] },
+        policy: { basePath: tmpDir, allowedCommands: ['node *'], approvalRequired: ['node *'] },
         onApproval: async () => ({ approved: true, approvedBy: 'test' }),
       });
-      const result = await rt.exec('echo approved', 'agent-a');
+      const result = await rt.exec('node -e "process.stdout.write(\'approved\')"', 'agent-a');
       assert(result.stdout.trim() === 'approved', 'Exec succeeds after approval');
     }
 
@@ -705,10 +732,10 @@ async function testAgentRuntime() {
     // 11. Audit log populated
     {
       const rt = new AgentRuntime({
-        policy: { basePath: tmpDir, allowedCommands: ['echo *'] },
+        policy: { basePath: tmpDir, allowedCommands: ['node *'] },
         autoApproveAll: true,
       });
-      await rt.exec('echo audit test', 'auditor');
+      await rt.exec('node -e "process.stdout.write(\'audit test\')"', 'auditor');
       const log = rt.getAuditLog();
       assert(log.length > 0, 'Audit log has entries');
       assert(log.some(e => e.action === 'shell_execute'), 'Audit log has shell_execute entry');
@@ -717,10 +744,10 @@ async function testAgentRuntime() {
     // 12. Audit log cleared
     {
       const rt = new AgentRuntime({
-        policy: { basePath: tmpDir, allowedCommands: ['echo *'] },
+        policy: { basePath: tmpDir, allowedCommands: ['node *'] },
         autoApproveAll: true,
       });
-      await rt.exec('echo audit', 'auditor');
+      await rt.exec('node -e "process.stdout.write(\'audit\')"', 'auditor');
       assert(rt.getAuditLog().length > 0, 'Log has entries before clear');
       rt.clearAuditLog();
       assert(rt.getAuditLog().length === 0, 'Log empty after clear');
@@ -729,14 +756,14 @@ async function testAgentRuntime() {
     // 13. Events emitted on exec
     {
       const rt = new AgentRuntime({
-        policy: { basePath: tmpDir, allowedCommands: ['echo *'] },
+        policy: { basePath: tmpDir, allowedCommands: ['node *'] },
         autoApproveAll: true,
       });
       let started = false;
       let completed = false;
       rt.on('command:start', () => { started = true; });
       rt.on('command:complete', () => { completed = true; });
-      await rt.exec('echo events', 'agent-a');
+      await rt.exec('node -e "process.stdout.write(\'events\')"', 'agent-a');
       assert(started, 'command:start event emitted');
       assert(completed, 'command:complete event emitted');
     }
@@ -756,14 +783,14 @@ async function testAgentRuntime() {
     // 15. Approval events emitted
     {
       const rt = new AgentRuntime({
-        policy: { basePath: tmpDir, allowedCommands: ['echo *'], approvalRequired: ['echo *'] },
+        policy: { basePath: tmpDir, allowedCommands: ['node *'], approvalRequired: ['node *'] },
         onApproval: async () => ({ approved: true }),
       });
       let approvalRequested = false;
       let approvalDecided = false;
       rt.on('approval:requested', () => { approvalRequested = true; });
       rt.on('approval:decided', () => { approvalDecided = true; });
-      await rt.exec('echo approval-events', 'agent-a');
+      await rt.exec('node -e "process.stdout.write(\'approval-events\')"', 'agent-a');
       assert(approvalRequested, 'approval:requested event emitted');
       assert(approvalDecided, 'approval:decided event emitted');
     }
@@ -771,14 +798,14 @@ async function testAgentRuntime() {
     // 16. Audit entry has correct structure
     {
       const rt = new AgentRuntime({
-        policy: { basePath: tmpDir, allowedCommands: ['echo *'] },
+        policy: { basePath: tmpDir, allowedCommands: ['node *'] },
         autoApproveAll: true,
       });
-      await rt.exec('echo structure', 'struct-agent');
+      await rt.exec('node -e "process.stdout.write(\'structure\')"', 'struct-agent');
       const entry = rt.getAuditLog().find(e => e.action === 'shell_execute');
       assert(!!entry, 'Shell execute audit entry exists');
       assert(entry!.agentId === 'struct-agent', 'Audit entry agentId correct');
-      assert(entry!.target === 'echo structure', 'Audit entry target correct');
+      assert(entry!.target === 'node -e "process.stdout.write(\'structure\')"', 'Audit entry target correct');
       assert(!!entry!.timestamp, 'Audit entry has timestamp');
     }
 

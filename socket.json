@@ -195,6 +195,14 @@
       {
         "path": "dist/lib/work-tree-dashboard.js",
         "reason": "Intentional — flagged by Socket.dev's import-graph analysis via transitive imports; WorkTreeDashboard does not make direct outbound HTTP calls."
+      },
+      {
+        "path": "lib/telemetry-provider.ts",
+        "reason": "False positive — telemetry-provider defines the ITelemetryProvider BYOT interface and the createOtelHooks() factory. It contains zero fetch usage and makes no outbound HTTP calls; any OTel exporter is supplied by the caller. Flagged by Socket.dev's transitive import-graph analysis only."
+      },
+      {
+        "path": "dist/lib/telemetry-provider.js",
+        "reason": "False positive — compiled output of telemetry-provider. No direct network calls; the OTel exporter is supplied by the caller. Flagged by Socket.dev's transitive import-graph analysis only."
       }
     ],
     "urlStrings": [

@@ -391,6 +391,26 @@ def evaluate_permission(
         "unknown_agent": unknown_agent,
     })
 
+    def _deny(result: dict[str, Any]) -> dict[str, Any]:
+        """Log an explicit ``permission_denied`` audit event, then return the denial.
+
+        Every denial path routes through here so the audit trail records a
+        ``permission_denied`` entry for each rejected request. ``audit_summary``
+        relies on these explicit events rather than inferring denials, so a
+        missing log entry would silently undercount denied access attempts.
+        Justification text is intentionally omitted to avoid re-persisting
+        sensitive content already captured (truncated) on the request event.
+        """
+        log_audit("permission_denied", {
+            "agent_id": agent_id,
+            "resource_type": resource_type,
+            "scope": scope,
+            "reason": result.get("reason"),
+            "scores": result.get("scores"),
+            "unknown_agent": unknown_agent,
+        })
+        return result
+
     # Require explicit acknowledgement for high-risk resources
     needs_confirmation = (
         resource_type in HIGH_RISK_RESOURCES
@@ -399,7 +419,7 @@ def evaluate_permission(
         ))
     )
     if needs_confirmation and not confirm_high_risk:
-        return {
+        return _deny({
             "granted": False,
             "advisory": True,
             "reason": (
@@ -408,12 +428,12 @@ def evaluate_permission(
                 "the supplied agent identity."
             ),
             "scores": {"justification": None, "trust": None, "risk": None},
-        }
+        })
 
     # 1. Justification Quality (40% weight)
     justification_score = score_justification(justification)
     if justification_score < 0.3:
-        return {
+        return _deny({
             "granted": False,
             "advisory": True,
             "reason": "Justification is insufficient. Please provide specific task context.",
@@ -422,7 +442,7 @@ def evaluate_permission(
                 "trust": None,
                 "risk": None,
             },
-        }
+        })
 
     # 2. Agent Trust Level (30% weight)
     # Unknown agents receive a reduced base trust score (0.3) — their identity
@@ -430,7 +450,7 @@ def evaluate_permission(
     trust_level = DEFAULT_TRUST_LEVELS.get(agent_id, 0.3) if not unknown_agent \
         else 0.3
     if trust_level < 0.4:
-        return {
+        return _deny({
             "granted": False,
             "advisory": True,
             "reason": (
@@ -442,12 +462,12 @@ def evaluate_permission(
                 "trust": trust_level,
                 "risk": None,
             },
-        }
+        })
     
     # 3. Risk Assessment (30% weight)
     risk_score = assess_risk(resource_type, scope)
     if risk_score > 0.8:
-        return {
+        return _deny({
             "granted": False,
             "advisory": True,
             "reason": "Risk assessment exceeds acceptable threshold. Narrow the requested scope.",
@@ -456,7 +476,7 @@ def evaluate_permission(
                 "trust": trust_level,
                 "risk": risk_score,
             },
-        }
+        })
     
     # Calculate weighted approval score
     weighted_score = (
@@ -466,7 +486,7 @@ def evaluate_permission(
     )
     
     if weighted_score < 0.5:
-        return {
+        return _deny({
             "granted": False,
             "advisory": True,
             "reason": f"Combined evaluation score ({weighted_score:.2f}) below threshold (0.5).",
@@ -476,7 +496,7 @@ def evaluate_permission(
                 "risk": risk_score,
                 "weighted": weighted_score,
             },
-        }
+        })
     
     # Generate grant
     token = generate_grant_token()

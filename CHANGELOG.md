@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.9.1] - 2026-06-02
+
+### Security
+- **GHSA-qw6v-5fcf-5666 (Critical, CWE-78 OS Command Injection) — `lib/agent-runtime.ts` `ShellExecutor`**: `SandboxPolicy.isCommandAllowed` glob-matched the entire command string, but `ShellExecutor` then ran that string through `/bin/sh -c` (or `cmd.exe /c`). A scoped allowlist entry such as `git *`, `npm *`, or `node *` therefore also matched chained payloads like `git status; id`, and the injected command executed — defeating the one control THREAT_MODEL.md designates against a compromised agent (Adversary 3.2). **Fixed**: commands now execute with `spawn(file, args, { shell: false })` using a parsed argv — no shell is ever invoked, so metacharacters cannot be interpreted. A new `parseCommandLine()` tokenizer (quote-aware) backs both `isCommandAllowed()` and the new `SandboxPolicy.tokenizeCommand()`; any unquoted shell metacharacter (`;`, `&`, `|`, `$`, `` ` ``, `(`, `)`, `<`, `>`, `{`, `}`, newline) or unterminated quote is rejected **before** the allowlist glob match. Quoted metacharacters are preserved as literal argument data. Reported by lexdotdev.
+
+### Fixed
+- **SkillSpector Intent-Code Divergence — `scripts/check_permission.py` denial logging**: `audit_summary` reads explicit `permission_denied` audit events (since v5.9.0), but the permission-checking paths returned denials without ever logging such an event, leaving an incomplete audit trail. Fixed: a `_deny()` helper now writes a `permission_denied` audit event (with `agent_id`, `resource_type`, `scope`, `reason`, and `scores`) at every denial point — high-risk confirmation, insufficient justification, low trust, excessive risk, and below-threshold weighted score — so the log matches what `audit_summary` reports.
+- **Socket.dev Network access false positive — `lib/telemetry-provider.ts`**: Added `networkAccess` ignore entries for `lib/telemetry-provider.ts` and `dist/lib/telemetry-provider.js` in `socket.json`. The module defines the BYOT `ITelemetryProvider` interface and `createOtelHooks()` factory and makes no outbound HTTP calls; it was flagged only by transitive import-graph analysis.
+- **`test-phase9.ts`**: Added command-injection regression tests (chaining, pipe, `$()`, backticks, redirection, newline, quoted-literal handling, and `tokenizeCommand`). Converted `ShellExecutor`/`AgentRuntime` test commands from shell builtins (`echo`, `exit`, `>&2`) to `node -e`, since execution is now shell-free.
+- Version bump to 5.9.1 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
 ## [5.9.0] - 2026-06-01
 
 ### Fixed
