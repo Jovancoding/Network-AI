@@ -7,7 +7,6 @@
  *   Phase 3 — Trust decay via AuthGuardian.recordClaimViolation
  */
 
-import { tmpdir } from 'os';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 
@@ -54,7 +53,7 @@ function header(title: string) {
 }
 
 function makeRuntime() {
-  const basePath = join(tmpdir(), `nai-cv-test-${Date.now()}`);
+  const basePath = join('.', 'data', `test-cv-runtime-${Date.now()}`);
   mkdirSync(basePath, { recursive: true });
   return new AgentRuntime({
     policy: {
@@ -325,8 +324,8 @@ async function testTrustDecayAfterNViolations() {
 
   const guardian = new AuthGuardian({
     trustLevels: [{ agentId: 'liar-agent', trustLevel: 0.8 }],
-    auditLogPath: join(tmpdir(), `nai-cv-trust-${Date.now()}.jsonl`),
-    trustConfigPath: join(tmpdir(), `nai-cv-trustcfg-${Date.now()}.json`),
+    auditLogPath: join('.', 'data', `nai-cv-trust-${Date.now()}.jsonl`),
+    trustConfigPath: join('.', 'data', `nai-cv-trustcfg-${Date.now()}.json`),
   });
 
   // First 2 violations — under the default threshold of 3, no decay yet
@@ -350,8 +349,8 @@ async function testTrustNoDecayOnSingleMiss() {
 
   const guardian = new AuthGuardian({
     trustLevels: [{ agentId: 'agent-x', trustLevel: 0.9 }],
-    auditLogPath: join(tmpdir(), `nai-cv-trust2-${Date.now()}.jsonl`),
-    trustConfigPath: join(tmpdir(), `nai-cv-trustcfg2-${Date.now()}.json`),
+    auditLogPath: join('.', 'data', `nai-cv-trust2-${Date.now()}.jsonl`),
+    trustConfigPath: join('.', 'data', `nai-cv-trustcfg2-${Date.now()}.json`),
   });
 
   guardian.recordClaimViolation('agent-x');
@@ -363,8 +362,8 @@ async function testTrustResetsOnCorroboratedTurn() {
 
   const guardian = new AuthGuardian({
     trustLevels: [{ agentId: 'agent-y', trustLevel: 0.8 }],
-    auditLogPath: join(tmpdir(), `nai-cv-trust3-${Date.now()}.jsonl`),
-    trustConfigPath: join(tmpdir(), `nai-cv-trustcfg3-${Date.now()}.json`),
+    auditLogPath: join('.', 'data', `nai-cv-trust3-${Date.now()}.jsonl`),
+    trustConfigPath: join('.', 'data', `nai-cv-trustcfg3-${Date.now()}.json`),
   });
 
   guardian.recordClaimViolation('agent-y');
@@ -384,8 +383,8 @@ async function testCustomThresholdAndDecayStep() {
 
   const guardian = new AuthGuardian({
     trustLevels: [{ agentId: 'agent-z', trustLevel: 1.0 }],
-    auditLogPath: join(tmpdir(), `nai-cv-trust4-${Date.now()}.jsonl`),
-    trustConfigPath: join(tmpdir(), `nai-cv-trustcfg4-${Date.now()}.json`),
+    auditLogPath: join('.', 'data', `nai-cv-trust4-${Date.now()}.jsonl`),
+    trustConfigPath: join('.', 'data', `nai-cv-trustcfg4-${Date.now()}.json`),
   });
 
   // threshold=2, decayStep=0.2

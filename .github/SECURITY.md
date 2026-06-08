@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 5.8.x   | ✅ Yes — full support (current, latest: 5.10.1) |
+| 5.8.x   | ✅ Yes — full support (current, latest: 5.10.2) |
 | 5.7.x   | ✅ Security fixes only |
 | 5.6.x   | ✅ Security fixes only |
 | 5.5.x   | ✅ Security fixes only |
@@ -61,7 +61,7 @@ Network-AI includes built-in security features:
 - **Confidence-Based Filtering** (v4.13.0) -- `ConfidenceFilter` rejects low-confidence agent findings below configurable thresholds and validates rejected results with secondary agents; aggregation strategies (unanimous, majority) enforce consensus before accepting multi-agent results
 - **Agent Runtime Sandbox** (v4.14.0) -- `SandboxPolicy` enforces command allowlists/blocklists, path scoping with traversal protection, and risk assessment; `ShellExecutor` sandboxes child processes with timeout/output limits; `FileAccessor` restricts file I/O to scoped base paths
 - **Approval Gates** (v4.14.0) -- `ApprovalGate` requires explicit human or callback approval for high-risk operations (writes, shell commands, budget spend); full approval history with audit trail. **WARNING:** `auto_approve: true` must only be used in explicitly isolated CI/dev sandboxes where all commands are known and trusted in advance — never in production, shared, or untrusted environments. Default is `auto_approve: false`.
-- **ClaimVerifier — Tier 1 Agent Honesty** (v5.10.1) — `ClaimVerifier` (`lib/claim-verifier.ts`) reconciles agent-declared `ActionManifest[]` against runtime-witnessed `RuntimeAuditEntry` records using outcome-bound HMAC-signed `ExecutionReceipt`s. `AgentRuntime` issues receipts committing to `{ agentId, action, target, exitCode, outputHash }` — never the agent. Tampering with any field invalidates the signature. `UNSUPPORTED_CLAIM` / `UNDISCLOSED_ACTION` violations surface through `ComplianceMonitor`; repeated fabrication decays `AuthGuardian` trust and forces `ApprovalGate` supervision.
+- **ClaimVerifier — Tier 1 Agent Honesty** (v5.10.2) — `ClaimVerifier` (`lib/claim-verifier.ts`) reconciles agent-declared `ActionManifest[]` against runtime-witnessed `RuntimeAuditEntry` records using outcome-bound HMAC-signed `ExecutionReceipt`s. `AgentRuntime` issues receipts committing to `{ agentId, action, target, exitCode, outputHash }` — never the agent. Tampering with any field invalidates the signature. `UNSUPPORTED_CLAIM` / `UNDISCLOSED_ACTION` violations surface through `ComplianceMonitor`; repeated fabrication decays `AuthGuardian` trust and forces `ApprovalGate` supervision.
 - **Pipe Mode Authentication** (v4.14.0) -- JSON stdin/stdout protocol for programmatic agent control; commands processed one-at-a-time with structured responses; no shell injection surface
 - **Strategy Agent Pool Isolation** (v4.14.0) -- `AgentPool` enforces per-pool capacity ceilings; `WorkloadPartitioner` routes tasks by priority class; adaptive scaling respects budget constraints before spawning agents
 - **Goal Decomposer DAG Validation** (v4.15.0) -- `validateDAG()` enforces acyclicity (Kahn's algorithm), rejects self-dependencies and unknown task references; task graphs are validated before execution to prevent infinite loops or orphaned tasks
@@ -76,8 +76,8 @@ Network-AI includes built-in security features:
 - **Circuit Breaker on AdapterRegistry** (v5.6.1) -- per-adapter `CircuitBreaker` (CLOSED/OPEN/HALF_OPEN) stops calls to failing adapters after `failureThreshold` failures; `fallbackChain` provides automatic failover; `CircuitOpenError` prevents thundering-herd load on degraded adapters
 - **OTel `ITelemetryProvider` BYOT interface** (v5.7.0) -- `createOtelHooks(provider)` wires adapter lifecycle events as spans; `NullTelemetryProvider` default prevents accidental telemetry exfiltration; `CapturingTelemetryProvider` for deterministic CI testing without network calls
 - **Source Protection** (v5.4.0) -- `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any out-of-scope access throws `SourceProtectionError` and returns `{success: false}` to the agent
-- **SkillSpector (v5.10.1) — `check_permission.py` two findings resolved**: `FILE_EXPORT` added to `HIGH_RISK_RESOURCES` (was missing despite comment/policy requiring `--confirm-high-risk`); `ensure_data_dir()` now delegates to `_resolve_data_dir()` for env-scoped correctness.
-- **CodeQL #174 (CWE-377) — `AuthGuardian.trustConfigPath`**: `path.resolve()` applied in constructor to break taint chain from caller-supplied `os.tmpdir()` paths.
+- **SkillSpector (v5.10.2) — `check_permission.py` two findings resolved**: `FILE_EXPORT` added to `HIGH_RISK_RESOURCES` (was missing despite comment/policy requiring `--confirm-high-risk`); `ensure_data_dir()` now delegates to `_resolve_data_dir()` for env-scoped correctness.
+- **CodeQL #174 (CWE-377) — Insecure temporary file path in `AuthGuardian`** (v5.10.2): All `join(tmpdir(), ...)` sources in `test-claim-verifier.ts` replaced with `join('.', 'data', ...)` paths, eliminating the taint source. `AuthGuardian` constructor retains `path.resolve()` for defense-in-depth.
 
 ## Security Scan Results
 

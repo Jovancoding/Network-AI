@@ -5,6 +5,11 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.10.2] - 2026-06-08
+
+### Fixed
+- **CodeQL #174 (CWE-377) — `os.tmpdir()` taint source in `test-claim-verifier.ts`**: `path.resolve()` in the `AuthGuardian` constructor does not satisfy CodeQL's CWE-377 taint analysis — the taint still propagates from `os.tmpdir()` through `resolve()` into `writeFile()`. Root cause: the taint sources were the `join(tmpdir(), ...)` calls in the test file itself. All 10 occurrences replaced with `join('.', 'data', ...)` paths. `AuthGuardian` constructor retains `path.resolve()` for defense-in-depth. 50/50 claim verifier tests still passing.
+
 ## [5.10.1] - 2026-06-08
 
 ### Fixed

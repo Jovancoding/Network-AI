@@ -1,4 +1,4 @@
-# Audit Log Schema — Network-AI v5.10.1
+# Audit Log Schema — Network-AI v5.10.2
 
 Network-AI writes a JSONL audit trail during permission management and swarm execution. This document describes every field and event type.
 
@@ -255,7 +255,7 @@ The following event types were added in v5.0:
 
 ## v5.10 Event Types
 
-The following event types were added in v5.10.1 (ClaimVerifier / Tier 1 agent honesty):
+The following event types were added in v5.10.2 (ClaimVerifier / Tier 1 agent honesty):
 
 | Action | Source Module | Description |
 |--------|--------------|-------------|
