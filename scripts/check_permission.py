@@ -96,7 +96,7 @@ KNOWN_AGENTS: set[str] = set(DEFAULT_TRUST_LEVELS.keys())
 _JUSTIFICATION_MAX_LOG_LEN: int = 200
 
 # Resource types that require --confirm-high-risk before a grant is issued
-HIGH_RISK_RESOURCES: set[str] = {"PAYMENTS", "DATABASE"}
+HIGH_RISK_RESOURCES: set[str] = {"PAYMENTS", "DATABASE", "FILE_EXPORT"}
 
 # Base risk scores for resource types
 BASE_RISKS = {
@@ -116,9 +116,9 @@ RESTRICTIONS = {
 
 
 def ensure_data_dir():
-    """Ensure data directory exists."""
-    data_dir = Path(__file__).parent.parent / "data"
-    data_dir.mkdir(exist_ok=True)
+    """Ensure the active (env-scoped) data directory exists."""
+    data_dir = _resolve_data_dir()
+    data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 
 

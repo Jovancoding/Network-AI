@@ -1,6 +1,6 @@
 # Network-AI Threat Model
 
-Version: 5.10.0 — updated with each release that changes a trust boundary or auth mechanism.
+Version: 5.10.1 — updated with each release that changes a trust boundary or auth mechanism.
 
 ---
 
@@ -54,7 +54,7 @@ or hijack another agent's goal.
 - Justification hardening rejects prompt-injection patterns, keyword stuffing, repetition, and structural incoherence.
 - Agent trust levels are stored in `data/trust_levels.json`; modifications are audit-logged.
 - `ComplianceMonitor` detects behavioural anomalies in real time.
-- `ShellExecutor` runs commands with `spawn(shell: false)` using a parsed argv; `SandboxPolicy` rejects unquoted shell metacharacters before the allowlist match, so a scoped allow such as `git *` cannot be escaped into arbitrary execution (v5.10.0, GHSA-qw6v-5fcf-5666).
+- `ShellExecutor` runs commands with `spawn(shell: false)` using a parsed argv; `SandboxPolicy` rejects unquoted shell metacharacters before the allowlist match, so a scoped allow such as `git *` cannot be escaped into arbitrary execution (v5.10.1, GHSA-qw6v-5fcf-5666).
 
 ### 3.3 Blackboard Poisoning / Context Injection
 
@@ -173,7 +173,7 @@ operators must address them at the infrastructure layer:
 
 ## 8. ClaimVerifier Scope and Limits (Tier 1 / Tier 2)
 
-### Tier 1 — What is built and enforced (v5.10.0+)
+### Tier 1 — What is built and enforced (v5.10.1+)
 
 `ClaimVerifier` (`lib/claim-verifier.ts`) reconciles agent-declared action manifests against runtime-witnessed audit entries using outcome-bound signed receipts.
 

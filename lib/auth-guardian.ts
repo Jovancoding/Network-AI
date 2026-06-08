@@ -10,7 +10,7 @@
  */
 
 import { existsSync, readFileSync, writeFile, appendFile, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { randomUUID, generateKeyPairSync, sign as ed25519Sign, verify as ed25519Verify, createHmac, KeyObject } from 'crypto';
 import { InputSanitizer } from '../security';
 import { ValidationError } from './errors';
@@ -82,7 +82,7 @@ export class AuthGuardian {
     hmacSecret?: string;
   }) {
     this.auditLogPath = options?.auditLogPath ?? CONFIG.auditLogPath;
-    this.trustConfigPath = options?.trustConfigPath ?? CONFIG.trustConfigPath;
+    this.trustConfigPath = resolve(options?.trustConfigPath ?? CONFIG.trustConfigPath);
     this.signingAlgorithm = options?.algorithm ?? 'hmac-sha256';
 
     if (this.signingAlgorithm === 'ed25519') {

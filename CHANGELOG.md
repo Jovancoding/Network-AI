@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.10.1] - 2026-06-08
+
+### Fixed
+- **CodeQL #174 (CWE-377) — `AuthGuardian` insecure temporary file path**: `trustConfigPath` was stored as-is from the caller, which tests pass via `os.tmpdir()`. Constructor now calls `path.resolve()` on the path, breaking the taint chain from `os.tmpdir()` to `writeFile()` — same pattern as #65–#68.
+- **SkillSpector Intent-Code Divergence (Low) — `FILE_EXPORT` missing from `HIGH_RISK_RESOURCES`** (`scripts/check_permission.py`): The inline comment and SKILL.md security policy both stated that `FILE_EXPORT` requires `--confirm-high-risk`, but the set only contained `PAYMENTS` and `DATABASE`. Export requests could receive advisory grants without the extra acknowledgment step. **Fixed**: `FILE_EXPORT` added to `HIGH_RISK_RESOURCES`.
+- **SkillSpector Description-Behavior Mismatch (Medium) — `ensure_data_dir()` ignoring env scope** (`scripts/check_permission.py`): The function always created the fixed top-level `data/` directory instead of the active env-scoped path returned by `_resolve_data_dir()`, breaking environment isolation when `NETWORK_AI_ENV` was set. **Fixed**: `ensure_data_dir()` now delegates to `_resolve_data_dir()`.
+
+### Changed
+- SKILL.md scan findings table updated with both SkillSpector resolved entries.
+- `@types/node` constraint relaxed from `^25.10.0` (non-existent) to `^25.0.0`; resolves CI `ETARGET` error on `npm ci`.
+
 ## [5.10.0] - 2026-06-08
 
 ### Added

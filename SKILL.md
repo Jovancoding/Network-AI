@@ -755,7 +755,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.10.0"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.10.1"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |
@@ -777,6 +777,8 @@ This skill is scanned on every publish. The following Notes are flagged by desig
 | **ASI06** Memory and Context Poisoning (audit log free text) | Low | `justification` field in permission requests and `data/audit_log.jsonl` store agent-provided free-text strings locally — PII or secrets placed there will persist on disk | Do not include PII, secrets, or credentials in justification text; restrict access to `data/` on shared machines; rotate/delete `audit_log.jsonl` when no longer needed |
 | **ASI07** Insecure Inter-Agent Communication | High | Blackboard is local file-based; origin/identity depends on local file access, not authenticated messaging | Run in a trusted workspace; restrict file permissions on `data/`; review blackboard changes before relying on them for important decisions |
 | **ASI08** Cascading Failures | ~~High~~ Resolved | `os` was referenced before import in `swarm_guard.py` — fixed in v5.4.4; `import os` now present | Fixed — `swarm_guard.py` now imports `os` at module level; budget/health guard starts correctly |
+| **SkillSpector** Intent-Code Divergence (`FILE_EXPORT` missing from `HIGH_RISK_RESOURCES`) | ~~Low~~ Resolved | Comment stated `FILE_EXPORT` requires `--confirm-high-risk` but `HIGH_RISK_RESOURCES` only contained `PAYMENTS` and `DATABASE`; file export requests could receive advisory grants without the extra acknowledgment | Fixed in v5.10.1 — `FILE_EXPORT` added to `HIGH_RISK_RESOURCES` in `check_permission.py`; now requires `--confirm-high-risk` consistent with the documented policy |
+| **SkillSpector** Description-Behavior Mismatch (`ensure_data_dir()` ignoring env scope) | ~~Medium~~ Resolved | `ensure_data_dir()` always created the fixed top-level `data/` directory instead of the active env-specific path, breaking environment isolation when `NETWORK_AI_ENV` is set | Fixed in v5.10.1 — `ensure_data_dir()` now delegates to `_resolve_data_dir()` so audit log and grant files are always written to the correct env-scoped directory |
 
 ## References
 
