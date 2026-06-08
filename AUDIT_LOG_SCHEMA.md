@@ -1,4 +1,4 @@
-# Audit Log Schema — Network-AI v5.9.1
+# Audit Log Schema — Network-AI v5.10.0
 
 Network-AI writes a JSONL audit trail during permission management and swarm execution. This document describes every field and event type.
 
@@ -252,6 +252,16 @@ The following event types were added in v5.0:
 | `vcr_record_start` | AgentVCR | Recording session started |
 | `vcr_record_stop` | AgentVCR | Recording session stopped |
 | `vcr_replay` | AgentVCR | Replay of recorded session executed |
+
+## v5.10 Event Types
+
+The following event types were added in v5.10.0 (ClaimVerifier / Tier 1 agent honesty):
+
+| Action | Source Module | Description |
+|--------|--------------|-------------|
+| `shell_execute` | `AgentRuntime` | Shell command executed; `details.exitCode` and `details.timedOut` record the real outcome. An `ExecutionReceipt` is attached to the `ShellResult` (signed by runtime, committed to `exitCode + outputHash`). |
+| `file_write` | `AgentRuntime` | File write completed; an `ExecutionReceipt` is attached to the `FileResult` committing to content hash. |
+| `trust_decay` | `AuthGuardian` | Agent trust level decremented after N consecutive `UNSUPPORTED_CLAIM` violations; `details.previousTrust`, `details.newTrust`, and `details.consecutiveViolations` recorded. |
 
 ---
 

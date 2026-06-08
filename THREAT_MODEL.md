@@ -1,6 +1,6 @@
 # Network-AI Threat Model
 
-Version: 5.9.1 — updated with each release that changes a trust boundary or auth mechanism.
+Version: 5.10.0 — updated with each release that changes a trust boundary or auth mechanism.
 
 ---
 
@@ -54,7 +54,7 @@ or hijack another agent's goal.
 - Justification hardening rejects prompt-injection patterns, keyword stuffing, repetition, and structural incoherence.
 - Agent trust levels are stored in `data/trust_levels.json`; modifications are audit-logged.
 - `ComplianceMonitor` detects behavioural anomalies in real time.
-- `ShellExecutor` runs commands with `spawn(shell: false)` using a parsed argv; `SandboxPolicy` rejects unquoted shell metacharacters before the allowlist match, so a scoped allow such as `git *` cannot be escaped into arbitrary execution (v5.9.1, GHSA-qw6v-5fcf-5666).
+- `ShellExecutor` runs commands with `spawn(shell: false)` using a parsed argv; `SandboxPolicy` rejects unquoted shell metacharacters before the allowlist match, so a scoped allow such as `git *` cannot be escaped into arbitrary execution (v5.10.0, GHSA-qw6v-5fcf-5666).
 
 ### 3.3 Blackboard Poisoning / Context Injection
 
@@ -165,12 +165,40 @@ operators must address them at the infrastructure layer:
 | npm provenance / SLSA | CI pipeline | Adversary 3.4 |
 | Append-only audit log | `security.ts` | Adversary 3.5 |
 | ComplianceMonitor | `lib/compliance-monitor.ts` | Adversary 3.2 |
+| **ClaimVerifier — Tier 1 agent honesty** | `lib/claim-verifier.ts` | Adversary 3.2 |
 | Rate limiting | `security.ts` | All |
 | Path traversal protection | `scripts/blackboard.py` | Adversary 3.5 |
 
 ---
 
-## 7. Out-of-scope Findings
+## 8. ClaimVerifier Scope and Limits (Tier 1 / Tier 2)
+
+### Tier 1 — What is built and enforced (v5.10.0+)
+
+`ClaimVerifier` (`lib/claim-verifier.ts`) reconciles agent-declared action manifests against runtime-witnessed audit entries using outcome-bound signed receipts.
+
+**What it catches:**
+- **Fabricated actions** — agent claims it ran a command or wrote a file when it did not; detected by the absence of a valid signed receipt + matching audit entry.
+- **Fabricated/misrepresented outcomes** — agent presents a tampered receipt claiming `exitCode: 0` when the command actually failed; detected because tampering with any receipt field (including `exitCode` or `outputHash`) invalidates the HMAC signature.
+- **Undisclosed actions** — agent executes something without declaring it in its manifest; detected by diffing the `AgentRuntime` audit log against the manifest.
+
+**Trust consequences:** N consecutive `UNSUPPORTED_CLAIM` violations (default: 3) decay the agent's trust score via `AuthGuardian.registerAgentTrust()`. Below the 0.4 threshold, `requestPermission()` denies high-risk resources and the agent is effectively gated behind `ApprovalGate`.
+
+**Scope ceiling (explicit, not hidden):**
+- Trusts that side effects route through `AgentRuntime` (`ShellExecutor` / `FileAccessor`). BYOC adapter network calls are **unmediated** — a compromised adapter can make arbitrary outbound HTTP calls without a receipt.
+- Audit log is **in-memory per session**; verification is per-runtime-session, not cross-session or cross-process.
+- Does **not** catch misleading interpretation of true outcomes (e.g. `exit 0` → "production-ready"). Receipt proves what ran and what the exit code was — not what it means.
+- Claim identity is cryptographically bound to `agentId` inside the signed receipt, so trust decay cannot be weaponised against a different agent.
+
+### Tier 2 — Hardening path for Adversary-3.2 deployments (not yet built)
+
+For deployments where the threat model explicitly includes a compromised adapter making direct system calls:
+
+1. **Child-process sandbox** — run adapter/agent code in a separate OS process (not a worker thread) with Node's Permission Model stripping `--allow-child-process`, `--allow-fs-write`, `--allow-worker`, `--allow-addons`. Converts `ShellExecutor`/`FileAccessor` from a convention into the only possible path.
+2. **`CapabilityBroker`** — privileged parent holds the only real fs/proc handles; sandbox communicates via IPC only.
+3. **OS-level egress-deny** — container/network namespace with default-deny egress; broker's unix socket is the only reachable endpoint. This is the only option that closes the BYOC network channel.
+
+Until Tier 2 is deployed, operators running Adversary-3.2-grade workloads should run adapters in separate containers with egress controls at the infrastructure level.
 
 Findings in the following categories will be acknowledged but closed as by-design:
 

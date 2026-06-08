@@ -1296,6 +1296,15 @@ export type {
   ComplianceMonitorOptions,
 } from './lib/compliance-monitor';
 
+// Claim Verifier (Tier 1 Agent Honesty / Lie Detector)
+export { ClaimVerifier } from './lib/claim-verifier';
+export type {
+  ActionManifest,
+  VerificationOutcome,
+  VerificationResult,
+  ClaimVerifierOptions,
+} from './lib/claim-verifier';
+
 // QA Orchestrator Agent
 export { QAOrchestratorAgent } from './lib/qa-orchestrator';
 export type {
@@ -1391,6 +1400,7 @@ export type {
   RuntimeEvents,
   AgentRuntimeOptions,
 } from './lib/agent-runtime';
+export type { ExecutionReceipt } from './security';
 
 // Console UI — Interactive terminal dashboard (Phase 9b)
 export { ConsoleUI, ansi } from './lib/console-ui';

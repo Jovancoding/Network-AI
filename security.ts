@@ -79,6 +79,30 @@ interface SecureToken {
 }
 
 /**
+ * Outcome-bound execution receipt issued by the runtime after a real action.
+ * Signed by SecureTokenManager so the runtime — not the agent — is the
+ * authority on what happened and what the result was.
+ */
+export interface ExecutionReceipt {
+  /** Unique receipt identifier */
+  receiptId: string;
+  /** Agent that requested the action */
+  agentId: string;
+  /** Action type: 'shell_execute' | 'file_write' */
+  action: string;
+  /** Command or file path that was acted on */
+  target: string;
+  /** Exit code (0 = success) for shell; 0 for successful file writes */
+  exitCode: number;
+  /** SHA-256 hex hash of the output (stdout+stderr+exitCode for shell; content for file write) */
+  outputHash: string;
+  /** Unix ms timestamp of issue */
+  issuedAt: number;
+  /** HMAC-SHA256 signature over all fields — only trusted if verified */
+  signature: string;
+}
+
+/**
  * Cryptographically signed token manager using HMAC.
  *
  * Generates, validates, and revokes tokens with configurable expiration.
@@ -154,6 +178,52 @@ export class SecureTokenManager {
    */
   revokeToken(tokenId: string): void {
     this.revokedTokens.add(tokenId);
+  }
+
+  /**
+   * Generate an outcome-bound execution receipt.
+   * Called by the runtime after an action actually executes — never by agent code.
+   * The signature commits to every field, so tampering with any one field
+   * (including exitCode or outputHash) invalidates the receipt.
+   *
+   * @param agentId   - Agent that requested the action
+   * @param action    - 'shell_execute' | 'file_write'
+   * @param target    - Command string or file path
+   * @param exitCode  - Actual exit code observed by the runtime
+   * @param outputHash - SHA-256 hex of the actual output (runtime-computed)
+   */
+  generateReceipt(
+    agentId: string,
+    action: string,
+    target: string,
+    exitCode: number,
+    outputHash: string,
+  ): ExecutionReceipt {
+    const receiptId = randomBytes(16).toString('hex');
+    const issuedAt = Date.now();
+    const payload = `${receiptId}:${agentId}:${action}:${target}:${exitCode}:${outputHash}:${issuedAt}`;
+    const signature = this.sign(payload);
+    return { receiptId, agentId, action, target, exitCode, outputHash, issuedAt, signature };
+  }
+
+  /**
+   * Validate an execution receipt's signature and age.
+   * Returns the verified receipt on success so callers can safely read its fields.
+   *
+   * @param receipt - The receipt to verify (as returned by generateReceipt)
+   */
+  validateReceipt(receipt: ExecutionReceipt): { valid: boolean; reason?: string; receipt?: ExecutionReceipt } {
+    // Age check — receipts are valid for the same window as tokens
+    if (Date.now() > receipt.issuedAt + this.config.maxTokenAge) {
+      return { valid: false, reason: 'Receipt has expired' };
+    }
+    // Signature verification
+    const payload = `${receipt.receiptId}:${receipt.agentId}:${receipt.action}:${receipt.target}:${receipt.exitCode}:${receipt.outputHash}:${receipt.issuedAt}`;
+    const expected = this.sign(payload);
+    if (!this.constantTimeCompare(receipt.signature, expected)) {
+      return { valid: false, reason: 'Invalid receipt signature' };
+    }
+    return { valid: true, receipt };
   }
   
   /**

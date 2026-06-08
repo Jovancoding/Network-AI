@@ -68,6 +68,8 @@ export class AuthGuardian {
   private readonly hmacSecret: string;
   private readonly ed25519PrivateKey: KeyObject | null;
   private readonly ed25519PublicKey: KeyObject | null;
+  /** Per-agent consecutive unsupported-claim counters (ClaimVerifier integration) */
+  private _consecutiveClaims: Map<string, number> = new Map();
 
   constructor(options?: {
     trustLevels?: AgentTrustConfig[];
@@ -541,6 +543,57 @@ export class AuthGuardian {
     // HMAC: append signature so tokens are tamper-evident
     const sig = createHmac('sha256', this.hmacSecret).update(payload).digest('base64url');
     return `${payload}.${sig}`;
+  }
+
+  // --------------------------------------------------------------------------
+  // Claim-verifier trust decay integration
+  // --------------------------------------------------------------------------
+
+  /**
+   * Record one unsupported-claim violation for an agent.
+   * After `threshold` consecutive violations the agent's trust is decremented
+   * by `decayStep`. Below 0.4 trust, requestPermission() will deny high-risk
+   * resources and the agent is effectively forced into ApprovalGate territory.
+   *
+   * Call this from ClaimVerifier after each UNSUPPORTED_CLAIM violation.
+   * The consecutive counter resets when a corroborated turn is recorded.
+   *
+   * @param agentId    - The lying/hallucinating agent
+   * @param threshold  - Consecutive misses before decay (default: 3)
+   * @param decayStep  - Trust reduction per threshold breach (default: 0.1)
+   */
+  recordClaimViolation(agentId: string, threshold = 3, decayStep = 0.1): void {
+    const count = (this._consecutiveClaims.get(agentId) ?? 0) + 1;
+    this._consecutiveClaims.set(agentId, count);
+
+    if (count >= threshold) {
+      const current = this.agentTrustLevels.get(agentId) ?? 0.5;
+      const next = Math.max(0, +(current - decayStep).toFixed(4));
+      this.registerAgentTrust({ agentId, trustLevel: next });
+      this.log('trust_decay', { agentId, previousTrust: current, newTrust: next, consecutiveViolations: count });
+      this._consecutiveClaims.set(agentId, 0); // reset after decay fires
+    }
+  }
+
+  /**
+   * Reset the consecutive unsupported-claim counter for an agent.
+   * Call this when the agent produces a fully corroborated turn.
+   */
+  resetClaimViolations(agentId: string): void {
+    this._consecutiveClaims.set(agentId, 0);
+  }
+
+  /** Current consecutive unsupported-claim count for an agent. */
+  getClaimViolationCount(agentId: string): number {
+    return this._consecutiveClaims.get(agentId) ?? 0;
+  }
+
+  /**
+   * Get the current trust level for an agent (0–1).
+   * Returns 0.5 (the default) for unknown agents.
+   */
+  getTrustLevel(agentId: string): number {
+    return this.agentTrustLevels.get(agentId) ?? 0.5;
   }
 
   /**

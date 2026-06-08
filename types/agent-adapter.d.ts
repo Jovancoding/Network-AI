@@ -83,6 +83,8 @@ export interface AgentResult {
     retryAttempts?: number;
     /** Framework-specific trace data */
     trace?: Record<string, unknown>;
+    /** Runtime-issued outcome-bound receipts for actions performed during this result */
+    receipts?: import('../security').ExecutionReceipt[];
     [key: string]: unknown;
   };
 }

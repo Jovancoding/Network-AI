@@ -743,6 +743,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 |---|---|
 | **Zero network calls (Python scripts)** | All bundled Python scripts use Python stdlib only, spawn no subprocesses, and make no network calls — declared in `metadata.openclaw.network_calls` and `bundle_scope`. The optional MCP SSE server (`bin/mcp-server.ts`) binds a TCP port only when explicitly started by the operator and requires a non-empty bearer-token secret. |
 | **AgentRuntime sandbox** | `ShellExecutor` enforces per-command timeout and output-size limits; `SandboxPolicy` allowlist/blocklist prevents unapproved shell commands from running at all |
+| **ClaimVerifier (Tier 1 agent honesty)** | `AgentRuntime` issues HMAC-signed outcome-bound receipts (`ExecutionReceipt`) on every `exec()` and `writeFile()`; `ClaimVerifier` (`lib/claim-verifier.ts`) reconciles agent-declared manifests against the audit log — `UNSUPPORTED_CLAIM` and `UNDISCLOSED_ACTION` violations surface through `ComplianceMonitor`; repeated fabrication decays `AuthGuardian` trust and forces `ApprovalGate` supervision |
 | **Source protection** | `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any attempt to read outside that boundary throws `SourceProtectionError` — the agent receives `{success: false}`, no path details leak |
 | **Environment isolation** | `NETWORK_AI_ENV` / `--env` routes all state to `data/<env>/`; dev, staging, and production state are fully separated; live state (`audit_log.jsonl`, `active_grants.json`) never promotes across environments |
 | **ApprovalGate** | High-risk shell or file operations require explicit human or callback approval before execution; auto-approve only in explicitly trusted environments |
@@ -754,7 +755,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.9.1"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.10.0"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |

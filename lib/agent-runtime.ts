@@ -16,9 +16,12 @@
  */
 
 import { spawn } from 'child_process';
+import { createHash } from 'crypto';
 import { readFile, writeFile, readdir, stat, mkdir } from 'fs/promises';
 import { join, normalize, isAbsolute, resolve, dirname } from 'path';
 import { EventEmitter } from 'events';
+import type { ExecutionReceipt } from '../security';
+import { SecureTokenManager } from '../security';
 
 // ============================================================================
 // ERRORS
@@ -60,6 +63,8 @@ export interface ShellResult {
   timedOut: boolean;
   /** Whether the command was killed due to output limit */
   truncated: boolean;
+  /** Runtime-issued outcome-bound receipt (present when AgentRuntime executes via exec()) */
+  receipt?: ExecutionReceipt;
 }
 
 /** Options for shell execution */
@@ -86,6 +91,8 @@ export interface FileResult {
   entries?: string[];
   error?: string;
   durationMs: number;
+  /** Runtime-issued outcome-bound receipt (present on successful write operations) */
+  receipt?: ExecutionReceipt;
 }
 
 /** Sandbox policy configuration */
@@ -849,6 +856,7 @@ export class AgentRuntime extends EventEmitter {
   readonly files: FileAccessor;
   readonly gate: ApprovalGate;
   private auditLog: RuntimeAuditEntry[] = [];
+  private readonly receiptManager = new SecureTokenManager();
 
   constructor(opts: AgentRuntimeOptions) {
     super();
@@ -906,6 +914,11 @@ export class AgentRuntime extends EventEmitter {
     this.emit('command:start', agentId, command);
     const result = await this.shell.execute(command, { ...opts, agentId });
     this.emit('command:complete', agentId, command, result);
+    // Issue outcome-bound receipt — runtime authority, not agent's word
+    const outputHash = createHash('sha256')
+      .update(result.stdout + result.stderr + String(result.exitCode))
+      .digest('hex');
+    result.receipt = this.receiptManager.generateReceipt(agentId, 'shell_execute', command, result.exitCode, outputHash);
     this.audit({
       action: 'shell_execute',
       agentId,
@@ -963,6 +976,11 @@ export class AgentRuntime extends EventEmitter {
 
     this.emit('file:access', agentId, filePath, 'write');
     const result = await this.files.write(filePath, content, agentId);
+    // Issue outcome-bound receipt on successful write
+    if (result.success) {
+      const contentHash = createHash('sha256').update(content).digest('hex');
+      result.receipt = this.receiptManager.generateReceipt(agentId, 'file_write', result.path, 0, contentHash);
+    }
     this.audit({
       action: 'file_write', agentId, target: filePath,
       result: result.success ? 'success' : 'error', durationMs: result.durationMs,

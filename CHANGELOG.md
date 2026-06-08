@@ -5,6 +5,25 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.10.0] - 2026-06-08
+
+### Added
+- **ClaimVerifier — Tier 1 Agent Honesty / Lie Detector** (`lib/claim-verifier.ts`): reconciles agent-declared `ActionManifest[]` against `AgentRuntime`'s in-memory `RuntimeAuditEntry` log using outcome-bound HMAC-signed `ExecutionReceipt`s. Core guarantees:
+  - `AgentRuntime.exec()` and `AgentRuntime.writeFile()` now issue a signed `ExecutionReceipt` committing to `{ agentId, action, target, exitCode, outputHash }` co-located with the existing `audit()` call. Tampering with any field (including `exitCode` or `outputHash`) invalidates the HMAC signature — the runtime, not the agent, is the outcome authority.
+  - `ClaimVerifier.verify(manifests, agentId, windowMs)` validates each manifest receipt, checks agent-identity binding, finds matching audit entries, and emits `UNSUPPORTED_CLAIM` (fabricated or misrepresented action) or `UNDISCLOSED_ACTION` (executed but not declared) through `ComplianceMonitor`.
+  - `AuthGuardian.recordClaimViolation()` / `resetClaimViolations()` / `getClaimViolationCount()` / `getTrustLevel()`: trust decays after N consecutive `UNSUPPORTED_CLAIM` violations (default 3); below trust 0.4 the agent is forced into `ApprovalGate` supervised execution.
+  - `SecureTokenManager.generateReceipt()` / `validateReceipt()`: new HMAC receipt primitives reusing existing `sign()` infrastructure.
+  - `ShellResult.receipt?` and `FileResult.receipt?`: optional `ExecutionReceipt` attached on successful execution.
+  - `AgentResult.metadata.receipts?`: non-breaking addition to the open metadata bag.
+  - `ViolationType` extended with `UNSUPPORTED_CLAIM` and `UNDISCLOSED_ACTION`.
+  - `THREAT_MODEL.md` section 8 documents Tier 1 scope ceiling (unmediated BYOC network, per-session audit, interpretive gap) and Tier 2 hardening path (capability broker + process isolation + egress-deny).
+  - 50 new tests in `test-claim-verifier.ts` across Phase 1 (receipt generation/tamper/expiry), Phase 2 (corroborated/unsupported/undisclosed/identity), Phase 3 (trust decay/reset/DoS protection/custom threshold).
+- **`AuthGuardian.getTrustLevel(agentId)`**: new public accessor returning current trust level (0–1), defaulting to 0.5 for unknown agents.
+- Version bump to 5.10.0 in `package.json`, `skill.json`, `openapi.yaml`, `README.md`, and all doc/config files.
+
+### Changed
+- Test suite: **3211 tests across 32 suites** (was 3161/31).
+
 ## [5.9.1] - 2026-06-02
 
 ### Security

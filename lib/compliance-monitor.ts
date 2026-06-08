@@ -23,7 +23,9 @@ export type ViolationType =
   | 'JOURNEY_TIMEOUT'
   | 'TOOL_ABUSE'
   | 'UNAUTHORIZED_ACTION'
-  | 'RATE_LIMIT';
+  | 'RATE_LIMIT'
+  | 'UNSUPPORTED_CLAIM'
+  | 'UNDISCLOSED_ACTION';
 
 /** A single compliance violation event. */
 export interface ComplianceViolation {
