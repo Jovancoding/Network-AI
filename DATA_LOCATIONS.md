@@ -20,6 +20,15 @@ All paths are relative to the **data directory** (default: `./data/`, override w
 | `project-context.json` | `GoalDecomposer` | Active project metadata for LLM-assisted goal decomposition | Internal | No |
 | `backups/` | `EnvironmentManager` | Point-in-time snapshots created by `env backup create` | Sensitive | Same as source |
 
+## Operator-Configured Paths
+
+These files are written **only** when the operator explicitly sets the corresponding option. They are not created by default.
+
+| Option | Created by | Purpose | Data class |
+|--------|-----------|---------|-----------|
+| `PhasePipelineOptions.checkpointPath` | `PhasePipeline` | JSON checkpoint recording completed phases and `nextPhaseIndex`; enables resume after crash | Internal |
+| `SemanticMemory` constructor `persistPath` | `SemanticMemory` | Versioned JSON index of all embedded entries; enables vector store persistence across restarts | Internal |
+
 ### `pending_changes/` layout
 
 ```

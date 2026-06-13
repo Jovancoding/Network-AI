@@ -60,6 +60,8 @@ maintainer publishes a new version. It is not executed on the operator's machine
 | `EnvironmentManager` | Per-env data directories, backup snapshots | `data/<env>/`, `data/backups/` |
 | `check_permission.py` | HMAC signing key (on first run) | `data[/<env>]/.signing_key` |
 | `LockedBlackboard` | Filesystem mutex | `data/.lock` |
+| `PhasePipeline` | DAG checkpoint JSON (when `checkpointPath` is set) | operator-configured path |
+| `SemanticMemory` | Persisted vector index JSON (when `persistPath` is set) | operator-configured path |
 
 All writes are confined to the configured data directory. Path traversal is blocked: all
 file operations resolve the final path and assert it is within the data root before I/O.
@@ -74,8 +76,10 @@ The core library (`index.ts`, `lib/`, `security.ts`) makes **no outbound network
 All network I/O is performed by:
 
 - The operator's BYOC client (passed in by the operator at runtime)
-- The MCP transport (`lib/mcp-transport-sse.ts`), which **receives** inbound HTTP/SSE
+- `lib/mcp-transport-sse.ts`), which **receives** inbound HTTP/SSE
   connections — it does not initiate outbound connections
+- The Streamable HTTP MCP transport (`lib/mcp-transport-http.ts`), which also **receives**
+  inbound connections — no outbound calls
 
 ### Python helper scripts
 
@@ -145,7 +149,8 @@ before each release.
 The published npm package includes:
 
 ```
-dist/          compiled JavaScript + declaration files
+dist/          compiled JavaScript + declaration files (CJS, CommonJS target ES2022)
+dist/esm/      ESM build (module: Node16, for bundlers and native ESM consumers)
 bin/           CLI entry points (TypeScript source)
 types/         additional .d.ts declarations
 scripts/       Python helper scripts
@@ -170,6 +175,6 @@ Notably **excluded** from the published package:
 ## 10. Dependency Update Policy
 
 - Dependabot is enabled for npm (weekly PRs for patch/minor updates).
-- All dependency update PRs run the full test suite (3,148 tests) before merge.
+- All dependency update PRs run the full test suite (3,269 tests) before merge.
 - Major version bumps require manual review and a CHANGELOG entry.
 - New **runtime** dependencies require explicit approval and an update to this file.

@@ -154,7 +154,8 @@ operators must address them at the infrastructure layer:
 
 | Control | Where | Addresses |
 |---------|-------|-----------|
-| Fail-closed MCP auth | `lib/mcp-transport-sse.ts` | Adversary 3.1 |
+| Fail-closed MCP auth (SSE) | `lib/mcp-transport-sse.ts` | Adversary 3.1 |
+| Fail-closed MCP auth (Streamable HTTP) | `lib/mcp-transport-http.ts` | Adversary 3.1 |
 | `propose → validate → commit` | `lib/locked-blackboard.ts` | Adversary 3.2 |
 | AuthGuardian weighted scoring | `lib/auth-guardian.ts` | Adversary 3.2 |
 | Shell-free command execution (`shell: false` + metacharacter rejection) | `lib/agent-runtime.ts` | Adversary 3.2 |
