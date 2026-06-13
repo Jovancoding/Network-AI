@@ -5,11 +5,17 @@
  * answer similarity queries. Bring your own embedding function (BYOE) —
  * no runtime dependency on any specific model or provider.
  *
+ * Optionally persists the index to a JSON file (`persistPath`) so memory
+ * survives process restarts without re-embedding everything.
+ *
  * Inspired by Claw-Code's semantic memory pattern.
  *
  * @module SemanticSearch
- * @version 1.0.0
+ * @version 1.1.0
  */
+
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
+import { dirname, resolve } from 'path';
 
 // ============================================================================
 // TYPES
@@ -76,15 +82,23 @@ function cosineSimilarity(a: number[], b: number[]): number {
 // ============================================================================
 
 /**
- * In-memory semantic vector store.
+ * In-memory semantic vector store with optional file-backed persistence.
  *
  * @example
  * ```typescript
+ * // Ephemeral (in-memory only)
  * const memory = new SemanticMemory(async (text) => openai.embed(text));
+ *
+ * // Persistent across restarts
+ * const memory = new SemanticMemory(
+ *   async (text) => openai.embed(text),
+ *   { persistPath: './data/semantic-index.json' }
+ * );
+ * await memory.load(); // restore from disk on startup
  *
  * // Index entries
  * await memory.index('task:1', 'Quarterly revenue analysis', { status: 'done' }, 'analyst');
- * await memory.index('task:2', 'Customer churn prediction', { status: 'done' }, 'ml-agent');
+ * await memory.save(); // flush to disk
  *
  * // Search
  * const results = await memory.search('financial trends', 5);
@@ -94,12 +108,79 @@ function cosineSimilarity(a: number[], b: number[]): number {
 export class SemanticMemory {
   private entries: Map<string, IndexedEntry> = new Map();
   private embeddingFn: EmbeddingFn;
+  private readonly persistPath: string | undefined;
 
   /**
-   * @param embeddingFn Function that produces embeddings from text
+   * @param embeddingFn  Function that produces embeddings from text
+   * @param options      Optional configuration
+   * @param options.persistPath  Path to a JSON file for durable storage.
+   *   Call `load()` after construction to restore, and `save()` (or use
+   *   `autoSave`) to flush writes.
    */
-  constructor(embeddingFn: EmbeddingFn) {
+  constructor(
+    embeddingFn: EmbeddingFn,
+    options?: { persistPath?: string }
+  ) {
     this.embeddingFn = embeddingFn;
+    this.persistPath = options?.persistPath ? resolve(options.persistPath) : undefined;
+  }
+
+  // --------------------------------------------------------------------------
+  // Persistence
+  // --------------------------------------------------------------------------
+
+  /**
+   * Persist the current in-memory index to `persistPath`.
+   * No-op when `persistPath` was not set.
+   */
+  save(): void {
+    if (!this.persistPath) return;
+    try {
+      mkdirSync(dirname(this.persistPath), { recursive: true });
+      const data = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        entries: Array.from(this.entries.values()),
+      };
+      writeFileSync(this.persistPath, JSON.stringify(data), 'utf-8');
+    } catch { /* non-fatal */ }
+  }
+
+  /**
+   * Restore the index from `persistPath`.
+   * No-op when `persistPath` was not set or the file does not exist.
+   *
+   * Call this once after construction to warm the index from a previous run.
+   */
+  load(): void {
+    if (!this.persistPath || !existsSync(this.persistPath)) return;
+    try {
+      const raw = readFileSync(this.persistPath, 'utf-8');
+      const data = JSON.parse(raw) as { version: number; entries: IndexedEntry[] };
+      if (data.version !== 1 || !Array.isArray(data.entries)) return;
+      this.entries.clear();
+      for (const entry of data.entries) {
+        if (
+          typeof entry.key === 'string' &&
+          Array.isArray(entry.embedding) &&
+          entry.embedding.length > 0
+        ) {
+          this.entries.set(entry.key, entry);
+        }
+      }
+    } catch { /* non-fatal — start with empty index */ }
+  }
+
+  /**
+   * Delete the persistence file.
+   * Useful for clearing stale indexes between projects.
+   */
+  clearPersisted(): void {
+    if (!this.persistPath || !existsSync(this.persistPath)) return;
+    try {
+      const { unlinkSync } = require('fs') as typeof import('fs');
+      unlinkSync(this.persistPath);
+    } catch { /* ignore */ }
   }
 
   /**
@@ -110,10 +191,12 @@ export class SemanticMemory {
    * @param text The text to embed for similarity matching
    * @param value The value to return in search results
    * @param sourceAgent Agent that produced this entry
+   * @param autoSave Flush to disk after indexing (requires `persistPath`). Default false.
    */
-  async index(key: string, text: string, value: unknown, sourceAgent: string): Promise<void> {
+  async index(key: string, text: string, value: unknown, sourceAgent: string, autoSave = false): Promise<void> {
     const embedding = await this.embeddingFn(text);
     this.entries.set(key, { key, text, value, sourceAgent, embedding });
+    if (autoSave) this.save();
   }
 
   /**

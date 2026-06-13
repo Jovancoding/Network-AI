@@ -11,6 +11,8 @@
 
 import type { AgentPayload, AgentContext, AgentResult } from '../types/agent-adapter';
 import type { AdapterRegistry } from '../adapters/adapter-registry';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
+import { join, dirname, resolve } from 'path';
 
 // ============================================================================
 // TYPES
@@ -141,6 +143,14 @@ export interface PhasePipelineOptions {
    * summarises the history whenever the threshold is breached.
    */
   compaction?: CompactionOptions;
+  /**
+   * Path to a JSON checkpoint file for durable DAG execution.
+   * When set, the pipeline saves a checkpoint after every completed phase.
+   * On restart, if the file exists, already-completed phases are skipped and
+   * execution resumes from the first non-completed phase.
+   * Use `PhasePipeline.clearCheckpoint(path)` to delete after a successful run.
+   */
+  checkpointPath?: string;
 }
 
 /**
@@ -153,6 +163,27 @@ export interface PipelineExecutionContext {
   currentPhaseIndex: number;
   /** Total number of phases */
   totalPhases: number;
+}
+
+// ============================================================================
+// CHECKPOINT TYPES
+// ============================================================================
+
+/** Serializable form of a PhaseResult (Maps → arrays for JSON). */
+interface CheckpointPhaseResult {
+  phaseName: string;
+  status: PhaseStatus;
+  agentResults: Array<[string, AgentResult]>;
+  durationMs: number;
+  approval?: { approvedBy?: string; reason?: string; timestamp: number };
+}
+
+/** On-disk checkpoint format. */
+interface PipelineCheckpoint {
+  version: 1;
+  savedAt: string;
+  nextPhaseIndex: number;
+  completedPhases: CheckpointPhaseResult[];
 }
 
 // ============================================================================
@@ -235,7 +266,11 @@ export class PhasePipeline {
     this._status = 'running';
     this.phaseResults = [];
 
-    for (let i = 0; i < this.options.phases.length; i++) {
+    // ── Checkpoint resume ─────────────────────────────────────────────────
+    const startIndex = this._loadCheckpoint();
+    // ── End checkpoint resume ─────────────────────────────────────────────
+
+    for (let i = startIndex; i < this.options.phases.length; i++) {
       const phaseDef = this.options.phases[i];
       this.options.onPhaseStart?.(phaseDef.name, i);
 
@@ -285,6 +320,7 @@ export class PhasePipeline {
         phaseResult.status = 'failed';
         this.phaseResults.push(phaseResult);
         this.options.onPhaseComplete?.(phaseResult, i);
+        this._saveCheckpoint(i); // save so resume can retry from this phase
         this._status = 'failed';
         return {
           success: false,
@@ -332,6 +368,7 @@ export class PhasePipeline {
           phaseResult.status = 'rejected';
           this.phaseResults.push(phaseResult);
           this.options.onPhaseComplete?.(phaseResult, i);
+          this._saveCheckpoint(i); // save so resume can retry from this phase
           this._status = 'rejected';
           return {
             success: false,
@@ -347,6 +384,7 @@ export class PhasePipeline {
 
       this.phaseResults.push(phaseResult);
       this.options.onPhaseComplete?.(phaseResult, i);
+      this._saveCheckpoint(i + 1); // advance checkpoint to next phase
 
       // ── Trajectory compaction ─────────────────────────────────────────────
       if (this.options.compaction) {
@@ -381,6 +419,87 @@ export class PhasePipeline {
     this._status = 'idle';
     this._compactionCount = 0;
     this._lastCompactionSummary = null;
+  }
+
+  // --------------------------------------------------------------------------
+  // Checkpoint / resume
+  // --------------------------------------------------------------------------
+
+  /**
+   * Save the current pipeline state to the checkpoint file.
+   * Called automatically after each phase when `checkpointPath` is set.
+   * @internal
+   */
+  private _saveCheckpoint(nextPhaseIndex: number): void {
+    const path = this.options.checkpointPath;
+    if (!path) return;
+    const resolved = resolve(path);
+    const dir = dirname(resolved);
+    try {
+      mkdirSync(dir, { recursive: true });
+      const checkpoint: PipelineCheckpoint = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        nextPhaseIndex,
+        completedPhases: this.phaseResults.map(pr => ({
+          phaseName: pr.phaseName,
+          status: pr.status,
+          agentResults: Array.from(pr.agentResults.entries()),
+          durationMs: pr.durationMs,
+          approval: pr.approval,
+        })),
+      };
+      writeFileSync(resolved, JSON.stringify(checkpoint, null, 2), 'utf-8');
+    } catch {
+      // Non-fatal — checkpoint write failure should not abort the pipeline
+    }
+  }
+
+  /**
+   * Load a checkpoint from disk and restore phase results + next phase index.
+   * Returns the index of the next phase to run (0 if no checkpoint).
+   * @internal
+   */
+  private _loadCheckpoint(): number {
+    const path = this.options.checkpointPath;
+    if (!path) return 0;
+    const resolved = resolve(path);
+    if (!existsSync(resolved)) return 0;
+    try {
+      const raw = readFileSync(resolved, 'utf-8');
+      const cp = JSON.parse(raw) as PipelineCheckpoint;
+      if (cp.version !== 1) return 0;
+      this.phaseResults = cp.completedPhases.map(pr => ({
+        phaseName: pr.phaseName,
+        status: pr.status,
+        agentResults: new Map(pr.agentResults),
+        durationMs: pr.durationMs,
+        approval: pr.approval,
+      }));
+      return cp.nextPhaseIndex;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Delete the checkpoint file for this pipeline (or any given path).
+   * Call this after a successful pipeline run to clean up.
+   *
+   * @example
+   * ```typescript
+   * const result = await pipeline.run();
+   * if (result.success) PhasePipeline.clearCheckpoint('./data/my-pipeline.checkpoint.json');
+   * ```
+   */
+  static clearCheckpoint(checkpointPath: string): void {
+    const resolved = resolve(checkpointPath);
+    if (existsSync(resolved)) {
+      try {
+        const { unlinkSync } = require('fs') as typeof import('fs');
+        unlinkSync(resolved);
+      } catch { /* ignore */ }
+    }
   }
 
   // --------------------------------------------------------------------------

@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.11.0] - 2026-06-13
+
+### Added
+- **ESM dual-build** (`tsconfig.esm.json`, `package.json` `"exports"` map): `dist/esm/` output compiled with `module: Node16`; `"exports"` map provides `import` (ESM), `require` (CJS), and `types` conditions for `.`, `./security`, and `./adapters` sub-paths. `package.json` gains `"module"` field pointing to `dist/esm/index.js`. `build:cjs` / `build:esm` scripts replace the single `build` step; `"build"` now runs both.
+- **Streamable HTTP MCP transport — `lib/mcp-transport-http.ts`** (MCP spec 2025-03-26): `McpStreamableServer` exposes a single `/mcp` POST endpoint (JSON-RPC) with optional SSE upgrade for server-push, plus a `/health` liveness probe. Implements `resources/list`, `resources/read`, `prompts/list`, `prompts/get` in addition to the standard `initialize`, `tools/list`, `tools/call`. Pluggable `McpResourceProvider` and `McpPromptProvider` interfaces; built-in `BlackboardResourceProvider` (`network-ai://blackboard/<key>`) and `OrchestrationPromptProvider` (orchestrate / audit_summary). Fail-closed: `listen()` rejects if `secret` is empty.
+- **PhasePipeline DAG checkpoint/resume** (`lib/phase-pipeline.ts`): `PhasePipelineOptions.checkpointPath` enables durable execution. A JSON checkpoint (version 1, `nextPhaseIndex`, `completedPhases`) is written after each phase completes; `run()` reads any existing checkpoint and resumes from `nextPhaseIndex`, replaying already-saved results. `PhasePipeline.clearCheckpoint(path)` static helper deletes the file. Non-fatal on checkpoint I/O errors (pipeline continues without persistence).
+- **SemanticMemory file-backed persistence** (`lib/semantic-search.ts` v1.1.0): `SemanticMemory` constructor accepts `options?: { persistPath?: string }`. `save()` serializes the entry store to a versioned JSON file (version 1); `load()` restores entries from that file on startup. `index()` gains an `autoSave = false` parameter — `true` flushes immediately after indexing. `clearPersisted()` deletes the persist file. All methods are no-ops when `persistPath` is unset.
+- **58 new tests** in `test-phase13.ts` across 4 phases (ESM build config, McpStreamableServer dispatch + resources + prompts, PhasePipeline checkpoint/resume/clear, SemanticMemory save/load/autoSave/clearPersisted).
+
+### Changed
+- **Test suite: 3,269 tests across 33 suites** (was 3,148/32; +121 from test-phase13.ts and updated existing suite counts).
+- `run-tests.ts`: `test-phase13.ts` added to SUITES array.
+
 ## [5.10.2] - 2026-06-08
 
 ### Fixed

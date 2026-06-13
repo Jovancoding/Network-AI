@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.10.2 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,148 tests, 70+ modules.
+Network-AI v5.11.0 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,206 tests, 72+ modules.
 
 ## The Multi-Agent Race Condition Problem
 
@@ -404,7 +404,9 @@ Network-AI/
 │   ├── env-manager.ts            # Promotion chain dev→…→prod, backup/restore (v5.4)
 │   ├── circuit-breaker.ts        # CLOSED/OPEN/HALF_OPEN per-adapter; fallbackChain (v5.6.1)
 │   ├── telemetry-provider.ts     # ITelemetryProvider BYOT; NullTelemetryProvider; createOtelHooks (v5.7)
-│   └── auth-guardian.ts          # Permission wall; scoreRequest() diagnostic API (v5.8)
+│   ├── auth-guardian.ts          # Permission wall; scoreRequest() diagnostic API (v5.8)
+│   ├── claim-verifier.ts         # ClaimVerifier: manifest vs audit reconciliation, HMAC receipts (v5.10)
+│   └── mcp-transport-http.ts     # McpStreamableServer: MCP 2025-03-26 Streamable HTTP + resources/prompts (v5.11)
 ├── scripts/                      # Python helper scripts (local orchestration only)
 │   ├── blackboard.py             # Shared state management with atomic commits
 │   ├── swarm_guard.py            # Handoff tax prevention, budget tracking

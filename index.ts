@@ -1709,6 +1709,24 @@ export {
 } from './lib/mcp-transport-sse';
 export type { McpToolProvider, McpSseServerOptions } from './lib/mcp-transport-sse';
 
+// MCP Streamable HTTP Transport — 2025 MCP spec (tools + resources + prompts)
+export {
+  McpStreamableServer,
+  BlackboardResourceProvider,
+  OrchestrationPromptProvider,
+} from './lib/mcp-transport-http';
+export type {
+  McpStreamableServerOptions,
+  McpResourceProvider,
+  McpPromptProvider,
+  McpResource,
+  McpResourceContent,
+  McpPrompt,
+  McpPromptArgument,
+  McpPromptMessage,
+  McpPromptResult,
+} from './lib/mcp-transport-http';
+
 export { ExtendedMcpTools } from './lib/mcp-tools-extended';
 export type { IBudget, ITokenManager, ExtendedMcpToolsOptions } from './lib/mcp-tools-extended';
 

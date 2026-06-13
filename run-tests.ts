@@ -42,6 +42,7 @@ const SUITES = [
   'test-env-manager.ts',
   'test-transport.ts',
   'test-claim-verifier.ts',
+  'test-phase13.ts',
 ];
 
 const WIDTH = 60;
