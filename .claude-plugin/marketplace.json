@@ -1,0 +1,35 @@
+{
+  "name": "network-ai",
+  "owner": {
+    "name": "OpenClaw Community",
+    "url": "https://github.com/Jovancoding/Network-AI"
+  },
+  "metadata": {
+    "description": "Network-AI — multi-agent orchestration framework exposed as a Claude Code plugin.",
+    "version": "5.11.0"
+  },
+  "plugins": [
+    {
+      "name": "network-ai",
+      "source": "./",
+      "description": "Multi-agent orchestration for Claude Code — shared blackboard state, permission gating, federated budgets, audit trails, and 29 framework adapters, exposed as MCP tools.",
+      "version": "5.11.0",
+      "author": {
+        "name": "OpenClaw Community",
+        "url": "https://github.com/Jovancoding/Network-AI"
+      },
+      "homepage": "https://network-ai.org",
+      "repository": "https://github.com/Jovancoding/Network-AI",
+      "license": "MIT",
+      "keywords": [
+        "ai-agents",
+        "multi-agent",
+        "orchestration",
+        "mcp",
+        "blackboard",
+        "swarm"
+      ],
+      "category": "orchestration"
+    }
+  ]
+}

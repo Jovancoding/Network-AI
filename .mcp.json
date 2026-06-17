@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "network-ai": {
+      "command": "npx",
+      "args": ["-y", "-p", "network-ai", "network-ai-server", "--stdio"]
+    }
+  }
+}
