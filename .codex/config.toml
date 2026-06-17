@@ -1,0 +1,17 @@
+# Network-AI — OpenAI Codex MCP server (project-scoped)
+#
+# Codex auto-loads this file for trusted projects (CLI and IDE extension).
+# It registers the Network-AI MCP server over stdio, exposing the blackboard,
+# federated budget, permission-token, and audit-log tools.
+#
+# To register globally instead, copy the [mcp_servers.network-ai] block into
+# ~/.codex/config.toml. Or run:
+#   codex mcp add network-ai -- npx -y -p network-ai network-ai-server --stdio
+#
+# startup_timeout_sec is raised from the default (10s) because the first run
+# may download the package via npx.
+
+[mcp_servers.network-ai]
+command = "npx"
+args = ["-y", "-p", "network-ai", "network-ai-server", "--stdio"]
+startup_timeout_sec = 30

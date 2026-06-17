@@ -282,6 +282,30 @@ Validate the manifests locally with `claude plugin validate .`.
 
 ---
 
+## Use with OpenAI Codex
+
+Network-AI also runs as an [OpenAI Codex](https://developers.openai.com/codex) MCP server — in both the Codex CLI and the IDE extension. The same tools that load in Claude Code become available in Codex.
+
+**Add it with one command** (uses the published npm package):
+
+```bash
+codex mcp add network-ai -- npx -y -p network-ai network-ai-server --stdio
+```
+
+In the Codex TUI, run `/mcp` to confirm `network-ai` is connected.
+
+**Or scope it to a project** — the repo root ships a [`.codex/config.toml`](.codex/config.toml) so any trusted checkout picks the server up automatically. To register it globally instead, drop the same block into `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.network-ai]
+command = "npx"
+args = ["-y", "-p", "network-ai", "network-ai-server", "--stdio"]
+```
+
+Either route exposes the full tool set (`blackboard_read`, `budget_status`, `audit_query`, `token_create`, …) over stdio MCP — no API keys, no running server to manage.
+
+---
+
 ## CLI
 
 Control Network-AI directly from the terminal — no server required. The CLI imports the same core engine used by the MCP server.

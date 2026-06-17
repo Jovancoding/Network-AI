@@ -686,6 +686,15 @@ Install Network-AI as a [Claude Code](https://code.claude.com) plugin — the MC
 
 Every Network-AI tool (`blackboard_read`, `budget_status`, `audit_query`, …) then loads natively. The plugin runs `npx -y -p network-ai network-ai-server --stdio`. Validate the manifests locally with `claude plugin validate .`.
 
+**OpenAI Codex (CLI & IDE):**
+Add Network-AI as a Codex MCP server with one command:
+
+```bash
+codex mcp add network-ai -- npx -y -p network-ai network-ai-server --stdio
+```
+
+Or commit it per-project — the repo root ships a [`.codex/config.toml`](.codex/config.toml) that registers the same stdio server for trusted checkouts. Run `/mcp` in the Codex TUI to verify it connected.
+
 ---
 
 ## Fan-Out / Fan-In Pattern
