@@ -5,6 +5,21 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.12.1] - 2026-06-17
+
+### Added
+- **OpenAI Codex integration** — project-scoped `.codex/config.toml` registers the Network-AI MCP server (stdio) for the Codex CLI and IDE extension. One-command install: `codex mcp add network-ai -- npx -y -p network-ai network-ai-server --stdio`. New "Use with OpenAI Codex" section in README and a Codex block in QUICKSTART.
+- **`PRIVACY.md`** — explicit privacy policy: no data collection, no telemetry (opt-in BYOT only), no call-home; all state stored in local files the operator controls.
+
+### Fixed
+- **CI npm publish race** — the publish job now serializes per tag ref (`concurrency`) and treats a 403 as success when the version already exists on the registry, eliminating the E403 that occurred when two tag runs published the same version concurrently.
+- **`package.json` metadata** — removed the leading `./` from the four `bin` paths and set `repository.url` to the `git+https://…` form to silence npm publish warnings.
+
+### Changed
+- Version bump 5.12.0 → 5.12.1 across `package.json`, `skill.json`, `openapi.yaml`, the README release badge, the Claude Code plugin manifests, and documentation headers (ARCHITECTURE, BENCHMARKS, AUDIT_LOG_SCHEMA, INTEGRATION_GUIDE, references/adapter-system, SKILL, CLAUDE, CODEX, copilot-instructions).
+- Corrected stale test counts in `CLAUDE.md`, `CODEX.md`, and `CONTRIBUTING.md` to **3,269 tests across 33 suites**.
+- Sharper Claude Code plugin descriptions in `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`.
+
 ## [5.12.0] - 2026-06-17
 
 ### Added

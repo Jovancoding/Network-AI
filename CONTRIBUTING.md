@@ -41,7 +41,7 @@ Unsolicited PRs without a linked, approved issue will be closed.
 2. Implement your change with tests
 3. Run the full test suite:
    ```bash
-   npm run test:all   # 3211 tests across 32 suites
+   npm run test:all   # 3,269 tests across 33 suites
    npx tsc --noEmit
    ```
 4. Open a PR referencing the approved issue

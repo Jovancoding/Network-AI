@@ -5,7 +5,7 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.12.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.12.1-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![Tests](https://img.shields.io/badge/tests-3269%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-29%20supported-blueviolet.svg)](#adapter-system)
@@ -554,6 +554,8 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 ## Use with Claude, ChatGPT & Codex
 
 > Using **Claude Code** (the CLI)? See [Use as a Claude Code Plugin](#use-as-a-claude-code-plugin) — one command installs every tool.
+>
+> Using **OpenAI Codex** (CLI or IDE)? See [Use with OpenAI Codex](#use-with-openai-codex) — add the MCP server with a single `codex mcp add`.
 
 Three integration files are included in the repo root:
 
