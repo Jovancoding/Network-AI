@@ -86,6 +86,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, build]
     if: startsWith(github.ref, 'refs/tags/v')
+    # Serialize publish runs for the same tag ref so a re-pointed/forced tag
+    # cannot race a still-running publish of the same version.
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write  # required for npm provenance
@@ -110,10 +115,17 @@ jobs:
       - name: Publish to npm (with provenance)
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
-          if npm view network-ai@$PKG_VERSION version 2>/dev/null; then
+          if [ -n "$(npm view network-ai@$PKG_VERSION version 2>/dev/null)" ]; then
             echo "network-ai@$PKG_VERSION already published — skipping."
+            exit 0
+          fi
+          if npm publish --provenance --access public; then
+            echo "Published network-ai@$PKG_VERSION."
+          elif [ -n "$(npm view network-ai@$PKG_VERSION version 2>/dev/null)" ]; then
+            echo "network-ai@$PKG_VERSION was published by a concurrent run — treating as success."
           else
-            npm publish --provenance --access public
+            echo "npm publish failed and network-ai@$PKG_VERSION is not on the registry."
+            exit 1
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

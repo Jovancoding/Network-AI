@@ -1,6 +1,6 @@
 {
   "name": "network-ai",
-  "description": "Multi-agent orchestration for Claude Code — shared blackboard state, permission gating, federated budgets, audit trails, and 29 framework adapters, exposed as MCP tools.",
+  "description": "Gives Claude Code a multi-agent coordination layer over MCP — an atomic shared blackboard (locked propose/validate/commit), permission gating with HMAC/Ed25519-signed tokens, federated token-budget tracking, and append-only audit-log queries. Backed by an orchestrator with 29 framework adapters (LangChain, AutoGen, CrewAI, and more).",
   "version": "5.12.0",
   "author": {
     "name": "OpenClaw Community",
