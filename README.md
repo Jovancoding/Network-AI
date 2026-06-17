@@ -5,7 +5,7 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.11.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.12.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![Tests](https://img.shields.io/badge/tests-3269%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-29%20supported-blueviolet.svg)](#adapter-system)
@@ -257,6 +257,31 @@ Options: `--no-budget`, `--no-token`, `--no-control`, `--ceiling <n>`, `--board 
 
 ---
 
+## Use as a Claude Code Plugin
+
+Network-AI ships as a [Claude Code](https://code.claude.com) plugin — the MCP server wires in automatically, so every tool listed above becomes available inside Claude Code with no manual config.
+
+**Install from the self-hosted marketplace (zero approval needed):**
+
+```bash
+/plugin marketplace add Jovancoding/Network-AI
+/plugin install network-ai@network-ai
+```
+
+That's it — `blackboard_read`, `budget_status`, `audit_query`, `token_create`, and the rest load as native Claude Code tools. Under the hood the plugin runs `npx -y -p network-ai network-ai-server --stdio` (stdio MCP transport), so it always uses the published npm package.
+
+The repo root carries the standard plugin layout:
+
+| File | Role |
+|---|---|
+| [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) | Plugin manifest |
+| [`.mcp.json`](.mcp.json) | Registers the Network-AI MCP server (stdio) |
+| [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) | Self-hosted marketplace catalog |
+
+Validate the manifests locally with `claude plugin validate .`.
+
+---
+
 ## CLI
 
 Control Network-AI directly from the terminal — no server required. The CLI imports the same core engine used by the MCP server.
@@ -503,6 +528,8 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 ---
 
 ## Use with Claude, ChatGPT & Codex
+
+> Using **Claude Code** (the CLI)? See [Use as a Claude Code Plugin](#use-as-a-claude-code-plugin) — one command installs every tool.
 
 Three integration files are included in the repo root:
 

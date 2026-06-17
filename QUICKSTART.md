@@ -676,6 +676,16 @@ Set the server URL to your running `npx network-ai-server --port 3001` instance.
 **Claude Projects:**
 Copy the contents of `claude-project-prompt.md` into a Claude Project's Custom Instructions field. No server required for instruction-only mode.
 
+**Claude Code (CLI) plugin:**
+Install Network-AI as a [Claude Code](https://code.claude.com) plugin — the MCP server wires in automatically:
+
+```bash
+/plugin marketplace add Jovancoding/Network-AI
+/plugin install network-ai@network-ai
+```
+
+Every Network-AI tool (`blackboard_read`, `budget_status`, `audit_query`, …) then loads natively. The plugin runs `npx -y -p network-ai network-ai-server --stdio`. Validate the manifests locally with `claude plugin validate .`.
+
 ---
 
 ## Fan-Out / Fan-In Pattern

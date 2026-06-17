@@ -1,7 +1,7 @@
 {
   "name": "network-ai",
   "description": "Multi-agent orchestration for Claude Code — shared blackboard state, permission gating, federated budgets, audit trails, and 29 framework adapters, exposed as MCP tools.",
-  "version": "5.11.0",
+  "version": "5.12.0",
   "author": {
     "name": "OpenClaw Community",
     "url": "https://github.com/Jovancoding/Network-AI"

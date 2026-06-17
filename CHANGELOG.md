@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.12.0] - 2026-06-17
+
+### Added
+- **Claude Code plugin** — Network-AI can now be installed as a [Claude Code](https://code.claude.com) plugin. New manifests wire the existing `network-ai-server` MCP server (stdio transport) into Claude Code so every Network-AI tool (`blackboard_read`, `budget_status`, `audit_query`, `token_create`, …) loads automatically:
+  - `.claude-plugin/plugin.json` — plugin manifest (name, version, author, repository, license, keywords).
+  - `.mcp.json` — registers `npx -y -p network-ai network-ai-server --stdio` as a stdio MCP server (the `-p network-ai` selector resolves the binary because the bin name differs from the package name).
+  - `.claude-plugin/marketplace.json` — self-hosted marketplace catalog listing `network-ai` with `source: "./"`. Users add it with `/plugin marketplace add Jovancoding/Network-AI`, then install via `/plugin install network-ai@network-ai` — **zero approval required**.
+  - Both manifests pass `claude plugin validate` (Claude Code CLI v2.1.179).
+
+### Changed
+- Version bump 5.11.0 → 5.12.0 across `package.json`, `skill.json`, `openapi.yaml`, README release badge, and documentation headers (ARCHITECTURE, BENCHMARKS, AUDIT_LOG_SCHEMA, INTEGRATION_GUIDE, references/adapter-system, SKILL, CLAUDE, CODEX, copilot-instructions).
+- `SECURITY.md` / `.github/SECURITY.md` supported versions — 5.12.x is now the fully supported release; 5.11.x receives security fixes only.
+
 ## [5.11.0] - 2026-06-13
 
 ### Added
