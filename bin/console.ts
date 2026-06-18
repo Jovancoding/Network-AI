@@ -119,7 +119,18 @@ async function main(): Promise<void> {
       autoApproveReads: true,
     },
     autoApproveAll: args.autoApprove,
-    onApproval: args.autoApprove ? undefined : async (req) => {
+    onApproval: args.autoApprove
+      ? undefined
+      : args.pipe
+      // Pipe mode has no interactive approver — fail closed. Approval-required
+      // operations (rm, git push, npm publish, …) are denied unless the operator
+      // explicitly opts in with --auto-approve, so untrusted stdin cannot trigger
+      // a high-risk command silently.
+      ? async (req) => ({
+          approved: false,
+          reason: `Operation requires approval ([${req.type}] ${req.target}); pipe mode has no interactive approver. Re-run with --auto-approve to permit it.`,
+        })
+      : async (req) => {
       // Interactive approval via console
       ui.log(`APPROVAL NEEDED: [${req.type}] ${req.target} (risk: ${req.risk})`, 'approval');
       ui.log(`Type 'approve' or 'deny <reason>'`, 'approval');

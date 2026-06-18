@@ -5,6 +5,15 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.12.3] - 2026-06-18
+
+### Security
+- **Console pipe mode fail-closed** — in `--pipe` mode (`bin/console.ts`), operations that require human approval (e.g. `rm`, `git push`, `npm publish`) are now denied with a clear JSON error instead of hanging on an unreachable interactive approver. Untrusted stdin can no longer leave a high-risk command silently pending; `exec`/`spawn` remain gated by the AgentRuntime `SandboxPolicy`, and `--auto-approve` is required to permit approval-gated operations in pipe mode.
+
+### Changed
+- **Socket.dev supply-chain triage for the dual build** — added a `gptSecurity` triage entry for the local, opt-in console pipe-mode control surface, and `dist/esm/…` triage mirrors (11 `networkAccess`, 2 `shellAccess`) for the ESM output introduced by the dual CJS+ESM build. These capabilities (BYOC adapter `fetch`, `AgentRuntime` `child_process`) are intended and policy-gated; the triage documents why.
+- Version bump 5.12.2 → 5.12.3 across `package.json`, `skill.json`, `openapi.yaml`, README badge, Claude Code plugin manifests, and documentation headers.
+
 ## [5.12.2] - 2026-06-18
 
 ### Security

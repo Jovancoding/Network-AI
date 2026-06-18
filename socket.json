@@ -1,6 +1,16 @@
-            {
+{
   "version": 2,
   "ignore": {
+    "gptSecurity": [
+      {
+        "path": "bin/console.ts",
+        "reason": "Intentional — `--pipe` mode is an opt-in LOCAL control surface. It reads newline-delimited JSON only from this process's own stdin (no network listener is opened) and writes JSON to stdout. `exec`/`spawn` are gated by the same AgentRuntime SandboxPolicy (command allow-list, audit log, approval gate); approval-required operations are denied in pipe mode unless the operator passes --auto-approve. Anyone able to write to the process stdin already controls the process, so no privilege boundary is crossed. Operators bridging pipe mode to a network transport must add their own authentication."
+      },
+      {
+        "path": "dist/bin/console.js",
+        "reason": "Intentional — compiled output of bin/console.ts. `--pipe` mode reads JSON only from this process's own stdin (no network listener); exec/spawn are SandboxPolicy-gated and approval-required ops are denied unless --auto-approve is set. No privilege boundary is crossed by local stdin input."
+      }
+    ],
     "evalDynamicCodeExecution": [
       {
         "path": "lib/blackboard-validator.ts",
@@ -203,6 +213,50 @@
       {
         "path": "dist/lib/telemetry-provider.js",
         "reason": "False positive — compiled output of telemetry-provider. No direct network calls; the OTel exporter is supplied by the caller. Flagged by Socket.dev's transitive import-graph analysis only."
+      },
+      {
+        "path": "dist/esm/adapters/a2a-adapter.js",
+        "reason": "Intentional — ESM build output of A2AAdapter. It talks only to agent endpoints explicitly registered by the user."
+      },
+      {
+        "path": "dist/esm/adapters/codex-adapter.js",
+        "reason": "Intentional — ESM build output of CodexAdapter. It talks to OpenAI or a caller-provided base URL."
+      },
+      {
+        "path": "dist/esm/adapters/custom-adapter.js",
+        "reason": "Intentional — ESM build output of CustomAdapter. It calls a caller-supplied endpoint as part of documented BYOC adapter behavior."
+      },
+      {
+        "path": "dist/esm/adapters/minimax-adapter.js",
+        "reason": "Intentional — ESM build output of MiniMaxAdapter. It talks to MiniMax endpoints as configured by the caller."
+      },
+      {
+        "path": "dist/esm/adapters/pydantic-ai-adapter.js",
+        "reason": "Intentional — ESM build output of PydanticAIAdapter. Uses fetch for outbound HTTP calls to caller-supplied PydanticAI endpoints."
+      },
+      {
+        "path": "dist/esm/lib/approval-inbox.js",
+        "reason": "Intentional — ESM build output of ApprovalInbox. The HTTP approval server binds to 127.0.0.1 by default and supports a required bearer secret (5.12.2); flagged via transitive imports, it makes no direct outbound fetch calls."
+      },
+      {
+        "path": "dist/esm/lib/control-plane.js",
+        "reason": "Intentional — ESM build output of ControlPlane; flagged via transitive imports. It makes no direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/esm/lib/dashboard-server.js",
+        "reason": "Intentional — ESM build output of DashboardServer; flagged via transitive imports. It makes no direct outbound HTTP calls via fetch."
+      },
+      {
+        "path": "dist/esm/lib/mcp-tool-consumer.js",
+        "reason": "Intentional — ESM build output of McpToolConsumer. Uses fetch for HTTP/SSE MCP transport to a caller-configured MCP server URL."
+      },
+      {
+        "path": "dist/esm/lib/swarm-transport.js",
+        "reason": "Intentional — ESM build output of SwarmTransport. Uses fetch to relay messages to a caller-configured HTTP endpoint."
+      },
+      {
+        "path": "dist/esm/lib/work-tree-dashboard.js",
+        "reason": "Intentional — ESM build output of WorkTreeDashboard; flagged via transitive imports. It makes no direct outbound HTTP calls."
       }
     ],
     "urlStrings": [
@@ -319,6 +373,14 @@
       {
         "path": "dist/lib/mcp-tool-consumer.js",
         "reason": "Intentional — compiled output of McpToolConsumer. Imports child_process to launch caller-configured MCP server subprocesses for stdio transport."
+      },
+      {
+        "path": "dist/esm/lib/agent-runtime.js",
+        "reason": "Intentional — ESM build output of AgentRuntime. Imports child_process for ShellExecutor; sandboxed by SandboxPolicy, opt-in only."
+      },
+      {
+        "path": "dist/esm/lib/mcp-tool-consumer.js",
+        "reason": "Intentional — ESM build output of McpToolConsumer. Imports child_process to launch caller-configured MCP server subprocesses for stdio transport."
       }
     ],
     "filesystemAccess": [

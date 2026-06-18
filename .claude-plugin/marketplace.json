@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Network-AI — a multi-agent coordination layer for Claude Code: shared blackboard state, permission gating, federated budgets, and audit queries over MCP.",
-    "version": "5.12.2"
+    "version": "5.12.3"
   },
   "plugins": [
     {
       "name": "network-ai",
       "source": "./",
       "description": "Gives Claude Code a multi-agent coordination layer over MCP — an atomic shared blackboard (locked propose/validate/commit), permission gating with HMAC/Ed25519-signed tokens, federated token-budget tracking, and append-only audit-log queries. Backed by an orchestrator with 29 framework adapters (LangChain, AutoGen, CrewAI, and more).",
-      "version": "5.12.2",
+      "version": "5.12.3",
       "author": {
         "name": "OpenClaw Community",
         "url": "https://github.com/Jovancoding/Network-AI"
