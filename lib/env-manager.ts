@@ -25,12 +25,13 @@ import {
   writeFileSync,
   copyFileSync,
   statSync,
+  lstatSync,
   rmSync,
   openSync,
   closeSync,
   constants,
 } from 'fs';
-import { join, resolve } from 'path';
+import { join, resolve, dirname } from 'path';
 import { randomUUID } from 'crypto';
 
 // ============================================================================
@@ -474,7 +475,15 @@ export class EnvironmentManager {
   restore(env: EnvName, backupId: string): RestoreResult {
     const envDir = this.getDataDir(env);
     const backupsDir = join(envDir, '.backups');
-    const backupPath = join(backupsDir, backupId);
+
+    // Reject IDs with path separators, dots, or other traversal characters (GHSA-48x2-6pr9-2jjf)
+    if (!/^[\w\-]+$/.test(backupId)) {
+      throw new Error(`Invalid backup ID: '${backupId}'`);
+    }
+    const backupPath = resolve(join(backupsDir, backupId));
+    if (dirname(backupPath) !== resolve(backupsDir)) {
+      throw new Error(`Backup ID '${backupId}' would escape the backups directory`);
+    }
 
     if (!existsSync(backupPath)) {
       throw new Error(`Backup '${backupId}' not found for environment '${env}'`);
@@ -531,10 +540,17 @@ export class EnvironmentManager {
     if (all.length <= keep) return 0;
 
     const toDelete = all.slice(keep);
+    const resolvedBackupsDir = resolve(join(this.getDataDir(env), '.backups'));
     let deleted = 0;
     for (const entry of toDelete) {
       try {
-        rmSync(entry.path, { recursive: true, force: true });
+        // Recompute the deletion path from backupId instead of trusting entry.path from
+        // the manifest — a poisoned manifest could set path to '/' and cause arbitrary
+        // recursive deletion (GHSA-2fmp-9rvw-hc96).
+        if (!/^[\w\-]+$/.test(entry.backupId)) continue;
+        const safePath = resolve(join(resolvedBackupsDir, entry.backupId));
+        if (dirname(safePath) !== resolvedBackupsDir) continue;
+        rmSync(safePath, { recursive: true, force: true });
         deleted++;
       } catch { /* ignore */ }
     }
@@ -603,10 +619,11 @@ export class EnvironmentManager {
         const full = join(current, entry);
         const rel = prefix ? `${prefix}/${entry}` : entry;
         try {
-          const info = statSync(full);
+          const info = lstatSync(full); // lstat: never follow symlinks out of backup root (GHSA-6x2m-p4xp-wg22)
+          if (info.isSymbolicLink()) continue; // skip symlinks entirely
           if (info.isDirectory()) {
             walk(full, rel);
-          } else {
+          } else if (info.isFile()) {
             results.push(rel);
           }
         } catch { /* skip */ }

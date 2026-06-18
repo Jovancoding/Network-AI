@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.12.2] - 2026-06-18
+
+### Security
+- **GHSA-6x2m-p4xp-wg22** (Moderate) — `EnvironmentManager.backup()` now uses `lstatSync` instead of `statSync` in `_collectBackupFiles()`. Symlinks are detected with `isSymbolicLink()` and skipped, preventing backup from following symlinks outside the environment root.
+- **GHSA-48x2-6pr9-2jjf** (Moderate) — `EnvironmentManager.restore()` validates `backupId` against `/^[\w\-]+$/` and checks `dirname(backupPath) === resolve(backupsDir)` before any filesystem access, blocking path-traversal backup IDs such as `../../etc`.
+- **GHSA-2fmp-9rvw-hc96** (High) — `EnvironmentManager.pruneBackups()` no longer uses `entry.path` from the manifest for `rmSync`. The deletion path is recomputed from `entry.backupId` after format validation, and a `dirname` check ensures it is exactly one level under the backups directory. A poisoned `path: "/"` in a manifest is now harmless.
+- **GHSA-jvcm-f35g-w78p** (Moderate) — `SandboxPolicy.resolvePath()` and `isPathAllowed()` now use sep-anchored prefix checks (`basePath + sep`) instead of bare `startsWith(basePath)`. This prevents `/foo/barextra` from being accepted as a subpath of basePath `/foo/bar`.
+- **GHSA-mxjx-28vx-xjjj** (Moderate) — `ApprovalInbox` HTTP server now supports a `secret` option. When set, `POST /:id/approve` and `POST /:id/deny` require `Authorization: Bearer <secret>`. Validation uses `timingSafeEqual` (constant-time) to prevent timing attacks.
+
+### Changed
+- Version bump 5.12.1 → 5.12.2 across `package.json`, `skill.json`, `openapi.yaml`, README badge, Claude Code plugin manifests, and documentation headers.
+
 ## [5.12.1] - 2026-06-17
 
 ### Added

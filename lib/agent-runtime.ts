@@ -18,7 +18,7 @@
 import { spawn } from 'child_process';
 import { createHash } from 'crypto';
 import { readFile, writeFile, readdir, stat, mkdir } from 'fs/promises';
-import { join, normalize, isAbsolute, resolve, dirname } from 'path';
+import { join, normalize, isAbsolute, resolve, dirname, sep } from 'path';
 import { EventEmitter } from 'events';
 import type { ExecutionReceipt } from '../security';
 import { SecureTokenManager } from '../security';
@@ -395,16 +395,16 @@ export class SandboxPolicy {
     const normalized = this.resolvePath(filePath);
     if (!normalized) return false;
 
-    // Check blocked paths
+    // Check blocked paths (sep-anchored prefix — GHSA-jvcm-f35g-w78p)
     for (const blocked of this.config.blockedPaths) {
       const blockedAbs = resolve(this.config.basePath, blocked);
-      if (normalized.startsWith(blockedAbs)) return false;
+      if (normalized === blockedAbs || normalized.startsWith(blockedAbs + sep)) return false;
     }
 
-    // Check allowed paths
+    // Check allowed paths (sep-anchored prefix — GHSA-jvcm-f35g-w78p)
     for (const allowed of this.config.allowedPaths) {
       const allowedAbs = resolve(this.config.basePath, allowed);
-      if (normalized.startsWith(allowedAbs)) return true;
+      if (normalized === allowedAbs || normalized.startsWith(allowedAbs + sep)) return true;
     }
 
     return false;
@@ -418,8 +418,9 @@ export class SandboxPolicy {
       : join(this.config.basePath, normalized);
     const resolved = resolve(absolute);
 
-    // Traversal check
-    if (!resolved.startsWith(this.config.basePath)) return null;
+    // Traversal check — sep-anchored so '/foo/bar2' cannot match basePath '/foo/bar'
+    // (GHSA-jvcm-f35g-w78p).
+    if (resolved !== this.config.basePath && !resolved.startsWith(this.config.basePath + sep)) return null;
     return resolved;
   }
 

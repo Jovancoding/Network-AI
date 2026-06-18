@@ -18,7 +18,7 @@
 
 import { EventEmitter } from 'events';
 import { createServer, IncomingMessage, ServerResponse, Server } from 'http';
-import { randomBytes } from 'crypto';
+import { randomBytes, timingSafeEqual } from 'crypto';
 import type { ApprovalRequest, ApprovalDecision, ApprovalCallback } from './agent-runtime';
 
 // ============================================================================
@@ -48,6 +48,13 @@ export interface ApprovalEntry {
 
 /** Options for the ApprovalInbox */
 export interface ApprovalInboxOptions {
+  /**
+   * Bearer token required for POST /approve and POST /deny endpoints.
+   * Strongly recommended in production — without a secret, any process that
+   * can reach the HTTP server can approve agent actions (GHSA-mxjx-28vx-xjjj).
+   * Clients must send: `Authorization: Bearer <secret>`.
+   */
+  secret?: string;
   /** Default timeout for approval requests in ms (default: 300000 = 5 min) */
   defaultTimeoutMs?: number;
   /** Maximum number of pending approvals (default: 100) */
@@ -106,6 +113,7 @@ export class ApprovalInbox extends EventEmitter {
   private readonly maxPending: number;
   private readonly maxHistory: number;
   private readonly pathPrefix: string;
+  private readonly secret: string | null;
 
   // Counters for stats (history may be truncated)
   private approvedCount = 0;
@@ -118,6 +126,7 @@ export class ApprovalInbox extends EventEmitter {
     this.maxPending = options.maxPending ?? 100;
     this.maxHistory = options.maxHistory ?? 1000;
     this.pathPrefix = (options.pathPrefix ?? '/approvals').replace(/\/$/, '');
+    this.secret = options.secret ?? null;
   }
 
   // --------------------------------------------------------------------------
@@ -389,6 +398,7 @@ export class ApprovalInbox extends EventEmitter {
     // POST /:id/approve
     const approveMatch = subPath.match(/^\/([a-f0-9]+)\/approve$/);
     if (approveMatch && req.method === 'POST') {
+      if (!this.checkAuth(req, res)) return;
       this.readBody(req).then((body) => {
         const approvedBy = typeof body.approvedBy === 'string' ? body.approvedBy : 'anonymous';
         const reason = typeof body.reason === 'string' ? body.reason : undefined;
@@ -407,6 +417,7 @@ export class ApprovalInbox extends EventEmitter {
     // POST /:id/deny
     const denyMatch = subPath.match(/^\/([a-f0-9]+)\/deny$/);
     if (denyMatch && req.method === 'POST') {
+      if (!this.checkAuth(req, res)) return;
       this.readBody(req).then((body) => {
         const deniedBy = typeof body.deniedBy === 'string' ? body.deniedBy : undefined;
         const reason = typeof body.reason === 'string' ? body.reason : undefined;
@@ -435,6 +446,28 @@ export class ApprovalInbox extends EventEmitter {
     }
 
     this.sendJson(res, 404, { error: 'Not found' });
+  }
+
+  /**
+   * Validates the Authorization: Bearer <secret> header on mutating requests.
+   * Returns true if the request is authorized (or no secret is configured).
+   * Sends a 401/403 response and returns false if authorization fails.
+   * Uses constant-time comparison to prevent timing attacks (GHSA-mxjx-28vx-xjjj).
+   */
+  private checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
+    if (this.secret === null) return true; // no secret configured — allow (backward-compatible)
+    const authHeader = req.headers['authorization'];
+    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      this.sendJson(res, 401, { error: 'Authorization: Bearer <token> required' });
+      return false;
+    }
+    const provided = Buffer.from(authHeader.slice(7));
+    const expected = Buffer.from(this.secret);
+    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+      this.sendJson(res, 403, { error: 'Forbidden' });
+      return false;
+    }
+    return true;
   }
 
   private sendJson(res: ServerResponse, status: number, data: unknown): void {
