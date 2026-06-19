@@ -38,6 +38,7 @@ const EXPECTED_ALERTS = {
   shellAccess:        'Expected — AgentRuntime shell sandbox (opt-in, policy-gated)',
   shellExec:          'Expected — AgentRuntime shell sandbox (opt-in, policy-gated)',
   recentlyPublished:  'Expected — auto-clears ~30 days after publish',
+  pendingScan:        'Expected — Socket is still scanning a freshly-published version; re-run in a few minutes',
   envVars:            'Expected — API key reading in adapters (operator-supplied)',
   filesystemAccess:   'Expected — LockedBlackboard file I/O (product feature)',
   urlStrings:         'Expected — comes from commander dependency, not network-ai',
@@ -109,7 +110,9 @@ const clean = stripAnsi(raw);
  */
 function parseScore(text) {
   const m = text.match(/Supply Chain(?:\s+Risk)?:\s*(\d+)/i);
-  return m ? parseInt(m[1], 10) : null;
+  if (!m) return null;
+  const v = parseInt(m[1], 10);
+  return v > 100 ? null : v; // guard against spurious matches during pending scan
 }
 
 /**
