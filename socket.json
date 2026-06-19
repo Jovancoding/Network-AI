@@ -257,6 +257,26 @@
       {
         "path": "dist/esm/lib/work-tree-dashboard.js",
         "reason": "Intentional — ESM build output of WorkTreeDashboard; flagged via transitive imports. It makes no direct outbound HTTP calls."
+      },
+      {
+        "path": "dist/adapters/a2a-adapter.d.ts",
+        "reason": "False positive — TypeScript declaration file; contains no executable code and makes no network calls. Flagged because the corresponding .js implementation uses fetch."
+      },
+      {
+        "path": "dist/lib/approval-inbox.d.ts",
+        "reason": "False positive — TypeScript declaration file; contains no executable code and makes no network calls. Flagged via import-graph association with the .js implementation."
+      },
+      {
+        "path": "dist/esm/adapters/aps-adapter.js",
+        "reason": "Intentional — ESM build output of APSAdapter. It talks only to a caller-configured verifier endpoint when that verification mode is enabled."
+      },
+      {
+        "path": "dist/esm/adapters/hermes-adapter.js",
+        "reason": "Intentional — ESM build output of HermesAdapter. Uses fetch for its built-in OpenAI-compatible completion transport; calls only the URL supplied by the caller."
+      },
+      {
+        "path": "dist/esm/adapters/rlm-adapter.js",
+        "reason": "Intentional — ESM build output of RLMAdapter. Uses fetch for outbound HTTP calls to caller-supplied RLM endpoints."
       }
     ],
     "urlStrings": [
@@ -381,6 +401,22 @@
       {
         "path": "dist/esm/lib/mcp-tool-consumer.js",
         "reason": "Intentional — ESM build output of McpToolConsumer. Imports child_process to launch caller-configured MCP server subprocesses for stdio transport."
+      },
+      {
+        "path": "dist/examples/05-code-review-swarm.js",
+        "reason": "Intentional — compiled output of the code-review example script. Uses child_process (execSync) to run TypeScript type-checking as part of the example workflow. Not part of the core library and never activated by importing the package."
+      },
+      {
+        "path": "dist/esm/examples/05-code-review-swarm.js",
+        "reason": "Intentional — ESM build output of the code-review example script. Same as the CJS variant — uses child_process for tsc type-checking in a developer example. Not activated by importing the package."
+      },
+      {
+        "path": "dist/run.js",
+        "reason": "Intentional — compiled output of run.ts, the local orchestrator bootstrap script. May spawn sub-processes as part of its demo workflow. Invoked directly by the operator, never imported as a library."
+      },
+      {
+        "path": "dist/esm/run.js",
+        "reason": "Intentional — ESM build output of run.ts. Same as dist/run.js — bootstraps the local orchestrator demo workflow when invoked directly by the operator."
       }
     ],
     "filesystemAccess": [

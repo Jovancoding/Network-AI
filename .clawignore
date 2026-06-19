@@ -1,0 +1,9 @@
+# Files to exclude from ClawHub skill package
+# comment.txt is an in-progress draft note and is not part of the published skill
+comment.txt
+
+# Dev/CI artifacts
+.github/
+.vscode/
+*.log
+data/

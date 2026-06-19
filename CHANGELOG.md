@@ -5,6 +5,16 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.12.4] - 2026-06-19
+
+### Security
+- **SkillSpector / ClawHub supply-chain triage** — added `.clawignore` to exclude `comment.txt` (an in-progress draft note) from future ClawHub packages; the file was inadvertently included in 5.12.3 via `clawhub publish .` and its bridge-pattern description of `McpStreamableServer` triggered SkillSpector's Description-Behavior Mismatch (High, 93%) and Context-Inappropriate Capability (Medium, 88%) findings.
+- **SKILL.md trigger hardening** — replaced the broad "When to Use This Skill" bullet list with explicit Use/Do NOT Use sections (resolves SkillSpector Vague Triggers, Medium, 81%): scope is now constrained to local file-based multi-agent coordination; shell execution, agent spawning, and MCP server startup are explicitly called out as out-of-scope for this skill bundle.
+
+### Changed
+- **Socket.dev supply-chain triage for 5.12.3 scan gap** — added 9 missing triage entries: declaration-file false positives (`dist/adapters/a2a-adapter.d.ts`, `dist/lib/approval-inbox.d.ts`), three ESM adapter mirrors (`dist/esm/adapters/aps-adapter.js`, `hermes-adapter.js`, `rlm-adapter.js`), and four shell-access entries for example and bootstrap scripts (`dist/examples/05-code-review-swarm.js`, `dist/esm/examples/…`, `dist/run.js`, `dist/esm/run.js`). networkAccess 59→64, shellAccess 6→10.
+- Version bump 5.12.3 → 5.12.4 across `package.json`, `skill.json`, `openapi.yaml`, README badge, Claude Code plugin manifests, and documentation headers.
+
 ## [5.12.3] - 2026-06-18
 
 ### Security

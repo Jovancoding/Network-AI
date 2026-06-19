@@ -278,10 +278,20 @@ python {baseDir}/scripts/context_manager.py update \
 
 ## When to Use This Skill
 
-- **Task Delegation**: Route work to specialized agents (data_analyst, strategy_advisor, risk_assessor)
-- **Parallel Execution**: Run multiple agents simultaneously and synthesize results
-- **Permission Wall**: Gate access to DATABASE, PAYMENTS, EMAIL, or FILE_EXPORT operations (abstract local resource types — no external credentials required)
-- **Shared Blackboard**: Coordinate agent state via persistent markdown file
+Use this skill when the task requires **local, file-based** multi-agent coordination within a single trusted workspace. All 6 bundled Python scripts run locally with zero network calls, zero subprocesses, and zero third-party packages.
+
+### Use for
+- **Task Delegation** — decompose complex work into sub-tasks routed to named in-session agents (`data_analyst`, `strategy_advisor`, `risk_assessor`)
+- **Parallel Execution** — run multiple local agents simultaneously and synthesize results via the shared blackboard
+- **Permission Wall** — score and gate access to abstract resource labels (`DATABASE`, `PAYMENTS`, `EMAIL`, `FILE_EXPORT`) before performing sensitive local operations
+- **Shared Blackboard** — coordinate ephemeral task state across in-session agents via a persistent markdown file
+
+### Do NOT use for
+- External API or network service calls — the bundled Python scripts make **zero outbound network calls**
+- Production identity or authorization — grant tokens are **advisory scoring outputs only**, not authenticated credentials; do not use as real access control
+- Shell command execution or agent spawning — those capabilities require the TypeScript library (`npm install network-ai`) with operator-level `AgentRuntime` + `SandboxPolicy` configuration; they are **never activated by this skill**
+- Starting an MCP or HTTP server — the optional MCP server (`bin/mcp-server.ts`) is an npm-package feature that must be explicitly started by the operator; it is **not part of this skill bundle**
+- Any task solvable with a single direct tool call — this skill adds coordination overhead and is only appropriate when multiple agents must share state
 
 ## Quick Start
 
@@ -755,7 +765,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.12.3"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.12.4"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |
