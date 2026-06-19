@@ -659,7 +659,7 @@ export class FileAccessor {
       ? resolve(base, 'data', env)
       : resolve(base, 'data');
 
-    if (resolvedPath.startsWith(dataEnvDir + require('path').sep) || resolvedPath === dataEnvDir) {
+    if (resolvedPath.startsWith(dataEnvDir + sep) || resolvedPath === dataEnvDir) {
       return; // allowed
     }
 

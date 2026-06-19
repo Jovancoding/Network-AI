@@ -76,10 +76,16 @@ The core library (`index.ts`, `lib/`, `security.ts`) makes **no outbound network
 All network I/O is performed by:
 
 - The operator's BYOC client (passed in by the operator at runtime)
-- `lib/mcp-transport-sse.ts`), which **receives** inbound HTTP/SSE
+- `lib/mcp-transport-sse.ts`, which **receives** inbound HTTP/SSE
   connections — it does not initiate outbound connections
 - The Streamable HTTP MCP transport (`lib/mcp-transport-http.ts`), which also **receives**
   inbound connections — no outbound calls
+
+### Adapters: outbound calls only to operator-configured endpoints
+
+The 29 adapters (`adapters/`) may make outbound HTTP calls, but only to endpoints
+explicitly provided by the operator at runtime (BYOC — Bring Your Own Client). No
+adapter hard-codes a URL that is called automatically at import or on first use.
 
 ### Python helper scripts
 
@@ -93,6 +99,43 @@ and write local files only.
 |------|-------------|---------|
 | `test-phase6.ts` | `localhost:<port>` | MCP SSE integration test (loopback only) |
 | `test-a2a.ts` | `localhost:<port>` | A2A protocol integration test (loopback only) |
+
+---
+
+## 5a. Shell Execution Surface
+
+Network-AI's `AgentRuntime` (`lib/agent-runtime.ts`) provides a sandboxed shell executor
+as an explicit, opt-in product feature. It is **not activated** by importing the library
+or starting the MCP server — it requires the operator to construct an `AgentRuntime`
+instance with an explicit `allowedCommands` allowlist.
+
+**How it is protected:**
+
+| Control | Implementation |
+|---------|---------------|
+| Command allowlist | `SandboxPolicy.allowedCommands` — deny-all by default; operator must explicitly add patterns |
+| Shell metacharacter rejection | `parseCommandLine()` rejects any command containing `;`, `&`, `\|`, `$`, backtick, or redirection outside of quotes |
+| `shell: false` | `child_process.spawn()` is called with `shell: false` — no shell interpreter is ever invoked |
+| Argument arrays | Commands are tokenized into `[file, ...args]` before `spawn()` — no string concatenation passed to a shell |
+| Approval gate | Commands matching `approvalRequired` patterns (e.g. `rm *`, `git push*`) are held for human confirmation before spawning |
+| Concurrency limit | Maximum 5 concurrent processes by default |
+| Audit log | Every spawn, denial, and approval decision is written to `data/audit_log.jsonl` |
+
+The `shellAccess` and `shellExec` alerts shown on the Socket.dev package page are
+**expected and intentional** for this class of tool. They reflect the presence of the
+shell sandbox, not a security defect.
+
+---
+
+## 5b. Telemetry
+
+Network-AI's telemetry system (`lib/telemetry-provider.ts`) uses a **Bring Your Own
+Telemetry (BYOT)** design. The default provider is `NullTelemetryProvider`, which
+discards all spans and metrics without making any network calls.
+
+**Zero telemetry is emitted by default.** No data is sent anywhere unless the operator
+explicitly constructs and registers an `ITelemetryProvider` implementation that forwards
+spans to their own OTel collector.
 
 ---
 

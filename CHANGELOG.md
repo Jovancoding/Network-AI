@@ -5,6 +5,22 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.12.5] - 2026-06-19
+
+### Security
+- **`debugAccess` alert resolved** — removed `String.fromCharCode(101,118,97,108)` construction in `lib/blackboard-validator.ts`. The obfuscated char-code build of the `eval` detection regex was the sole trigger for Socket.dev's `debugAccess` (low) alert and contributed to `gptSecurity` (medium). Replaced with a named constant `EVAL_FN = 'eval'` whose purpose is self-evident to both humans and static analysis tools; the runtime dangerous-code detection behaviour is identical (all 3,269 tests pass).
+- **`gptSecurity` hardening** — added explicit `runtime.policy.isCommandAllowed()` check at both `exec` call sites in `bin/console.ts` (interactive and pipe modes). The policy gate was already enforced inside `runtime.exec()`, but making it visible at the call site removes the ambiguous "variable → exec" pattern that Socket's AI heuristic flags as a potential security risk.
+- **Redundant dynamic `require('path')` removed** — replaced `require('path').sep` inside `FileAccessor.checkSourceProtection()` (`lib/agent-runtime.ts`) with the `sep` symbol already imported at module top level. Eliminates an unnecessary runtime require() call in a hot path.
+
+### Added
+- **`scripts/socket-check.js`** — Socket.dev supply-chain score monitor. Runs `socket package shallow` against the published package (or a local `socket scan` with `--local`) and exits 0 only when all fixable alerts (`gptSecurity`, `debugAccess`) are absent. Annotates expected capability alerts (`networkAccess`, `shellAccess`, `recentlyPublished`, etc.) so the output is actionable at a glance. Run via `npm run socket:check`.
+- **`npm run socket:check` / `npm run socket:check:local`** — added to `package.json` scripts.
+- **`RELEASING.md` step 9** — post-publish Socket score verification step added to the release checklist.
+
+### Changed
+- **`SUPPLY_CHAIN.md` sections 5a + 5b** — added explicit documentation of the shell execution surface (AgentRuntime sandbox — opt-in, policy-gated, approval-gated; `shellAccess` alert is expected and intentional) and telemetry posture (`NullTelemetryProvider` is the default; zero telemetry is emitted unless the operator explicitly registers an `ITelemetryProvider`).
+- Version bump 5.12.4 → 5.12.5 across `package.json`, `skill.json`, `openapi.yaml`, README badge, and Claude Code plugin manifests.
+
 ## [5.12.4] - 2026-06-19
 
 ### Security

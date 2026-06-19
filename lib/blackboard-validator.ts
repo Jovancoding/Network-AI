@@ -600,11 +600,13 @@ export class BlackboardValidator {
 
     // --- Rule: Dangerous patterns ---
     rulesApplied.push('code.dangerous_patterns');
-    // Build the dangerous-function pattern from char codes so static scanners
-    // (Socket.dev) do not flag this security-detection regex as actual usage.
-    const _e = String.fromCharCode(101, 118, 97, 108); // e-v-a-l
+    // Detection patterns for dangerous code that should not enter the blackboard.
+    // EVAL_FN is a string constant — it is NOT called as a function anywhere here.
+    // Storing it as a named constant (rather than a char-code construction) makes
+    // the security intent clear to both humans and static analysis tools.
+    const EVAL_FN = 'eval'; // the JS built-in name, stored as data — not invoked
     const dangerousPatterns = [
-      { pattern: new RegExp('\\b' + _e + '\\s*\\('), name: `${_e}()` },
+      { pattern: new RegExp(`\\b${EVAL_FN}\\s*\\(`), name: `${EVAL_FN}()` },
       { pattern: /exec\s*\(/, name: 'exec()' },
       { pattern: /rm\s+-rf\s+\//, name: 'rm -rf /' },
       { pattern: /DROP\s+TABLE|DROP\s+DATABASE/i, name: 'SQL DROP statements' },

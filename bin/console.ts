@@ -185,6 +185,13 @@ async function main(): Promise<void> {
 
   ui.command('exec', async (cmdArgs) => {
     if (!cmdArgs) { ui.log('Usage: exec <command>', 'warn'); return; }
+    // Validate against the sandbox policy allowlist before dispatch.
+    // runtime.exec() enforces the same check internally, but making it
+    // explicit at the call site keeps the security boundary visible.
+    if (!runtime.policy.isCommandAllowed(cmdArgs)) {
+      ui.log(`Command not in allowlist: ${cmdArgs}`, 'error');
+      return;
+    }
     try {
       const result = await runtime.exec(cmdArgs, 'console-user');
       if (result.stdout) ui.log(result.stdout.trim());
@@ -757,6 +764,11 @@ async function executePipeCommand(
 
     case 'exec': {
       if (!args) throw new Error('Usage: exec <command>');
+      // Validate against the sandbox policy allowlist before dispatch.
+      // This ensures pipe-mode callers cannot bypass the command allowlist.
+      if (!ctx.runtime.policy.isCommandAllowed(args)) {
+        throw new Error(`Command not in allowlist: ${args}`);
+      }
       return runtime.exec(args, 'pipe-agent');
     }
 
