@@ -12,7 +12,7 @@
 import type { AgentPayload, AgentContext, AgentResult } from '../types/agent-adapter';
 import type { AdapterRegistry } from '../adapters/adapter-registry';
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname, resolve } from 'path';
+import { dirname, resolve } from 'path';
 
 // ============================================================================
 // TYPES

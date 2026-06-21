@@ -71,7 +71,8 @@
     "validate-token": "python scripts/validate_token.py",
     "revoke-token": "python scripts/revoke_token.py",
     "socket:check": "node scripts/socket-check.js",
-    "socket:check:local": "node scripts/socket-check.js --local"
+    "socket:check:local": "node scripts/socket-check.js --local",
+    "codeql:check": "node scripts/codeql-check.js"
   },
   "keywords": [
     "ai-agents",

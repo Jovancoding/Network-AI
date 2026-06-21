@@ -8,7 +8,7 @@
  *   Phase 4 — SemanticMemory file-backed persistence
  */
 
-import { join, resolve } from 'path';
+import { join } from 'path';
 import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
 
 // ---------------------------------------------------------------------------

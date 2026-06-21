@@ -17,7 +17,7 @@
 
 'use strict';
 
-const { execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -68,30 +68,38 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 const version = forceVersion || pkg.version;
 const packageName = pkg.name;
 
+// Validate user-supplied version is safe semver (guards against shell injection)
+const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+if (forceVersion && !SEMVER_RE.test(forceVersion)) {
+  console.error(`Invalid --version value: ${JSON.stringify(forceVersion)} — must be semver (e.g. 5.12.5)`);
+  process.exit(1);
+}
+
+// npx binary name — on Windows the shim is npx.cmd
+const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+
 // ── Run Socket CLI ──────────────────────────────────────────────────────────
 
 console.log(`\n${c.bold}${c.cyan}Socket.dev Score Check${c.reset}`);
 console.log(`${c.gray}${'─'.repeat(50)}${c.reset}`);
 
 let raw;
-try {
-  if (localMode) {
-    console.log(`${c.gray}Mode: local scan (${process.cwd()})${c.reset}\n`);
-    raw = execSync(
-      'npx -y @socketsecurity/cli scan . --json 2>/dev/null || npx -y @socketsecurity/cli scan . 2>&1',
-      { cwd: path.join(__dirname, '..'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-    );
-  } else {
-    const purl = `npm ${packageName}@${version}`;
-    console.log(`${c.gray}Mode: published package — ${purl}${c.reset}\n`);
-    raw = execSync(
-      `npx -y @socketsecurity/cli package shallow ${purl} 2>&1`,
-      { cwd: path.join(__dirname, '..'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-    );
-  }
-} catch (err) {
-  // execSync throws on non-zero exit; capture output anyway
-  raw = err.stdout || err.message || '';
+if (localMode) {
+  console.log(`${c.gray}Mode: local scan (${process.cwd()})${c.reset}\n`);
+  const r = spawnSync(
+    npx, ['-y', '@socketsecurity/cli', 'scan', '.'],
+    { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
+  );
+  raw = (r.stdout || '') + (r.stderr || '');
+} else {
+  const purl = `npm ${packageName}@${version}`;
+  console.log(`${c.gray}Mode: published package — ${purl}${c.reset}\n`);
+  // Use spawnSync with an arg array — no shell interpolation, immune to injection
+  const r = spawnSync(
+    npx, ['-y', '@socketsecurity/cli', 'package', 'shallow', 'npm', `${packageName}@${version}`],
+    { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
+  );
+  raw = (r.stdout || '') + (r.stderr || '');
 }
 
 // ── Parse output ─────────────────────────────────────────────────────────────
