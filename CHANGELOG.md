@@ -5,6 +5,22 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.12.6] - 2026-06-21
+
+### Security
+- **CodeQL #177 resolved — `js/indirect-command-line-injection` (Medium)** — `scripts/socket-check.js` previously built the `npx @socketsecurity/cli package shallow` command as a template string containing the user-supplied `--version` argument, then passed it to `execSync()`. Fixed by switching to `spawnSync()` with an explicit arg array (`shell: false`) so no shell interpolation occurs regardless of input content. Added `SEMVER_RE` validation to reject non-semver `--version` values early. Local mode similarly migrated to `spawnSync`. Windows compatibility maintained via `npx.cmd` detection.
+- **CodeQL #176 resolved — `js/unused-local-variable` (Note)** — removed unused `resolve` from `import { join, resolve } from 'path'` in `test-phase13.ts:11`.
+- **CodeQL #175 resolved — `js/unused-local-variable` (Note)** — removed unused `join` from `import { join, dirname, resolve } from 'path'` in `lib/phase-pipeline.ts:15`.
+
+### Added
+- **`scripts/codeql-check.js`** — GitHub CodeQL alert monitor. Queries the GitHub Code Scanning API via `gh api`, categorises alerts as blocking (`error`/`warning` severity) or informational (`note`), and exits 0 only when no blocking alerts are open. Uses `spawnSync` with `shell: false` throughout. Run via `npm run codeql:check`.
+- **`npm run codeql:check`** — added to `package.json` scripts.
+
+### Changed
+- **`SKILL.md` Security Scan Findings table** — added 3 new SkillSpector by-design entries: Description-Behavior Mismatch re `McpStreamableServer` network exposure (Medium, 94%), Context-Inappropriate Capability re MCP control surface breadth (Medium, 90%), and Context-Inappropriate Capability re `_load_signing_key()` token minting in `check_permission.py` (Medium, 92%). All documented with disclosed controls matching the operator-disclosure overview.
+- **`RELEASING.md` QA loop** (local-only, gitignored) — new Step 7: `npm run codeql:check` gate before publishing (must be PASS); updated Step 9 (ClawHub) with correct `clawhub publish` CLI syntax, verified URL, and SkillSpector post-publish review guidance; steps renumbered 7→8→9→10 to accommodate the new gate.
+- Version bump 5.12.5 → 5.12.6 across `package.json`, `skill.json`, `openapi.yaml`, README badge.
+
 ## [5.12.5] - 2026-06-19
 
 ### Security
