@@ -417,6 +417,14 @@
       {
         "path": "dist/esm/run.js",
         "reason": "Intentional — ESM build output of run.ts. Same as dist/run.js — bootstraps the local orchestrator demo workflow when invoked directly by the operator."
+      },
+      {
+        "path": "scripts/socket-check.js",
+        "reason": "Intentional — dev/CI-only QA script. Uses child_process (spawnSync, shell:false) to invoke the Socket CLI via npx for supply-chain scanning. Never imported by the library and never executed by installing the package; runs only when a maintainer runs `npm run socket:check`."
+      },
+      {
+        "path": "scripts/codeql-check.js",
+        "reason": "Intentional — dev/CI-only QA script. Uses child_process (spawnSync, shell:false) to invoke the GitHub CLI (`gh api`) to query CodeQL code-scanning alerts. Never imported by the library and never executed by installing the package; runs only when a maintainer runs `npm run codeql:check`."
       }
     ],
     "filesystemAccess": [
