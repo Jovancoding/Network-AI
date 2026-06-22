@@ -5,6 +5,21 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.12.7] - 2026-06-22
+
+### Security
+- **ClawHub bundle hygiene — recurring SkillSpector finding fixed at the root** — the repeating *Description-Behavior Mismatch* / *Context-Inappropriate Capability* findings against `McpStreamableServer` were caused by `comment.txt` (an in-progress draft GitHub-issue note describing the optional HTTP MCP server and its 22 tools) being bundled into the published ClawHub skill. The v5.12.4 attempt to exclude it added the file to `.clawignore`, but the ClawHub CLI (v0.7.0) honours **`.clawhubignore`** — not `.clawignore`, and not `.gitignore`. Moved the exclusion to `.clawhubignore`.
+- **Additional bundle leaks closed** — auditing the bundle surfaced several other files that would have shipped in the Python-only skill: `scripts/socket-check.js` and `scripts/codeql-check.js` (broadened `scripts/postinstall.js` → `scripts/*.js`), four newer docs (`THREAT_MODEL.md`, `DATA_LOCATIONS.md`, `SUPPLY_CHAIN.md`, `PRIVACY.md`), `glama.json`, `Dockerfile`, `.mcp.json`, `tsconfig.esm.json`, the `assets/`, `boards/`, `.claude-plugin/`, `.codex/` directories, and — most importantly — **`data/`** (runtime audit log, grant tokens, signing key), `.env`, `.env.*`, and `*.log`. The `data/` and secret/log exclusions close a potential local-state/secret exposure.
+
+### Added
+- **`scripts/clawhub-check.js`** — ClawHub bundle hygiene guard that closes the QA gap behind the recurring SkillSpector findings. It parses `.clawhubignore`, replicates the exclusion ClawHub applies, then asserts the surviving file set is exactly the intended Python-skill allowlist (`SKILL.md`, `swarm-blackboard.md`, `requirements.txt`, `scripts/*.py`, skill manifest). It fails the release if any draft note, secret, log, doc, directory, or Node tooling file would be published, and hard-fails on `.env`/`*.log`/`*.key`/`*.pem`. Run via `npm run clawhub:check`. (On first run it immediately caught `data/` leaking into the bundle.)
+- **`npm run clawhub:check`** — added to `package.json` scripts.
+
+### Changed
+- **`SKILL.md` Security Scan Findings table** — the two `McpStreamableServer` SkillSpector rows are now marked **Resolved** with the real root cause (`comment.txt` bundle leak via the `.clawhubignore` vs `.clawignore` distinction) and the new `clawhub:check` guard documented as the durable control. The by-design `_load_signing_key()` token-minting row is retained.
+- **`RELEASING.md` QA loop** (local-only, gitignored) — Step 9 (ClawHub) now runs `npm run clawhub:check` and requires a PASS before `clawhub publish`, with a note that ClawHub honours `.clawhubignore` exclusively.
+- Version bump 5.12.6 → 5.12.7 across `package.json`, `skill.json`, `openapi.yaml`, README badge.
+
 ## [5.12.6] - 2026-06-21
 
 ### Security

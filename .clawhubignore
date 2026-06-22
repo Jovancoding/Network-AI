@@ -16,7 +16,8 @@ package.json
 package-lock.json
 node_modules/
 setup.ts
-scripts/postinstall.js
+# Node tooling scripts — ship only the Python skill scripts (scripts/*.py)
+scripts/*.js
 
 # ── Tests ──
 test.ts
@@ -42,6 +43,10 @@ CODEX.md
 SHOW_HN.md
 AWESOME_LISTS.md
 claude-project-prompt.md
+THREAT_MODEL.md
+DATA_LOCATIONS.md
+SUPPLY_CHAIN.md
+PRIVACY.md
 
 # ── Reference docs (TypeScript-specific) ──
 references/
@@ -64,3 +69,23 @@ docs/
 .npmignore
 err.txt
 socket.json
+glama.json
+Dockerfile
+.mcp.json
+tsconfig.esm.json
+.claude-plugin/
+.codex/
+assets/
+boards/
+
+# ── Secrets & logs (NEVER bundle) ──
+.env
+.env.*
+*.log
+data/
+
+# ── In-progress draft / scratch notes (NEVER bundle) ──
+comment.txt
+notes.txt
+scratch.txt
+*.draft.md
