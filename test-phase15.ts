@@ -55,7 +55,8 @@ function node(id: string, agent: string, extra: Partial<TaskNode> = {}): TaskNod
 function testRetryBudget() {
   header('#4 RetryBudget — per-key allowance and isolation');
   const b = new RetryBudget({ maxPerKey: 2 });
-  assert(b.tryConsume('a') && b.tryConsume('a'), 'two retries allowed for key a');
+  assert(b.tryConsume('a'), 'first retry allowed for key a');
+  assert(b.tryConsume('a'), 'second retry allowed for key a');
   assert(!b.tryConsume('a'), 'third retry denied for key a');
   assert(b.used('a') === 2 && b.remaining('a') === 0, 'used/remaining tracked');
   assert(b.tryConsume('b'), 'key b has its own independent budget');
