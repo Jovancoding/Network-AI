@@ -73,7 +73,8 @@
     "socket:check": "node scripts/socket-check.js",
     "socket:check:local": "node scripts/socket-check.js --local",
     "codeql:check": "node scripts/codeql-check.js",
-    "clawhub:check": "node scripts/clawhub-check.js"
+    "clawhub:check": "node scripts/clawhub-check.js",
+    "clawhub:publish": "node scripts/clawhub-publish.js"
   },
   "keywords": [
     "ai-agents",
