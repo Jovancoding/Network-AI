@@ -30,6 +30,15 @@ export interface FanOutStep {
   timeoutMs?: number;
   /** Arbitrary label for this step (used in result mapping) */
   label?: string;
+  /**
+   * Same-agent retries before falling back (default: 0). Budgeted per step, so
+   * one sub-agent's retries never consume another's allowance.
+   */
+  retries?: number;
+  /** This sub-agent's OWN fallback agent, tried once after retries are exhausted. */
+  fallbackAgentId?: string;
+  /** Payload for the fallback agent (defaults to the step's payload). */
+  fallbackPayload?: AgentPayload;
 }
 
 /**
@@ -46,6 +55,10 @@ export interface TaggedResult {
   result: AgentResult;
   /** Execution duration in ms */
   durationMs: number;
+  /** Total invocations (primary retries + fallback) when resilience is configured. */
+  retryAttempts?: number;
+  /** The fallback agent that served this result, if the primary chain failed. */
+  fellBackTo?: string;
 }
 
 /**
@@ -318,28 +331,66 @@ export class FanOutFanIn {
   // --------------------------------------------------------------------------
 
   private async executeStep(step: FanOutStep, index: number, globalTimeout?: number): Promise<TaggedResult> {
-    const ctx: AgentContext = { ...this.baseContext, ...step.context };
-    const timeout = step.timeoutMs ?? globalTimeout;
     const start = Date.now();
+    const maxRetries = Math.max(0, step.retries ?? 0);
+    const hasResilience = maxRetries > 0 || Boolean(step.fallbackAgentId);
 
-    let result: AgentResult;
-    if (timeout) {
-      result = await Promise.race([
-        this.registry.executeAgent(step.agentId, step.payload, ctx),
-        new Promise<AgentResult>((_, reject) =>
-          setTimeout(() => reject(new Error(`Fan-out timeout: agent "${step.agentId}" exceeded ${timeout}ms`)), timeout),
-        ),
-      ]);
-    } else {
-      result = await this.registry.executeAgent(step.agentId, step.payload, ctx);
+    // Backward-compatible simple path: no retries, no fallback.
+    if (!hasResilience) {
+      const result = await this.invoke(step.agentId, step.payload, step, globalTimeout);
+      return { agentId: step.agentId, label: step.label, index, result, durationMs: Date.now() - start };
     }
 
-    return {
-      agentId: step.agentId,
-      label: step.label,
-      index,
-      result,
-      durationMs: Date.now() - start,
-    };
+    // Resilient path: per-step retry budget, then this sub-agent's own fallback.
+    let attempts = 0;
+    let last: AgentResult = { success: false, error: { code: 'NOT_RUN', message: 'step not executed', recoverable: false } };
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      attempts++;
+      last = await this.invokeSafe(step.agentId, step.payload, step, globalTimeout);
+      if (last.success) {
+        return { agentId: step.agentId, label: step.label, index, result: last, durationMs: Date.now() - start, retryAttempts: attempts };
+      }
+    }
+
+    if (step.fallbackAgentId) {
+      attempts++;
+      const fb = await this.invokeSafe(step.fallbackAgentId, step.fallbackPayload ?? step.payload, step, globalTimeout);
+      return {
+        agentId: step.agentId,
+        label: step.label,
+        index,
+        result: fb,
+        durationMs: Date.now() - start,
+        retryAttempts: attempts,
+        fellBackTo: step.fallbackAgentId,
+      };
+    }
+
+    return { agentId: step.agentId, label: step.label, index, result: last, durationMs: Date.now() - start, retryAttempts: attempts };
+  }
+
+  /** Invoke an agent with the step's timeout. Rejects on timeout. @internal */
+  private async invoke(agentId: string, payload: AgentPayload, step: FanOutStep, globalTimeout?: number): Promise<AgentResult> {
+    const ctx: AgentContext = { ...this.baseContext, ...step.context };
+    const timeout = step.timeoutMs ?? globalTimeout;
+    if (timeout) {
+      return Promise.race([
+        this.registry.executeAgent(agentId, payload, ctx),
+        new Promise<AgentResult>((_, reject) =>
+          setTimeout(() => reject(new Error(`Fan-out timeout: agent "${agentId}" exceeded ${timeout}ms`)), timeout),
+        ),
+      ]);
+    }
+    return this.registry.executeAgent(agentId, payload, ctx);
+  }
+
+  /** Like {@link invoke} but captures timeouts/throws as a failed result so a retry can follow. @internal */
+  private async invokeSafe(agentId: string, payload: AgentPayload, step: FanOutStep, globalTimeout?: number): Promise<AgentResult> {
+    try {
+      return await this.invoke(agentId, payload, step, globalTimeout);
+    } catch (err) {
+      return { success: false, error: { code: 'FANOUT_ERROR', message: err instanceof Error ? err.message : String(err), recoverable: true } };
+    }
   }
 }

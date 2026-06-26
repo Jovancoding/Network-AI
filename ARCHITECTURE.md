@@ -1,6 +1,8 @@
 # Architecture
 
-Network-AI v5.12.4 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,269 tests, 72+ modules.
+Network-AI v5.13.0 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,373 tests, 78+ modules.
+
+> **Two governance layers.** Policy engines govern *what an agent may do* before it acts (pre-wire tool gating). Network-AI adds the layer underneath — **model-interaction lifecycle governance**: when a frontier model returns a classifier refusal, the `GovernedModelGateway` audits it, falls over to another model, reprices the retry with fallback credit, hands off thinking blocks, and accounts the cost — one governed, budgeted, audited call. The two layers are complementary.
 
 ## The Multi-Agent Race Condition Problem
 
@@ -406,7 +408,13 @@ Network-AI/
 │   ├── telemetry-provider.ts     # ITelemetryProvider BYOT; NullTelemetryProvider; createOtelHooks (v5.7)
 │   ├── auth-guardian.ts          # Permission wall; scoreRequest() diagnostic API (v5.8)
 │   ├── claim-verifier.ts         # ClaimVerifier: manifest vs audit reconciliation, HMAC receipts (v5.10)
-│   └── mcp-transport-http.ts     # McpStreamableServer: MCP 2025-03-26 Streamable HTTP + resources/prompts (v5.11)
+│   ├── mcp-transport-http.ts     # McpStreamableServer: MCP 2025-03-26 Streamable HTTP + resources/prompts (v5.11)
+│   ├── model-gateway.ts          # GovernedModelGateway: refusal → fallback → billing lifecycle (v5.13)
+│   ├── model-budget.ts           # ModelBudget: per-model USD cost + fallback-credit repricing (v5.13)
+│   ├── retry-budget.ts           # RetryBudget: per-request (not per-session) retry accounting (v5.13)
+│   ├── effort-policy.ts          # EffortPolicy: governed effort ceilings + justification gating (v5.13)
+│   ├── thinking-blocks.ts        # ThinkingBlockManager: cross-model thinking-block handoff (v5.13)
+│   └── owasp-compliance.ts       # OWASP Agentic Top 10 (2026) matrix + verifyOwaspCoverage() (v5.13)
 ├── scripts/                      # Python helper scripts (local orchestration only)
 │   ├── blackboard.py             # Shared state management with atomic commits
 │   ├── swarm_guard.py            # Handoff tax prevention, budget tracking

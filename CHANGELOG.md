@@ -5,6 +5,30 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.13.0] - 2026-06-26
+
+### Added — Model-Interaction Lifecycle Governance (Tier 1)
+- **`GovernedModelGateway`** (`lib/model-gateway.ts`) — a provider-agnostic gateway that absorbs the model **refusal → fallback → billing** chain behind one governed call. On a classifier refusal (`stop_reason: "refusal"`) it audits which classifier fired, routes to the next model in a fallback chain, redeems the fallback-credit token, and accounts each attempt. Distinct from `AdapterRegistry.fallbackChain` (which fails over on adapter *health*, not on a refusal).
+- **`ModelBudget`** (`lib/model-budget.ts`) — per-model USD accounting with `costOfUsage()`, cache-read/cache-write distinction, and fallback-credit repricing (a redeemed credit reprices the retry from cache-write to cache-read). `accountIterations()` accounts a server-side `usage.iterations` array. Never sums tokens across models.
+- **`RefusalTelemetry`** (`lib/telemetry-provider.ts`) — refusal observability: a refusal is a successful HTTP 200, invisible to error-rate monitoring, so it is recorded as a discrete **non-error** signal with `refusalCount`, `fallbackServedCount`, and an `unservedRefusalCount` gap to alert on.
+- **`AnthropicMessagesAdapter`** (`adapters/anthropic-messages-adapter.ts`) — a dependency-free (BYOC) Anthropic Messages binding that drives the gateway; maps refusals, `output_config.effort`, and the `fallback-credit-2026-06-01` beta header.
+
+### Added — Orchestration Resilience (Tier 2)
+- **`RetryBudget`** (`lib/retry-budget.ts`) — per-request (not per-session) retry accounting; one runaway request cannot starve another's allowance.
+- **`EffortPolicy`** (`lib/effort-policy.ts`) — turns the model `effort` cost lever into a policy object: global/per-agent ceilings and a justification requirement for high tiers (`gate()`).
+- **Per-sub-agent fallback** — `FanOutFanIn` steps (`retries`, `fallbackAgentId`, `fallbackPayload`) and `TeamRunner` tasks (`fallbackAgent`, `retriesPerTask`) each carry their own fallback and per-request retry budget. Default execution paths are unchanged.
+
+### Added — Thinking Lifecycle + Compliance (Tier 3)
+- **`ThinkingBlockManager`** (`lib/thinking-blocks.ts`) — keeps thinking blocks unchanged on the same model, strips `thinking`/`redacted_thinking` blocks on a cross-model fallback (the gateway skips stripping when redeeming a credit, which requires an exact body match), and guards prompts against `reasoning_extraction` refusals. Default-wired into `AnthropicMessagesAdapter`.
+- **OWASP Agentic AI Top 10 (2026) matrix** (`lib/owasp-compliance.ts`) — all 10 risk categories mapped to deterministic engine controls, verifiable via `verifyOwaspCoverage()` and renderable via `formatOwaspReport()`.
+
+### Changed
+- **README** — new "Model-Interaction Lifecycle Governance" section with the OWASP Agentic Top 10 coverage table; intro bullet; test badge 3,269 → 3,373.
+- **ARCHITECTURE.md / SKILL.md** — positioning note (lifecycle vs pre-wire governance), module tree, engine-OWASP pointer.
+- **AUDIT_LOG_SCHEMA.md** — documented the new `model.attempt` / `model.refusal` lifecycle events.
+- **104 new tests** (`test-phase14/15/16.ts`); suite total **3,269 → 3,373 across 37 suites**.
+- Version bump 5.12.7 → 5.13.0 across `package.json`, `skill.json`, `openapi.yaml`, README badge.
+
 ## [5.12.7] - 2026-06-22
 
 ### Security

@@ -147,6 +147,10 @@ export type {
   ComputerUseAgentConfig,
 } from './anthropic-computer-use-adapter';
 
+// Anthropic Messages adapter (governed refusal → fallback → billing lifecycle)
+export { AnthropicMessagesAdapter, createAnthropicCaller, normalizeAnthropicResponse } from './anthropic-messages-adapter';
+export type { AnthropicMessagesApiClient, AnthropicRawResponse, AnthropicMessagesAgentConfig } from './anthropic-messages-adapter';
+
 // OpenAI Agents SDK adapter (agent runners with tools, handoffs, guardrails)
 export { OpenAIAgentsAdapter } from './openai-agents-adapter';
 export type {

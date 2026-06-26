@@ -43,6 +43,9 @@ const SUITES = [
   'test-transport.ts',
   'test-claim-verifier.ts',
   'test-phase13.ts',
+  'test-phase14.ts',
+  'test-phase15.ts',
+  'test-phase16.ts',
 ];
 
 const WIDTH = 60;

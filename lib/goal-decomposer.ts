@@ -44,6 +44,10 @@ export interface TaskNode {
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
   /** Result after execution */
   result?: AgentResult;
+  /** Optional fallback agent to run if this task's primary agent fails. */
+  fallbackAgent?: string;
+  /** The fallback agent that served this task, if the primary failed. */
+  fellBackTo?: string;
   /** Error message if failed */
   error?: string;
   /** Timestamps */
@@ -118,6 +122,11 @@ export interface RunTeamOptions {
   totalTimeout?: number;
   /** Whether to continue executing tasks after one fails (default: false) */
   continueOnFailure?: boolean;
+  /**
+   * Same-agent retries per task before falling back to the task's `fallbackAgent`
+   * (default: 0). Budgeted per task, so one task's retries never starve another's.
+   */
+  retriesPerTask?: number;
   /** Session ID for context propagation */
   sessionId?: string;
   /** Arbitrary metadata passed to agent contexts */
@@ -576,6 +585,7 @@ export class TeamRunner extends EventEmitter {
       maxDepth = 1,
       depth: currentDepth = 0,
     } = options;
+    const retriesPerTask = Math.max(0, options.retriesPerTask ?? 0);
 
     const start = Date.now();
     const deadline = start + totalTimeout;
@@ -719,26 +729,54 @@ export class TeamRunner extends EventEmitter {
           };
 
           try {
-            const result = await withTimeout(
-              this.executor(node.agent, payload, context),
-              taskTimeout,
-              `Task "${taskId}" timed out after ${taskTimeout}ms`,
-            );
+            let execResult: AgentResult | undefined;
+            let threwMsg: string | undefined;
+            let fellBackTo: string | undefined;
 
-            results.set(taskId, result);
-
-            if (result.success) {
-              node.status = 'completed';
-              node.result = result;
-              node.completedAt = Date.now();
-              this.emit('task:complete', node, result);
+            if (retriesPerTask === 0 && !node.fallbackAgent) {
+              // Default path (unchanged semantics).
+              try {
+                execResult = await withTimeout(
+                  this.executor(node.agent, payload, context),
+                  taskTimeout,
+                  `Task "${taskId}" timed out after ${taskTimeout}ms`,
+                );
+              } catch (err) {
+                threwMsg = (err as Error).message ?? String(err);
+              }
             } else {
+              // Resilient path: per-task retries + this task's own fallback agent.
+              const outcome = await this.runTaskResilient(node, payload, context, taskTimeout, retriesPerTask);
+              execResult = outcome.result;
+              fellBackTo = outcome.fellBackTo;
+            }
+
+            if (threwMsg !== undefined) {
               node.status = 'failed';
-              node.error = result.error?.message ?? 'Agent returned failure';
-              node.result = result;
+              node.error = threwMsg;
               node.completedAt = Date.now();
-              this.emit('task:fail', node, node.error);
+              this.emit('task:fail', node, threwMsg);
+              results.set(taskId, {
+                success: false,
+                error: { code: 'EXECUTION_ERROR', message: threwMsg, recoverable: false },
+              });
               if (!continueOnFailure) aborted = true;
+            } else if (execResult) {
+              results.set(taskId, execResult);
+              if (fellBackTo) node.fellBackTo = fellBackTo;
+              if (execResult.success) {
+                node.status = 'completed';
+                node.result = execResult;
+                node.completedAt = Date.now();
+                this.emit('task:complete', node, execResult);
+              } else {
+                node.status = 'failed';
+                node.error = execResult.error?.message ?? 'Agent returned failure';
+                node.result = execResult;
+                node.completedAt = Date.now();
+                this.emit('task:fail', node, node.error);
+                if (!continueOnFailure) aborted = true;
+              }
             }
           } catch (err) {
             const errMsg = (err as Error).message ?? String(err);
@@ -781,6 +819,56 @@ export class TeamRunner extends EventEmitter {
     const teamResult: TeamResult = { success, dag, results, summary, durationMs, stats };
     this.emit('run:complete', teamResult);
     return teamResult;
+  }
+
+  /**
+   * Run a single task with a per-task retry budget, then its own fallback agent.
+   *
+   * Retries are isolated to this task (per request, not per session). Timeouts
+   * and thrown errors count as failed attempts so a retry or fallback can follow.
+   *
+   * @internal
+   */
+  private async runTaskResilient(
+    node: TaskNode,
+    payload: AgentPayload,
+    context: AgentContext,
+    taskTimeout: number,
+    retries: number,
+  ): Promise<{ result: AgentResult; fellBackTo?: string }> {
+    let last: AgentResult = { success: false, error: { code: 'NOT_RUN', message: 'task not executed', recoverable: true } };
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        last = await withTimeout(
+          this.executor(node.agent, payload, context),
+          taskTimeout,
+          `Task "${node.id}" timed out after ${taskTimeout}ms`,
+        );
+      } catch (err) {
+        last = { success: false, error: { code: 'EXECUTION_ERROR', message: (err as Error).message ?? String(err), recoverable: true } };
+      }
+      if (last.success) return { result: last };
+    }
+
+    if (node.fallbackAgent) {
+      const fbContext: AgentContext = { ...context, agentId: node.fallbackAgent };
+      try {
+        const fb = await withTimeout(
+          this.executor(node.fallbackAgent, payload, fbContext),
+          taskTimeout,
+          `Task "${node.id}" fallback timed out after ${taskTimeout}ms`,
+        );
+        return { result: fb, fellBackTo: node.fallbackAgent };
+      } catch (err) {
+        return {
+          result: { success: false, error: { code: 'EXECUTION_ERROR', message: (err as Error).message ?? String(err), recoverable: false } },
+          fellBackTo: node.fallbackAgent,
+        };
+      }
+    }
+
+    return { result: last };
   }
 }
 

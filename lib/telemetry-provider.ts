@@ -269,3 +269,143 @@ export function createOtelHooks(provider: ITelemetryProvider): ExecutionHook[] {
     },
   ];
 }
+
+// ============================================================================
+// REFUSAL OBSERVABILITY
+// ============================================================================
+
+/** Span/event name emitted for a classifier refusal. */
+export const REFUSAL_EVENT = 'model.refusal';
+/** Span/event name emitted when a fallback model serves a turn. */
+export const FALLBACK_SERVED_EVENT = 'model.fallback_served';
+
+/** Argument to {@link RefusalTelemetry.recordRefusal}. */
+export interface RefusalEventInfo {
+  model: string;
+  category: string | null;
+  agentId?: string;
+}
+
+/** Argument to {@link RefusalTelemetry.recordFallbackServed}. */
+export interface FallbackServedInfo {
+  requestedModel: string;
+  servedModel: string;
+  agentId?: string;
+}
+
+/** Point-in-time counters from {@link RefusalTelemetry.snapshot}. */
+export interface RefusalSnapshot {
+  refusals: number;
+  fallbackServed: number;
+  /** Refusals never served by a fallback — the gap to alert on. */
+  unservedRefusals: number;
+  byCategory: Record<string, number>;
+  byModel: Record<string, number>;
+}
+
+/**
+ * Refusal/fallback observability.
+ *
+ * A classifier refusal is a successful **HTTP 200**, so monitoring built on
+ * error rates or 5xx responses never sees it. `RefusalTelemetry` records each
+ * refusal and each fallback-served response as discrete **non-error** signals,
+ * keeps counters, and exposes the gap between them (`unservedRefusalCount`) so
+ * you can alert when refusals are not being served by a fallback.
+ *
+ * It satisfies the `RefusalTelemetrySink` contract consumed by
+ * {@link ../lib/model-gateway!GovernedModelGateway}. Pass an
+ * {@link ITelemetryProvider} to also emit spans to your tracing backend.
+ *
+ * @example
+ * ```typescript
+ * const refusals = new RefusalTelemetry(new CapturingTelemetryProvider());
+ * const gateway = new GovernedModelGateway({ caller, primaryModel, fallbackModels, telemetry: refusals });
+ * // ...later
+ * if (refusals.unservedRefusalCount > 0) alert('refusals are reaching users');
+ * ```
+ */
+export class RefusalTelemetry {
+  private readonly provider: ITelemetryProvider | undefined;
+  private _refusals = 0;
+  private _fallbackServed = 0;
+  private readonly _byCategory: Map<string, number> = new Map();
+  private readonly _byModel: Map<string, number> = new Map();
+
+  constructor(provider?: ITelemetryProvider) {
+    this.provider = provider;
+  }
+
+  /** Record a classifier refusal (counted as a signal, never as an error). */
+  recordRefusal(info: RefusalEventInfo): void {
+    this._refusals++;
+    const cat = info.category ?? 'unspecified';
+    this._byCategory.set(cat, (this._byCategory.get(cat) ?? 0) + 1);
+    this._byModel.set(info.model, (this._byModel.get(info.model) ?? 0) + 1);
+    this.emit(REFUSAL_EVENT, { model: info.model, category: cat, agentId: info.agentId ?? '' });
+  }
+
+  /** Record that a fallback model served a turn the primary declined. */
+  recordFallbackServed(info: FallbackServedInfo): void {
+    this._fallbackServed++;
+    this.emit(FALLBACK_SERVED_EVENT, {
+      requestedModel: info.requestedModel,
+      servedModel: info.servedModel,
+      agentId: info.agentId ?? '',
+    });
+  }
+
+  /** Total refusals observed. */
+  get refusalCount(): number {
+    return this._refusals;
+  }
+
+  /** Total fallback-served responses observed. */
+  get fallbackServedCount(): number {
+    return this._fallbackServed;
+  }
+
+  /** Refusals that were never served by a fallback (the gap to alert on). */
+  get unservedRefusalCount(): number {
+    return Math.max(0, this._refusals - this._fallbackServed);
+  }
+
+  /** Refusal counts keyed by classifier category. */
+  byCategory(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [k, v] of this._byCategory) out[k] = v;
+    return out;
+  }
+
+  /** A full counter snapshot. */
+  snapshot(): RefusalSnapshot {
+    const byModel: Record<string, number> = {};
+    for (const [k, v] of this._byModel) byModel[k] = v;
+    return {
+      refusals: this._refusals,
+      fallbackServed: this._fallbackServed,
+      unservedRefusals: this.unservedRefusalCount,
+      byCategory: this.byCategory(),
+      byModel,
+    };
+  }
+
+  /** Reset all counters. */
+  reset(): void {
+    this._refusals = 0;
+    this._fallbackServed = 0;
+    this._byCategory.clear();
+    this._byModel.clear();
+  }
+
+  /** Emit a discrete non-error span for a refusal/fallback signal. @internal */
+  private emit(name: string, attributes: SpanAttributes): void {
+    if (!this.provider) return;
+    try {
+      const id = this.provider.startSpan(name, attributes);
+      // A refusal is a successful HTTP 200 — close the span 'ok', never 'error'.
+      this.provider.endSpan(id, 'ok', attributes);
+    } catch {
+      // Telemetry must never throw.
+    }
+  }
+}

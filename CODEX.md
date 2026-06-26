@@ -4,14 +4,14 @@ This file is read automatically by OpenAI Codex CLI when working in this reposit
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.12.4.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.13.0.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 3,269 tests across 33 suites
+npm run test:all              # Run all 3,373 tests across 37 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 29 adapter tests

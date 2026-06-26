@@ -1789,6 +1789,10 @@ export type { LangGraphRunnable, LangGraphStreamable, LangGraphAgentConfig } fro
 export { AnthropicComputerUseAdapter } from './adapters/anthropic-computer-use-adapter';
 export type { ComputerAction, ComputerToolCall, ComputerToolResult, ComputerActionHandler, AnthropicMessagesClient, ComputerUseAgentConfig } from './adapters/anthropic-computer-use-adapter';
 
+// Anthropic Messages adapter — governed refusal → fallback → billing lifecycle (v5.13.0)
+export { AnthropicMessagesAdapter, createAnthropicCaller, normalizeAnthropicResponse } from './adapters/anthropic-messages-adapter';
+export type { AnthropicMessagesApiClient, AnthropicRawResponse, AnthropicMessagesAgentConfig } from './adapters/anthropic-messages-adapter';
+
 // OpenAI Agents SDK adapter
 export { OpenAIAgentsAdapter } from './adapters/openai-agents-adapter';
 export type { OAIAgentTool, OAIAgentRunResult, OAIAgentRunner, OAIAgentsConfig } from './adapters/openai-agents-adapter';
@@ -1819,3 +1823,42 @@ export type { CircuitBreakerConfig, CircuitState } from './lib/circuit-breaker';
 // Telemetry Provider — BYOT (v5.7.0)
 export { NullTelemetryProvider, CapturingTelemetryProvider, createOtelHooks } from './lib/telemetry-provider';
 export type { ITelemetryProvider, SpanAttributes, CapturedSpan } from './lib/telemetry-provider';
+
+// Model-interaction lifecycle governance — refusal → fallback → billing (v5.13.0)
+export { GovernedModelGateway, isRefusal } from './lib/model-gateway';
+export type {
+  EffortLevel,
+  RefusalCategory,
+  ModelMessage,
+  ModelContentBlock,
+  ModelUsage,
+  RefusalDetails,
+  ModelRequest,
+  ModelResponse,
+  ModelCaller,
+  BudgetSink,
+  AuditSink,
+  ThinkingSink,
+  EffortSink,
+  RefusalTelemetrySink,
+  GovernedModelGatewayConfig,
+  GatewayAttempt,
+  GovernedSendRequest,
+  GovernedModelResult,
+} from './lib/model-gateway';
+export { ModelBudget, costOfUsage } from './lib/model-budget';
+export type { ModelPricing, UsageLike, TokenBudgetLike, ModelBudgetOptions, UsageIteration } from './lib/model-budget';
+export { RefusalTelemetry, REFUSAL_EVENT, FALLBACK_SERVED_EVENT } from './lib/telemetry-provider';
+export type { RefusalEventInfo, FallbackServedInfo, RefusalSnapshot } from './lib/telemetry-provider';
+
+// Orchestration resilience — per-sub-agent fallback + effort governance (v5.13.0)
+export { RetryBudget } from './lib/retry-budget';
+export type { RetryBudgetOptions } from './lib/retry-budget';
+export { EffortPolicy } from './lib/effort-policy';
+export type { EffortPolicyOptions, EffortDecision } from './lib/effort-policy';
+
+// Thinking-block lifecycle + OWASP Agentic Top 10 coverage (v5.13.0)
+export { ThinkingBlockManager } from './lib/thinking-blocks';
+export type { ReasoningExtractionCheck } from './lib/thinking-blocks';
+export { OWASP_AGENTIC_TOP10_2026, verifyOwaspCoverage, formatOwaspReport } from './lib/owasp-compliance';
+export type { OwaspControl, OwaspCoverageReport, CoverageStatus } from './lib/owasp-compliance';

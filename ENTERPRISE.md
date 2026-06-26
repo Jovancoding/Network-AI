@@ -106,7 +106,7 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 
 ### Stability Signals
 
-- 3,269 passing assertions across 33 suites
+- 3,373 passing assertions across 37 suites
 - Deterministic scoring — no random outcomes in permission evaluation or budget enforcement
 - CI runs on every push and every PR
 - All examples ship with the repo and run without mocking

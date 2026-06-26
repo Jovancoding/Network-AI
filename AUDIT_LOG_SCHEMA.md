@@ -1,4 +1,4 @@
-# Audit Log Schema — Network-AI v5.12.4
+# Audit Log Schema — Network-AI v5.13.0
 
 Network-AI writes a JSONL audit trail during permission management and swarm execution. This document describes every field and event type.
 
@@ -64,6 +64,10 @@ Every log entry uses the same outer structure:
 | `update_goals` | `context_manager.py` | Project goal added |
 | `update_banned` | `context_manager.py` | Banned approach recorded |
 | `update_project` | `context_manager.py` | Project metadata updated |
+| `model.attempt` | `GovernedModelGateway` (`lib/model-gateway.ts`) | A model served (or was attempted in) a governed request |
+| `model.refusal` | `GovernedModelGateway` (`lib/model-gateway.ts`) | A model returned a classifier refusal (`stop_reason:"refusal"`); records the category |
+
+> The `model.*` events are emitted by the TypeScript engine's `GovernedModelGateway` to its configured audit sink (e.g. `SecureAuditLogger`), capturing the refusal → fallback → billing lifecycle. Their `details` carry `model`, `stopReason`, `refusalCategory`, `servedByFallback`, `creditRedeemed`, `costUsd`, and `usage`.
 
 ---
 

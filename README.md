@@ -5,9 +5,9 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.12.7-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.13.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-3269%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-3373%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-29%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -34,6 +34,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 - **29 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS, Copilot, LangGraph, Anthropic Computer Use, OpenAI Agents SDK, Vertex AI, Pydantic AI, Browser Agent, Hermes (NousResearch Hermes / any OpenAI-compatible endpoint), Orchestrator (hierarchical multi-orchestrator), and RLM (Recursive Language Model / any RLM-compatible HTTP endpoint) — no glue code, no lock-in
 - **Persistent project memory (Layer 3)** — `context_manager.py` injects decisions, goals, stack, milestones, and banned patterns into every system prompt so agents always have full project context
 - **v5.0 modules** — Agent VCR (record/replay), comparison runner, coverage reporter, goal DSL, approval inbox, job queue, gRPC/HTTP transport, playground REPL, adapter test harness, and more
+- **Model-interaction lifecycle governance (v5.13)** — `GovernedModelGateway` absorbs the model refusal → fallback → billing chain (cross-model fallback, fallback-credit repricing, effort governance, thinking-block handoff) behind one governed, budgeted, audited call
 
 > **The silent failure mode in multi-agent systems:** parallel agents writing to the same key
 > use last-write-wins by default — one agent's result silently overwrites another's mid-flight.
@@ -48,6 +49,58 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 - An **OpenClaw skill** — `clawhub install network-ai`
 
 [**5-minute quickstart →**](QUICKSTART.md) &nbsp;|&nbsp; [**Architecture →**](ARCHITECTURE.md) &nbsp;|&nbsp; [**All adapters →**](#adapter-system) &nbsp;|&nbsp; [**Benchmarks →**](BENCHMARKS.md)
+
+---
+
+## 🛡️ Model-Interaction Lifecycle Governance
+
+Most governance tools stop at the agent boundary — they police which tools an agent may call *before* it acts. Network-AI also governs the layer underneath: **how an agent talks to the model.** When a frontier model declines a request with a classifier refusal, Network-AI absorbs the refusal → fallback → billing chain and presents one governed, budgeted, audited call.
+
+- **`GovernedModelGateway`** — detect `stop_reason:"refusal"`, audit which classifier fired, route to a fallback model, and redeem the fallback-credit token so the retry is repriced as a cache read.
+- **`ModelBudget`** — per-model USD accounting with fallback-credit repricing; never sums tokens across models.
+- **`RefusalTelemetry`** — a refusal is an HTTP 200, invisible to error-rate monitoring; emitted as a discrete non-error signal with an `unservedRefusalCount` gap to alert on.
+- **`EffortPolicy`** — turn the `effort` cost dial into a policy object: cap sub-agents at `low`, require justification for `xhigh`/`max`.
+- **`ThinkingBlockManager`** — keep thinking blocks unchanged on the same model; strip them on a cross-model fallback; guard prompts against `reasoning_extraction` refusals.
+- **Per-sub-agent fallback** — `FanOutFanIn` steps and `TeamRunner` tasks each carry their own fallback agent and per-request retry budget (`RetryBudget`), because a turn can refuse independently across an agent and its sub-agents.
+
+```typescript
+import { AnthropicMessagesAdapter, ModelBudget, RefusalTelemetry } from 'network-ai';
+
+const adapter = new AnthropicMessagesAdapter();
+await adapter.initialize({});
+adapter.registerModelAgent('analyst', {
+  client,                              // bring your own Anthropic client
+  model: 'claude-fable-5',
+  fallbackModels: ['claude-opus-4-8'], // classifier refusals fall through here
+  budget: new ModelBudget({
+    ceilingUsd: 5,
+    pricing: {
+      'claude-fable-5': { inputPerMTok: 10, outputPerMTok: 50 },
+      'claude-opus-4-8': { inputPerMTok: 5, outputPerMTok: 25 },
+    },
+  }),
+  telemetry: new RefusalTelemetry(),
+});
+const result = await adapter.executeAgent('analyst', { action: 'Summarize Q3 results', params: {} }, { agentId: 'cli' });
+// result.data: { servedModel, servedByFallback, refused, refusalCategories, attempts, totalCostUsd }
+```
+
+### OWASP Agentic AI Top 10 (2026) — engine coverage
+
+Verify programmatically with `verifyOwaspCoverage()` (exported from `network-ai`):
+
+| Risk | Status | Primary control |
+|---|---|---|
+| ASI-01 Agent Goal Hijack | ✅ Covered | AuthGuardian gating + JourneyFSM control plane |
+| ASI-02 Tool Misuse & Exploitation | ✅ Covered | AgentRuntime SandboxPolicy + ApprovalGate |
+| ASI-03 Identity & Privilege Abuse | ✅ Covered | HMAC / Ed25519 signed tokens + trust scoring |
+| ASI-04 Supply Chain Risks | ✅ Covered | 1 runtime dep + socket / clawhub / codeql gates |
+| ASI-05 Unsafe Code Execution | ✅ Covered | ShellExecutor `shell:false` argv + path guards |
+| ASI-06 Memory & Context Poisoning | ✅ Covered | LockedBlackboard + injection detection |
+| ASI-07 Insecure Inter-Agent Comms | 🟡 Partial | FS-mutex + signed handoffs (local-trust boundary) |
+| ASI-08 Cascading Failures | ✅ Covered | CircuitBreaker + budgets + RetryBudget |
+| ASI-09 Human-Agent Trust Exploitation | ✅ Covered | ApprovalGate + tamper-evident audit trail |
+| ASI-10 Rogue Agents | ✅ Covered | ComplianceMonitor + circuit-breaker kill switch |
 
 ---
 
@@ -489,7 +542,7 @@ npm run test:phase9       # Agent runtime, console, strategy agent
 npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate, Route Classifier
 ```
 
-**3,269 passing assertions across 33 test suites** (`npm run test:all`):
+**3,373 passing assertions across 37 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -525,6 +578,9 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | `test-transport.ts` | 117 | Basis transport tier: `TransportAgent` state machine, `LandscapeAgent` health tracking, `AgentPool` drain/pause, fleet coordination, canary, rollback |
 | `test-claim-verifier.ts` | 50 | ClaimVerifier: receipt generation/tamper/expiry, corroborated/unsupported/undisclosed, trust decay/reset/DoS protection |
 | `test-phase13.ts` | 58 | ESM dual-build config, McpStreamableServer dispatch + resources + prompts, PhasePipeline checkpoint/resume/clear, SemanticMemory save/load/autoSave/clearPersisted |
+| `test-phase14.ts` | 52 | Model lifecycle governance: `GovernedModelGateway` refusal→fallback, `ModelBudget` credit repricing, `RefusalTelemetry`, Anthropic Messages adapter |
+| `test-phase15.ts` | 31 | Orchestration resilience: `RetryBudget`, per-sub-agent fallback in `FanOutFanIn` + `TeamRunner`, `EffortPolicy` |
+| `test-phase16.ts` | 21 | `ThinkingBlockManager` lifecycle + reasoning-extraction guard, OWASP Agentic Top 10 coverage matrix |
 | `test.ts` | 39 | Core orchestrator smoke tests |
 
 ---
