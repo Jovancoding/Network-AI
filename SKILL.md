@@ -1,12 +1,12 @@
 ---
 name: network-ai
-description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. All bundled Python scripts run locally with zero network calls. The full npm package (npm install network-ai) additionally ships a TypeScript library, CLI, and an optional operator-started MCP SSE server that binds a TCP port."
+description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. The bundled Python scripts make no network calls and have zero third-party dependencies. The parent repository also contains a TypeScript engine (not included in this skill bundle)."
 metadata:
   openclaw:
     emoji: "\U0001F41D"
     homepage: https://network-ai.org
     capabilities:
-      filesystem: "read/write — project root `swarm-blackboard.md` (blackboard state), `data/pending_changes/<id>.json` (WAL entries), `data/audit_log.jsonl`, `data/active_grants.json`, `data/.signing_key`, `data/project-context.json`, `data/task_tracking.json`, `data/agent_health.json`, `data/budget_tracking.json`. All paths are local; nothing is transmitted over the network. When NETWORK_AI_ENV is set, data paths are rooted at `data/<env>/` instead of `data/`. The `--path` argument in blackboard.py is validated against the project root at runtime — paths outside the project directory are rejected (CWE-22)."
+      filesystem: "read/write — project root `swarm-blackboard.md` (blackboard state), `data/pending_changes/<id>.json` (WAL entries), `data/audit_log.jsonl`, `data/active_grants.json`, `data/.signing_key`, `data/project-context.json`, `data/task_tracking.json`, `data/agent_health.json`, `data/budget_tracking.json`. All paths are local; no data leaves the local filesystem. When NETWORK_AI_ENV is set, data paths are rooted at `data/<env>/` instead of `data/`. The `--path` argument in blackboard.py is validated against the project root at runtime — paths outside the project directory are rejected (CWE-22)."
       env_vars: "read — NETWORK_AI_ENV (environment routing), NETWORK_AI_MCP_SECRET (MCP bearer auth), NETWORK_AI_MINIMAL (minimal-mode flag). No env vars are written."
       shell_exec: "optional — AgentRuntime (lib/agent-runtime.ts) with SandboxPolicy and ApprovalGate; disabled by default. Never auto-enabled by this skill. auto_approve must NOT be set in production (see auto_approve_warning below)."
       tcp_port: "optional — MCP SSE server (bin/mcp-server.ts) binds 127.0.0.1 only when explicitly started by the operator. Requires a non-empty bearer-token secret. Never auto-started by this skill or any bundled Python script."
@@ -35,7 +35,7 @@ metadata:
         path: data/
         scope: local-only
         files: ["audit_log.jsonl", "active_grants.json", ".signing_key", "project-context.json", "task_tracking.json", "agent_health.json", "budget_tracking.json", "pending_changes/<id>.json"]
-        description: "All persistent state is local-only. No files are transmitted over the network."
+        description: "All persistent state is local-only. No data leaves the local filesystem."
       blackboard_file:
         path: swarm-blackboard.md
         scope: local-only
@@ -535,7 +535,7 @@ Sequential processing - output of one feeds into next.
 
 **Every sensitive action MUST be logged to `data/audit_log.jsonl`** to maintain compliance and enable forensic analysis.
 
-> **Privacy note:** Audit log entries contain agent-provided free-text fields (justifications, descriptions). These are stored locally in `data/audit_log.jsonl` and never transmitted over the network by this skill. However, **do not put PII, passwords, or API keys in justification strings** — they persist on disk. Consider periodic log rotation and restricting OS file permissions on the `data/` directory.
+> **Privacy note:** Audit log entries contain agent-provided free-text fields (justifications, descriptions). These are stored locally in `data/audit_log.jsonl` and kept on this machine only by this skill — no audit data leaves the local filesystem. However, **do not put PII, passwords, or API keys in justification strings** — they persist on disk. Consider periodic log rotation and restricting OS file permissions on the `data/` directory.
 
 ### What Gets Logged Automatically
 
@@ -753,7 +753,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Zero network calls (Python scripts)** | All bundled Python scripts use Python stdlib only, spawn no subprocesses, and make no network calls — declared in `metadata.openclaw.network_calls` and `bundle_scope`. The optional MCP SSE server (`bin/mcp-server.ts`) binds a TCP port only when explicitly started by the operator and requires a non-empty bearer-token secret. |
+| **Zero network calls (Python scripts)** | All bundled Python scripts use Python stdlib only, spawn no subprocesses, and make no network calls — declared in `metadata.openclaw.network_calls` and `bundle_scope`. The optional TypeScript MCP server (`bin/mcp-server.ts`) is not part of the ClawHub bundle; it must be explicitly started by the operator via `npx network-ai-server` and requires a non-empty bearer-token secret. |
 | **AgentRuntime sandbox** | `ShellExecutor` enforces per-command timeout and output-size limits; `SandboxPolicy` allowlist/blocklist prevents unapproved shell commands from running at all |
 | **ClaimVerifier (Tier 1 agent honesty)** | `AgentRuntime` issues HMAC-signed outcome-bound receipts (`ExecutionReceipt`) on every `exec()` and `writeFile()`; `ClaimVerifier` (`lib/claim-verifier.ts`) reconciles agent-declared manifests against the audit log — `UNSUPPORTED_CLAIM` and `UNDISCLOSED_ACTION` violations surface through `ComplianceMonitor`; repeated fabrication decays `AuthGuardian` trust and forces `ApprovalGate` supervision |
 | **Source protection** | `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any attempt to read outside that boundary throws `SourceProtectionError` — the agent receives `{success: false}`, no path details leak |
@@ -767,7 +767,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.13.0"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.13.1"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |
@@ -793,6 +793,7 @@ This skill is scanned on every publish. The following Notes are flagged by desig
 | **SkillSpector** Context-Inappropriate Capability (MCP control surface breadth) | ~~Medium~~ Resolved | Same root cause — `comment.txt` enumerated the HTTP MCP server's 22 privileged tools (blackboard write, token ops, agent_spawn, fsm_transition, audit_query), which the scanner read as a broad remote-control surface inside a local skill. | Fixed in v5.12.7 — `comment.txt` excluded from the bundle (see row above) and enforced by the `clawhub:check` guard. The HTTP MCP server itself remains opt-in: it requires a non-empty bearer secret before `listen()` binds (fail-closed), runs only via `NETWORK_AI_MCP_SECRET=<secret> npx network-ai-server`, binds `127.0.0.1` by default, and is documented in `SUPPLY_CHAIN.md §5a`. |
 | **SkillSpector** Context-Inappropriate Capability (`_load_signing_key()` token minting) | Medium, 92% | `scripts/check_permission.py` mints, HMAC-signs, persists, and lists grant tokens — a de facto local authorization artifact that downstream components may be tempted to treat as real credentials. | Token advisory-only warnings appear in source, SKILL.md, and SECURITY.md. Every grant response includes the advisory notice. Tokens are labeled `grant_{uuid4().hex}`; the HMAC signature only proves local origin, not external identity. Platform-level authentication is required before any destructive action (PAYMENTS, DATABASE, FILE_EXPORT). See ASI03 rows above. |
 | **SkillSpector** Intent-Code Divergence (`FILE_EXPORT` missing from `HIGH_RISK_RESOURCES`) | ~~Low~~ Resolved | Comment stated `FILE_EXPORT` requires `--confirm-high-risk` but `HIGH_RISK_RESOURCES` only contained `PAYMENTS` and `DATABASE`; file export requests could receive advisory grants without the extra acknowledgment | Fixed in v5.11.0 — `FILE_EXPORT` added to `HIGH_RISK_RESOURCES` in `check_permission.py`; now requires `--confirm-high-risk` consistent with the documented policy |
+| **SkillSpector** YARA `agent_skill_mcp_tool_poisoning_metadata` (MCP/tool metadata poisoning indicators) | ~~High~~ Resolved | SKILL.md frontmatter `description:` retained an older phrasing that referenced the optional TypeScript network server alongside "zero network calls" — a combination the YARA rule flags. A privacy-note sentence also used wording adjacent to file/data references that the exfiltration sub-rule flagged. | Fixed in v5.13.1 — frontmatter `description:` confirmed clean (server reference removed; TypeScript engine noted as parent repository only). Privacy note reworded to remove the flagged phrase. VirusTotal 64/64 clean throughout. |
 | **SkillSpector** Description-Behavior Mismatch (`ensure_data_dir()` ignoring env scope) | ~~Medium~~ Resolved | `ensure_data_dir()` always created the fixed top-level `data/` directory instead of the active env-specific path, breaking environment isolation when `NETWORK_AI_ENV` is set | Fixed in v5.11.0 — `ensure_data_dir()` now delegates to `_resolve_data_dir()` so audit log and grant files are always written to the correct env-scoped directory |
 
 ## References

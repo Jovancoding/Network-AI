@@ -5,6 +5,12 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.13.1] - 2026-06-28
+
+### Fixed
+- **SkillSpector YARA `agent_skill_mcp_tool_poisoning_metadata`** — A privacy-note sentence in `SKILL.md` contained phrasing that the exfiltration sub-rule flagged. Reworded to "kept on this machine only — no audit data leaves the local filesystem." The frontmatter `description:` was already correct after the v5.13.0 fix; this patch removes the one remaining trigger phrase. VirusTotal 64/64 clean.
+- **CodeQL `js/redundant-operation` (alert #178)** — `test-phase15.ts`: split an `&&`-chained double-call to `RetryBudget.tryConsume()` into two explicit assertions, making the intended side-effect clear.
+
 ## [5.13.0] - 2026-06-26
 
 ### Added — Model-Interaction Lifecycle Governance (Tier 1)

@@ -5,7 +5,7 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.13.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.13.1-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
 [![Tests](https://img.shields.io/badge/tests-3373%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-29%20supported-blueviolet.svg)](#adapter-system)
@@ -590,18 +590,18 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | Doc | Contents |
 |---|---|
 | [QUICKSTART.md](QUICKSTART.md) | Installation, first run, CLI reference, PowerShell guide, Python scripts CLI |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Race condition problem, FSM design, handoff protocol, module inventory, project structure |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Race condition problem, FSM design, handoff protocol, model-interaction lifecycle governance, module inventory, project structure |
 | [BENCHMARKS.md](BENCHMARKS.md) | Provider performance, rate limits, local GPU, `max_completion_tokens` guide |
-| [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail, disclosure SLA, ClawHub scan findings |
+| [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail, OWASP Agentic Top 10 coverage, disclosure SLA, ClawHub scan findings |
 | [THREAT_MODEL.md](THREAT_MODEL.md) | Adversary profiles, trust boundaries, explicit non-goals, security controls summary |
 | [DATA_LOCATIONS.md](DATA_LOCATIONS.md) | Every file Network-AI creates — path, purpose, data classification, operator responsibilities |
 | [SUPPLY_CHAIN.md](SUPPLY_CHAIN.md) | Runtime dependencies, what runs at install, network surface, SLSA/npm provenance verification |
 | [ENTERPRISE.md](ENTERPRISE.md) | Evaluation checklist, stability policy, security summary, integration entry points |
-| [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md) | Audit log field reference, all event types, scoring formula |
+| [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md) | Audit log field reference, all event types (including `model.refusal` / `model.attempt`), scoring formula |
 | [ADOPTERS.md](ADOPTERS.md) | Known adopters — open a PR to add yourself |
-| [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | End-to-end integration walkthrough with v5.0 modules |
-| [SKILL.md](SKILL.md) | OpenClaw/ClawHub Python skill — setup, orchestrator protocol, security scan findings |
-| [references/adapter-system.md](references/adapter-system.md) | Adapter architecture, all 29 adapters, writing custom adapters |
+| [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | End-to-end integration walkthrough with v5.13 modules |
+| [SKILL.md](SKILL.md) | OpenClaw/ClawHub Python skill — setup, orchestrator protocol, OWASP engine coverage, security scan findings |
+| [references/adapter-system.md](references/adapter-system.md) | Adapter architecture, all 29 adapters (incl. `AnthropicMessagesAdapter`), writing custom adapters |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission scoring, resource types, `scoreRequest()`, IAuthValidator interface |
 | [references/trust-levels.md](references/trust-levels.md) | Trust level configuration, APS delegation-chain mapping |
 
@@ -619,7 +619,7 @@ Three integration files are included in the repo root:
 |---|---|
 | [`claude-tools.json`](claude-tools.json) | Claude API tool use & OpenAI Codex — drop into the `tools` array |
 | [`openapi.yaml`](openapi.yaml) | Custom GPT Actions — import directly in the GPT editor |
-| [`claude-project-prompt.md`](claude-project-prompt.md) | Claude Projects — paste into Custom Instructions |
+| [`claude-project-prompt.md`](claude-project-prompt.md) | Claude Projects — paste into Custom Instructions (includes lifecycle governance context) |
 
 **Claude API / Codex:**
 ```js
@@ -656,7 +656,7 @@ MIT License — [LICENSE](LICENSE) &nbsp;·&nbsp; [CHANGELOG](CHANGELOG.md) &nbs
 <details>
 <summary>Keywords</summary>
 
-multi-agent · agent orchestration · AI agents · agentic AI · agentic workflow · TypeScript · Node.js · LangGraph · CrewAI · AutoGen · MCP · model-context-protocol · LlamaIndex · Semantic Kernel · OpenAI Assistants · Haystack · DSPy · Agno · OpenClaw · ClawHub · shared state · blackboard pattern · atomic commits · guardrails · token budgets · permission gating · audit trail · agent coordination · agent handoffs · governance · cost-awareness
+multi-agent · agent orchestration · AI agents · agentic AI · agentic workflow · TypeScript · Node.js · LangGraph · CrewAI · AutoGen · MCP · model-context-protocol · LlamaIndex · Semantic Kernel · OpenAI Assistants · Haystack · DSPy · Agno · OpenClaw · ClawHub · shared state · blackboard pattern · atomic commits · guardrails · token budgets · permission gating · audit trail · agent coordination · agent handoffs · governance · cost-awareness · refusal handling · fallback routing · model lifecycle · OWASP agentic AI · effort policy · thinking blocks
 
 </details>
 
