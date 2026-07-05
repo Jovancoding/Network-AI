@@ -124,7 +124,7 @@
       },
       {
         "path": "adapters/adapter-registry.ts",
-        "reason": "Intentional — adapter-registry re-exports all 29 adapters; Socket.dev's import-graph analysis flags it because it transitively references adapters that use fetch. No direct HTTP calls are made here."
+        "reason": "Intentional — adapter-registry re-exports all 32 adapters; Socket.dev's import-graph analysis flags it because it transitively references adapters that use fetch. No direct HTTP calls are made here."
       },
       {
         "path": "dist/adapters/adapter-registry.js",

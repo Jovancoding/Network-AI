@@ -1627,7 +1627,335 @@ async function testAPSAdapter(): Promise<void> {
 }
 
 // ============================================================================
-// TEST 16: All Adapters in Registry Together
+// TEST 16: GeminiAdapter
+// ============================================================================
+
+async function testGeminiAdapter(): Promise<void> {
+  section('GeminiAdapter — Google Gemini Developer API (BYOC)');
+
+  const { GeminiAdapter } = await import('./adapters/gemini-adapter');
+  const adapter = new GeminiAdapter();
+  await adapter.initialize({});
+
+  // --- Registration ---
+  adapter.registerAgent('researcher', {
+    model: 'gemini-2.5-flash',
+    systemPrompt: 'You are a meticulous researcher.',
+  });
+  adapter.registerAgent('pro', {
+    model: 'gemini-2.5-pro',
+    maxOutputTokens: 1024,
+    temperature: 0.3,
+    thinkingBudget: 2048,
+  });
+
+  const agents = await adapter.listAgents();
+  assert(agents.length === 2, 'Two Gemini agents registered');
+  assert(agents.some((a) => a.id === 'researcher'), 'researcher agent registered');
+  assert(agents.every((a) => a.capabilities?.includes('multi-modal') === true), 'Gemini agents declare multi-modal capability');
+
+  // --- BYOC client path (SDK-style: text convenience accessor) ---
+  let capturedConfig: Record<string, unknown> | undefined;
+  const mockClient = {
+    generateContent: async (params: {
+      model: string;
+      contents: Array<{ role?: string; parts: Array<{ text?: string }> }> | string;
+      config?: Record<string, unknown>;
+    }) => {
+      capturedConfig = params.config;
+      const text = Array.isArray(params.contents)
+        ? params.contents[0].parts[0].text ?? ''
+        : String(params.contents);
+      return {
+        text: `Gemini says: ${text}`,
+        usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 24, totalTokenCount: 36 },
+      };
+    },
+  };
+  adapter.registerAgent('byoc', {
+    model: 'gemini-2.5-flash',
+    client: mockClient,
+    systemPrompt: 'Be brief.',
+    thinkingBudget: 512,
+  });
+
+  const ctx: AgentContext = { agentId: 'test', taskId: 't1' };
+  const result = await adapter.executeAgent('byoc', {
+    action: 'research',
+    params: {},
+    handoff: {
+      handoffId: 'h1', sourceAgent: 'test', targetAgent: 'byoc',
+      taskType: 'delegate' as const, instruction: 'Summarize the findings',
+    },
+  }, ctx);
+
+  assert(result.success === true, 'BYOC Gemini agent executes successfully');
+  const data = result.data as Record<string, unknown>;
+  assert(typeof data.output === 'string' && (data.output as string).includes('Summarize the findings'), 'Output contains prompt content');
+  assert(data.model === 'gemini-2.5-flash', 'Model name preserved in result');
+  assert(capturedConfig?.['systemInstruction'] === 'Be brief.', 'System prompt forwarded as systemInstruction');
+  assert(
+    (capturedConfig?.['thinkingConfig'] as Record<string, unknown> | undefined)?.['thinkingBudget'] === 512,
+    'Thinking budget forwarded in config'
+  );
+  const usage = (result.metadata?.trace as Record<string, unknown>)?.usage as Record<string, number>;
+  assert(usage?.totalTokenCount === 36, 'Usage metadata returned in trace');
+
+  // --- REST-shape response (candidates array, no text accessor) ---
+  const restClient = {
+    generateContent: async () => ({
+      candidates: [{ content: { role: 'model' as const, parts: [{ text: 'part one. ' }, { text: 'part two.' }] } }],
+    }),
+  };
+  adapter.registerAgent('rest', { client: restClient });
+  const restResult = await adapter.executeAgent('rest', { action: 'go', params: {} }, ctx);
+  assert(restResult.success === true, 'REST-shape response handled');
+  assert(
+    ((restResult.data as Record<string, unknown>).output as string) === 'part one. part two.',
+    'Multi-part candidates concatenated'
+  );
+
+  // --- Error: unknown agent ---
+  const errResult = await adapter.executeAgent('nope', { action: 'x', params: {} }, ctx);
+  assert(errResult.success === false, 'Missing Gemini agent returns failure');
+  assert(errResult.error?.code === 'AGENT_NOT_FOUND', 'Missing agent error code is AGENT_NOT_FOUND');
+
+  // --- Error: no API key and no client ---
+  adapter.registerAgent('keyless', { apiKey: '' });
+  const saved = process.env['GEMINI_API_KEY'];
+  delete process.env['GEMINI_API_KEY'];
+  const keyless = await adapter.executeAgent('keyless', { action: 'x', params: {} }, ctx);
+  if (saved !== undefined) process.env['GEMINI_API_KEY'] = saved;
+  assert(keyless.success === false, 'No API key and no client fails');
+  assert((keyless.error?.message ?? '').includes('GEMINI_API_KEY'), 'Error message mentions GEMINI_API_KEY');
+
+  // --- Error: invalid registration ---
+  let threw = false;
+  try { adapter.registerAgent('', {}); } catch { threw = true; }
+  assert(threw, 'Empty agentId throws on Gemini registration');
+
+  // --- Shutdown ---
+  await adapter.shutdown();
+  assert(!(await adapter.isAgentAvailable('byoc')), 'Gemini agents cleared after shutdown');
+}
+
+// ============================================================================
+// TEST 17: OpenAIResponsesAdapter
+// ============================================================================
+
+async function testOpenAIResponsesAdapter(): Promise<void> {
+  section('OpenAIResponsesAdapter — OpenAI Responses API (BYOC)');
+
+  const { OpenAIResponsesAdapter } = await import('./adapters/openai-responses-adapter');
+  const adapter = new OpenAIResponsesAdapter();
+  await adapter.initialize({});
+
+  // --- Registration ---
+  adapter.registerAgent('writer', { model: 'gpt-4.1', instructions: 'Be concise.' });
+  adapter.registerAgent('reasoner', { model: 'o4-mini', reasoningEffort: 'high' });
+
+  const agents = await adapter.listAgents();
+  assert(agents.length === 2, 'Two Responses agents registered');
+  assert(agents.some((a) => a.id === 'reasoner'), 'reasoner agent registered');
+
+  // --- BYOC client path (SDK-style: output_text accessor) ---
+  let capturedParams: Record<string, unknown> | undefined;
+  const mockClient = {
+    create: async (params: {
+      model: string;
+      input: string;
+      instructions?: string;
+      reasoning?: { effort?: string };
+    }) => {
+      capturedParams = params as unknown as Record<string, unknown>;
+      return {
+        output_text: `Response to: ${params.input}`,
+        usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
+      };
+    },
+  };
+  adapter.registerAgent('byoc', {
+    model: 'gpt-5.2',
+    client: mockClient,
+    instructions: 'You are terse.',
+    reasoningEffort: 'medium',
+  });
+
+  const ctx: AgentContext = { agentId: 'test', taskId: 't1' };
+  const result = await adapter.executeAgent('byoc', {
+    action: 'write',
+    params: {},
+    handoff: {
+      handoffId: 'h1', sourceAgent: 'test', targetAgent: 'byoc',
+      taskType: 'delegate' as const, instruction: 'Draft the summary',
+    },
+  }, ctx);
+
+  assert(result.success === true, 'BYOC Responses agent executes successfully');
+  const data = result.data as Record<string, unknown>;
+  assert((data.output as string).includes('Draft the summary'), 'Output contains prompt content');
+  assert(data.model === 'gpt-5.2', 'Model name preserved in result');
+  assert(capturedParams?.['instructions'] === 'You are terse.', 'Instructions forwarded to the API');
+  assert(
+    (capturedParams?.['reasoning'] as Record<string, unknown> | undefined)?.['effort'] === 'medium',
+    'Reasoning effort forwarded to the API'
+  );
+  const usage = (result.metadata?.trace as Record<string, unknown>)?.usage as Record<string, number>;
+  assert(usage?.total_tokens === 30, 'Usage stats returned in trace');
+
+  // --- REST-shape response (output items array, no output_text) ---
+  const restClient = {
+    create: async () => ({
+      output: [
+        { type: 'reasoning', content: [] },
+        { type: 'message', content: [{ type: 'output_text', text: 'structured answer' }] },
+      ],
+    }),
+  };
+  adapter.registerAgent('rest', { client: restClient });
+  const restResult = await adapter.executeAgent('rest', { action: 'go', params: {} }, ctx);
+  assert(restResult.success === true, 'Output-items response handled');
+  assert(
+    ((restResult.data as Record<string, unknown>).output as string) === 'structured answer',
+    'output_text extracted from message items'
+  );
+
+  // --- Error: unknown agent ---
+  const errResult = await adapter.executeAgent('nope', { action: 'x', params: {} }, ctx);
+  assert(errResult.success === false, 'Missing Responses agent returns failure');
+
+  // --- Error: no API key and no client ---
+  adapter.registerAgent('keyless', { apiKey: '' });
+  const saved = process.env['OPENAI_API_KEY'];
+  delete process.env['OPENAI_API_KEY'];
+  const keyless = await adapter.executeAgent('keyless', { action: 'x', params: {} }, ctx);
+  if (saved !== undefined) process.env['OPENAI_API_KEY'] = saved;
+  assert(keyless.success === false, 'No API key and no client fails');
+  assert((keyless.error?.message ?? '').includes('OPENAI_API_KEY'), 'Error message mentions OPENAI_API_KEY');
+
+  // --- Error: invalid registration ---
+  let threw = false;
+  try { adapter.registerAgent('  ', {}); } catch { threw = true; }
+  assert(threw, 'Blank agentId throws on Responses registration');
+
+  // --- Shutdown ---
+  await adapter.shutdown();
+  assert(!(await adapter.isAgentAvailable('byoc')), 'Responses agents cleared after shutdown');
+}
+
+// ============================================================================
+// TEST 18: ClaudeAgentSDKAdapter
+// ============================================================================
+
+async function testClaudeAgentSDKAdapter(): Promise<void> {
+  section('ClaudeAgentSDKAdapter — Claude Agent SDK agentic loop (BYOC)');
+
+  const { ClaudeAgentSDKAdapter } = await import('./adapters/claude-agent-sdk-adapter');
+  const adapter = new ClaudeAgentSDKAdapter();
+  await adapter.initialize({});
+
+  // --- Registration requires a query function ---
+  let threw = false;
+  try {
+    adapter.registerAgent('bad', {} as Parameters<typeof adapter.registerAgent>[1]);
+  } catch { threw = true; }
+  assert(threw, 'Registration without query function throws');
+
+  threw = false;
+  try {
+    adapter.registerAgent('', { query: async function* () { /* empty */ } });
+  } catch { threw = true; }
+  assert(threw, 'Empty agentId throws on SDK registration');
+
+  // --- Successful agentic loop ---
+  const seen: string[] = [];
+  let capturedOptions: Record<string, unknown> | undefined;
+  adapter.registerAgent('coder', {
+    query: async function* (params: { prompt: string; options?: Record<string, unknown> }) {
+      capturedOptions = params.options;
+      yield { type: 'system', subtype: 'init' };
+      yield { type: 'assistant' };
+      yield {
+        type: 'result',
+        subtype: 'success',
+        result: `Done: ${params.prompt.split('\n')[0]}`,
+        total_cost_usd: 0.042,
+        num_turns: 3,
+        session_id: 'sess-123',
+        usage: { input_tokens: 100, output_tokens: 50 },
+      };
+    },
+    options: { maxTurns: 10 },
+    systemPrompt: 'You are a careful coder.',
+    onMessage: (m) => seen.push(m.type),
+  });
+
+  const agents = await adapter.listAgents();
+  assert(agents.length === 1 && agents[0]?.id === 'coder', 'SDK agent registered');
+  assert(agents.every((a) => a.capabilities?.includes('agentic-loop') === true), 'SDK agent declares agentic-loop capability');
+
+  const ctx: AgentContext = { agentId: 'test', taskId: 't1' };
+  const result = await adapter.executeAgent('coder', {
+    action: 'refactor',
+    params: {},
+    handoff: {
+      handoffId: 'h1', sourceAgent: 'test', targetAgent: 'coder',
+      taskType: 'delegate' as const, instruction: 'Refactor the parser',
+    },
+  }, ctx);
+
+  assert(result.success === true, 'SDK agent executes successfully');
+  const data = result.data as Record<string, unknown>;
+  assert((data.output as string).includes('Refactor the parser'), 'Result text extracted from result message');
+  assert(data.sessionId === 'sess-123', 'Session id surfaced');
+  assert(data.numTurns === 3, 'Turn count surfaced');
+  assert(data.costUsd === 0.042, 'Cost surfaced');
+  assert(seen.length === 2 && seen[0] === 'system', 'Intermediate messages passed to onMessage');
+  assert(capturedOptions?.['maxTurns'] === 10, 'Options forwarded to query');
+  assert(capturedOptions?.['systemPrompt'] === 'You are a careful coder.', 'systemPrompt forwarded via options');
+
+  // --- Error result message ---
+  adapter.registerAgent('failer', {
+    query: async function* () {
+      yield { type: 'result', subtype: 'error_max_turns', result: 'ran out of turns', is_error: true };
+    },
+  });
+  const failResult = await adapter.executeAgent('failer', { action: 'x', params: {} }, ctx);
+  assert(failResult.success === false, 'Error result message fails the execution');
+  assert((failResult.error?.message ?? '').includes('error_max_turns'), 'Error subtype surfaced in message');
+
+  // --- Loop ends without result ---
+  adapter.registerAgent('empty', {
+    query: async function* () {
+      yield { type: 'assistant' };
+    },
+  });
+  const emptyResult = await adapter.executeAgent('empty', { action: 'x', params: {} }, ctx);
+  assert(emptyResult.success === false, 'Loop without result message fails');
+  assert(emptyResult.error?.code === 'NO_RESULT', 'NO_RESULT error code returned');
+
+  // --- Query function throws ---
+  adapter.registerAgent('thrower', {
+    query: async function* () {
+      yield { type: 'assistant' };
+      throw new Error('SDK exploded');
+    },
+  });
+  const throwResult = await adapter.executeAgent('thrower', { action: 'x', params: {} }, ctx);
+  assert(throwResult.success === false, 'Throwing query is caught');
+  assert((throwResult.error?.message ?? '').includes('SDK exploded'), 'Original error message preserved');
+
+  // --- Unknown agent ---
+  const missing = await adapter.executeAgent('ghost', { action: 'x', params: {} }, ctx);
+  assert(missing.success === false && missing.error?.code === 'AGENT_NOT_FOUND', 'Missing SDK agent returns AGENT_NOT_FOUND');
+
+  // --- Shutdown ---
+  await adapter.shutdown();
+  assert(!(await adapter.isAgentAvailable('coder')), 'SDK agents cleared after shutdown');
+}
+
+// ============================================================================
+// TEST 19: All Adapters in Registry Together
 // ============================================================================
 
 async function testAllAdaptersInRegistry(): Promise<void> {
@@ -1785,6 +2113,9 @@ async function runAllTests(): Promise<void> {
     await testAgnoAdapter();
     await testHermesAdapter();
     await testAPSAdapter();
+    await testGeminiAdapter();
+    await testOpenAIResponsesAdapter();
+    await testClaudeAgentSDKAdapter();
     await testAllAdaptersInRegistry();
   } catch (error) {
     console.log(`\n${colors.red}FATAL: Unexpected error: ${error}${colors.reset}`);

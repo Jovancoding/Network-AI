@@ -5,6 +5,25 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.14.0] - 2026-07-05
+
+### Added
+- **`GeminiAdapter`** (`adapters/gemini-adapter.ts`) — Google Gemini Developer API (AI Studio / `generativelanguage.googleapis.com`) as swarm agents: BYOC `@google/genai`-compatible client or built-in fetch with `GEMINI_API_KEY`; system instructions, generation config, thinking budgets; handles both SDK (`text`) and REST (`candidates[].content.parts`) response shapes. Complements the enterprise `VertexAIAdapter`.
+- **`OpenAIResponsesAdapter`** (`adapters/openai-responses-adapter.ts`) — OpenAI Responses API (`POST /v1/responses`), the successor to the deprecated Assistants API: BYOC `openai` SDK client or built-in fetch with `OPENAI_API_KEY`; instructions, `max_output_tokens`, temperature, reasoning-effort control (`minimal`/`low`/`medium`/`high`); extracts `output_text` or structured `output[]` message items.
+- **`ClaudeAgentSDKAdapter`** (`adapters/claude-agent-sdk-adapter.ts`) — runs Claude Agent SDK agentic loops (`@anthropic-ai/claude-agent-sdk` `query()`) as swarm agents, strictly BYOC: drives the async-iterable message stream to the final `result` message; surfaces session id, turn count, cost, and usage; intermediate messages stream through a per-agent `onMessage` callback; error subtypes (`error_max_turns`, …) map to failed `AgentResult`s.
+- **`ClaudeHookBridge`** (`lib/claude-hooks.ts`) + **`network-ai hook` CLI** — gate *any* hook-capable coding agent (Claude Code PreToolUse/PostToolUse) through AuthGuardian: `observe` mode audits every tool call to `data/hooks_audit.jsonl` without blocking; `enforce` mode maps tools to resource types (Bash → `SHELL_EXEC`, Write/Edit → `FILE_SYSTEM`, WebFetch/`mcp__*` → `EXTERNAL_SERVICE`) and requires a weighted permission grant — denials escalate as `ask` (or hard-`deny` via `--blocked-decision`); `--deny`/`--allow` regex patterns take precedence. Ships with `examples/claude-code-hooks.json`.
+- **MCP elicitation** (`lib/mcp-elicitation.ts`) — native in-client approval prompts per the MCP 2025-06-18 spec: `StdioElicitationChannel` manages server→client `elicitation/create` requests over newline-delimited JSON-RPC (id routing, timeouts, `rejectAll`); `createElicitationApprovalCallback()` adapts the round-trip into an `ApprovalCallback` for `ApprovalGate` — fail-closed on decline, cancel, timeout, and transport errors. The stdio MCP server now routes client responses to server-initiated requests instead of misdispatching them.
+- **`A2AServer`** (`lib/a2a-server.ts`) — expose the orchestrator as a Google A2A (Agent2Agent) agent: serves an Agent Card at `/.well-known/agent.json` and `tasks/send` / `tasks/get` / `tasks/cancel` JSON-RPC; pluggable executor delegates to the adapter registry or orchestrator; optional Bearer secret on task routes (fail closed), 127.0.0.1 default bind, body-size caps, bounded task history. Pairs with the existing `A2AAdapter` (client side) for full bidirectional A2A interop.
+- **Gemini CLI extension** — `gemini-extension.json` + `GEMINI.md` context file: `gemini extensions install https://github.com/Jovancoding/Network-AI` wires the stdio MCP server into Gemini CLI automatically.
+- **Claude Code plugin slash commands** — `commands/status.md`, `commands/budget.md`, `commands/audit.md`, `commands/blackboard.md` → `/network-ai:status`, `/network-ai:budget`, `/network-ai:audit`, `/network-ai:blackboard`.
+- **`AGENTS.md`** — cross-vendor agent instructions (OpenAI Codex, Gemini CLI, Cursor, Factory, and other AGENTS.md-compatible tools).
+- **`server.json`** — MCP Registry manifest (`io.github.jovancoding/network-ai`) for the official MCP server registry.
+- **Test suite: `test-phase18.ts`** (85 assertions) — hook bridge observe/enforce/deny-allow/parsing, elicitation channel routing + fail-closed approval mapping, A2A server card/tasks/auth/eviction. Adapter suite grows to 271 assertions with the three new adapters. Full suite: **3,525 tests across 39 suites**.
+
+### Changed
+- Adapter count 29 → **32** across README, ENTERPRISE, INTEGRATION_GUIDE, QUICKSTART, ARCHITECTURE, SUPPLY_CHAIN, references/adapter-system, plugin manifests, and package description.
+- Claude Code plugin manifests (`.claude-plugin/`) bumped to 5.14.0 and now mention the slash commands.
+
 ## [5.13.4] - 2026-07-05
 
 ### Security

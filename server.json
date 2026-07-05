@@ -1,0 +1,51 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.jovancoding/network-ai",
+  "description": "Multi-agent coordination over MCP: atomic shared blackboard (propose/validate/commit), permission gating with signed tokens, federated token budgets, and append-only audit-log queries.",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/Jovancoding/Network-AI",
+    "source": "github"
+  },
+  "version": "5.14.0",
+  "websiteUrl": "https://network-ai.org",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "network-ai",
+      "version": "5.14.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "positional",
+          "value": "-y",
+          "description": "Auto-confirm npx package install"
+        },
+        {
+          "type": "positional",
+          "value": "-p",
+          "description": "Package flag"
+        },
+        {
+          "type": "positional",
+          "value": "network-ai",
+          "description": "Package name"
+        },
+        {
+          "type": "positional",
+          "value": "network-ai-server",
+          "description": "MCP server binary"
+        },
+        {
+          "type": "positional",
+          "value": "--stdio",
+          "description": "Use stdio transport"
+        }
+      ]
+    }
+  ]
+}

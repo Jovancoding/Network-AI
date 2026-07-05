@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.13.4 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,388 tests, 78+ modules.
+Network-AI v5.14.0 — TypeScript/Node.js multi-agent orchestrator with 32 adapters, 3,525 tests, 80+ modules.
 
 > **Two governance layers.** Policy engines govern *what an agent may do* before it acts (pre-wire tool gating). Network-AI adds the layer underneath — **model-interaction lifecycle governance**: when a frontier model returns a classifier refusal, the `GovernedModelGateway` audits it, falls over to another model, reprices the retry with fallback credit, hands off thinking blocks, and accounts the cost — one governed, budgeted, audited call. The two layers are complementary.
 
@@ -57,7 +57,7 @@ flowchart TD
         QG["QualityGateAgent\n(validate blackboard writes)"]:::quality
         QA["QAOrchestratorAgent\n(scenario replay, regression tracking)"]:::quality
         BB["SharedBlackboard\n(shared agent state)\npropose → validate → commit\nfilesystem mutex"]:::blackboard
-        AD["Adapters — plug any framework in, swap freely\n29 adapters: LangChain · AutoGen · CrewAI · MCP · Copilot · LangGraph · Hermes · …"]:::adapters
+        AD["Adapters — plug any framework in, swap freely\n32 adapters: LangChain · AutoGen · CrewAI · MCP · Gemini · Copilot · LangGraph · Hermes · …"]:::adapters
         RT["AgentRuntime\n(sandbox policy, approval gates)"]:::security
         CUI["ConsoleUI\n(TUI dashboard + pipe mode)"]:::app
         SA["StrategyAgent\n(AgentPool, WorkloadPartitioner,\nadaptive scaling)"]:::routing
@@ -414,7 +414,10 @@ Network-AI/
 │   ├── retry-budget.ts           # RetryBudget: per-request (not per-session) retry accounting (v5.13)
 │   ├── effort-policy.ts          # EffortPolicy: governed effort ceilings + justification gating (v5.13)
 │   ├── thinking-blocks.ts        # ThinkingBlockManager: cross-model thinking-block handoff (v5.13)
-│   └── owasp-compliance.ts       # OWASP Agentic Top 10 (2026) matrix + verifyOwaspCoverage() (v5.13)
+│   ├── owasp-compliance.ts       # OWASP Agentic Top 10 (2026) matrix + verifyOwaspCoverage() (v5.13)
+│   ├── claude-hooks.ts           # ClaudeHookBridge: AuthGuardian-gated coding-agent tool calls (v5.14)
+│   ├── mcp-elicitation.ts        # StdioElicitationChannel + elicitation ApprovalCallback (v5.14)
+│   └── a2a-server.ts             # A2AServer: agent card + tasks/send — A2A server mode (v5.14)
 ├── scripts/                      # Python helper scripts (local orchestration only)
 │   ├── blackboard.py             # Shared state management with atomic commits
 │   ├── swarm_guard.py            # Handoff tax prevention, budget tracking

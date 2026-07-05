@@ -64,7 +64,7 @@ Answers drive `AuthGuardian` configuration and audit log retention policy.
 
 ## 2. Framework Mapping
 
-Network-AI ships 29 adapters. Map your existing agents to the right one:
+Network-AI ships 32 adapters. Map your existing agents to the right one:
 
 | Your Stack | Network-AI Adapter | Notes |
 |-----------|-------------------|-------|
@@ -89,6 +89,9 @@ Network-AI ships 29 adapters. Map your existing agents to the right one:
 | GitHub Copilot | `CopilotAdapter` | Code generate/review/explain/fix/test/refactor/chat |
 | Anthropic Computer Use | `AnthropicComputerUseAdapter` | Screenshot/click/type/scroll browser automation |
 | Google Vertex AI / Gemini | `VertexAIAdapter` | Function calling, multi-modal (text+image) |
+| Google Gemini (Developer API) | `GeminiAdapter` | Gemini 2.5 models, system instructions, thinking budgets (BYOC or `GEMINI_API_KEY`) |
+| OpenAI Responses API | `OpenAIResponsesAdapter` | Assistants successor — reasoning effort, instructions (BYOC or `OPENAI_API_KEY`) |
+| Claude Agent SDK | `ClaudeAgentSDKAdapter` | Full agentic loops (tools, file edits) as swarm agents (BYOC `query`) |
 | Pydantic AI | `PydanticAIAdapter` | Structured output with validation, deps injection |
 | Browser automation | `BrowserAgentAdapter` | Playwright/Puppeteer/CDP browser control |
 | NousResearch Hermes / OpenAI-compatible | `HermesAdapter` | Ollama, Together AI, Fireworks, llama.cpp |
@@ -496,7 +499,7 @@ Run these before declaring the integration production-ready:
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
 - [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
 - [ ] `npx ts-node test-phase7.ts` — 94 Phase 7 tests pass (hooks, flow control, composer, semantic search)
-- [ ] `npm run test:all` — all 3,388 tests pass across 38 suites
+- [ ] `npm run test:all` — all 3,525 tests pass across 39 suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety
@@ -554,7 +557,7 @@ Run these before declaring the integration production-ready:
 |----------|---------------|
 | [QUICKSTART.md](QUICKSTART.md) | Get running in 5 minutes |
 | [QUICKSTART.md § CLI](QUICKSTART.md) | CLI reference — bb, auth, budget, audit commands |
-| [references/adapter-system.md](references/adapter-system.md) | All 29 adapters with code examples |
+| [references/adapter-system.md](references/adapter-system.md) | All 32 adapters with code examples |
 | [references/trust-levels.md](references/trust-levels.md) | Trust scoring formula and agent roles |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission system, justification scoring, token lifecycle |
 | [references/blackboard-schema.md](references/blackboard-schema.md) | Blackboard key conventions and namespacing |

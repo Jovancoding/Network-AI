@@ -157,6 +157,14 @@ SSE/HTTP mode (for network clients):
  */
 async function runStdio(combined: McpCombinedBridge): Promise<void> {
   const { createInterface } = await import('readline');
+  const { StdioElicitationChannel } = await import('../lib/mcp-elicitation');
+
+  // Server→client request channel (MCP elicitation). Client responses to
+  // server-initiated requests are routed here instead of being dispatched
+  // (incorrectly) as client requests.
+  const elicitation = new StdioElicitationChannel((line: string) => {
+    process.stdout.write(line + '\n');
+  });
 
   const rl = createInterface({ input: process.stdin, terminal: false });
 
@@ -178,11 +186,17 @@ async function runStdio(combined: McpCombinedBridge): Promise<void> {
       return;
     }
 
+    // Response to a server-initiated request (elicitation)? Consume it.
+    if (elicitation.handleMessage(request)) return;
+
     const response = await combined.handleRPC(request);
     process.stdout.write(JSON.stringify(response) + '\n');
   });
 
-  rl.on('close', () => process.exit(0));
+  rl.on('close', () => {
+    elicitation.rejectAll('stdin closed');
+    process.exit(0);
+  });
 }
 
 // ============================================================================

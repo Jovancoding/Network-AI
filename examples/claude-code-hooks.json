@@ -1,0 +1,27 @@
+{
+  "$comment": "Claude Code hooks config — gate/audit every tool call through Network-AI's AuthGuardian. Merge the `hooks` block into ~/.claude/settings.json (or .claude/settings.json in a project). Modes: --mode observe (audit only, never blocks — default) or --mode enforce (weighted permission scoring; denied calls escalate to the human as 'ask'). Audit entries land in ./data/hooks_audit.jsonl.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y -p network-ai network-ai hook pre-tool-use --mode enforce --deny \"rm -rf\" --deny \"git push --force\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y -p network-ai network-ai hook post-tool-use"
+          }
+        ]
+      }
+    ]
+  }
+}

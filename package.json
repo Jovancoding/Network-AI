@@ -1,7 +1,7 @@
 {
   "name": "network-ai",
-  "version": "5.13.4",
-  "description": "AI agent orchestration framework for TypeScript/Node.js - 29 adapters (LangChain, AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS, Copilot, LangGraph, Anthropic Computer Use, OpenAI Agents SDK, Vertex AI, Pydantic AI, Browser Agent, Hermes, Orchestrator, RLM + streaming variants). Built-in CLI, security, swarm intelligence, real-time streaming, and agentic workflow patterns.",
+  "version": "5.14.0",
+  "description": "AI agent orchestration framework for TypeScript/Node.js - 32 adapters (LangChain, AutoGen, CrewAI, OpenAI Assistants, OpenAI Responses, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS, Copilot, LangGraph, Anthropic Computer Use, Claude Agent SDK, OpenAI Agents SDK, Vertex AI, Gemini, Pydantic AI, Browser Agent, Hermes, Orchestrator, RLM + streaming variants). Built-in CLI, security, swarm intelligence, real-time streaming, and agentic workflow patterns.",
   "homepage": "https://network-ai.org",
   "main": "dist/index.js",
   "module": "dist/esm/index.js",

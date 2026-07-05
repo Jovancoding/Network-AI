@@ -18,7 +18,7 @@ npm install
 npx ts-node setup.ts --check
 ```
 
-**Zero external AI dependencies.** All 29 adapters are self-contained — add framework SDKs only when you need them.
+**Zero external AI dependencies.** All 32 adapters are self-contained — add framework SDKs only when you need them.
 
 ---
 
@@ -49,6 +49,9 @@ npx ts-node setup.ts --check
 | `anthropic-computer-use` | Anthropic Computer Use | `@anthropic-ai/sdk` | Screenshot/click/type/scroll automation |
 | `openai-agents` | OpenAI Agents SDK | `openai` | Tool use, handoffs, guardrails |
 | `vertex-ai` | Vertex AI / Gemini | `@google-cloud/vertexai` | Function calling, multi-modal |
+| `gemini` | Gemini Developer API | none | Google AI Studio models, thinking budgets |
+| `openai-responses` | OpenAI Responses API | none | GPT-5.x / o-series via `/v1/responses` (Assistants successor) |
+| `claude-agent-sdk` | Claude Agent SDK | `@anthropic-ai/claude-agent-sdk` | Full agentic loops as swarm agents |
 | `pydantic-ai` | Pydantic AI | none | Structured output with validation |
 | `browser-agent` | Browser Automation | none | Playwright/Puppeteer/CDP browser control |
 | `hermes` | NousResearch Hermes / OpenAI-compatible | none | Ollama, Together AI, Fireworks, llama.cpp |
@@ -255,7 +258,7 @@ export class MyFrameworkAdapter extends BaseAdapter {
 ```bash
 npx ts-node test-standalone.ts    # 88 core tests
 npx ts-node test-security.ts      # 34 security tests
-npx ts-node test-adapters.ts      # 218 adapter tests (all 29 frameworks)
+npx ts-node test-adapters.ts      # 271 adapter tests (all 32 frameworks)
  npx ts-node test-cli.ts           # 65 CLI tests
 npx ts-node test-qa.ts             # 67 QA orchestrator tests
 ```
@@ -266,7 +269,7 @@ npx ts-node test-qa.ts             # 67 QA orchestrator tests
 
 ```bash
 npx ts-node setup.ts --check      # Verify installation
-npx ts-node setup.ts --list       # List all 29 adapters
+npx ts-node setup.ts --list       # List adapter quick-start snippets
 npx ts-node setup.ts --example    # Generate example.ts
 ```
 
@@ -495,11 +498,13 @@ Your App
             ├── HaystackAdapter     ─── Haystack pipelines
             ├── DSPyAdapter         ─── DSPy modules
             ├── AgnoAdapter         ─── Agno agents/teams
-            ├── AgnoAdapter         ─── Agno agents/teams
             ├── APSAdapter          ─── APS delegation-chain trust
             ├── CopilotAdapter      ─── GitHub Copilot
             ├── LangGraphAdapter    ─── LangGraph state graphs
             ├── VertexAIAdapter     ─── Vertex AI / Gemini
+            ├── GeminiAdapter       ─── Gemini Developer API
+            ├── OpenAIResponsesAdapter ── OpenAI Responses API
+            ├── ClaudeAgentSDKAdapter ─── Claude Agent SDK loops
             ├── PydanticAIAdapter   ─── Pydantic AI structured output
             ├── OpenAIAgentsAdapter ─── OpenAI Agents SDK
             ├── AnthropicComputerUseAdapter ─── Computer Use

@@ -5,10 +5,10 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.13.4-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.14.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-3388%20passing-brightgreen.svg)](#testing)
-[![Adapters](https://img.shields.io/badge/frameworks-29%20supported-blueviolet.svg)](#adapter-system)
+[![Tests](https://img.shields.io/badge/tests-3525%20passing-brightgreen.svg)](#testing)
+[![Adapters](https://img.shields.io/badge/frameworks-32%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -31,7 +31,7 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 
 - **Shared blackboard with locking** — atomic `propose → validate → commit` prevents race conditions and split-brain failures across parallel agents
 - **Guardrails and budgets** — FSM governance, per-agent token ceilings, HMAC / Ed25519 audit trails, and permission gating
-- **29 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS, Copilot, LangGraph, Anthropic Computer Use, OpenAI Agents SDK, Vertex AI, Pydantic AI, Browser Agent, Hermes (NousResearch Hermes / any OpenAI-compatible endpoint), Orchestrator (hierarchical multi-orchestrator), and RLM (Recursive Language Model / any RLM-compatible HTTP endpoint) — no glue code, no lock-in
+- **32 adapters** — LangChain (+ streaming), AutoGen, CrewAI, OpenAI Assistants, OpenAI Responses (Assistants successor), LlamaIndex, Semantic Kernel, Haystack, DSPy, Agno, MCP, Custom (+ streaming), OpenClaw, A2A, Codex, MiniMax, NemoClaw, APS, Copilot, LangGraph, Anthropic Computer Use, Claude Agent SDK (agentic loops), OpenAI Agents SDK, Vertex AI, Gemini (Developer API), Pydantic AI, Browser Agent, Hermes (NousResearch Hermes / any OpenAI-compatible endpoint), Orchestrator (hierarchical multi-orchestrator), and RLM (Recursive Language Model / any RLM-compatible HTTP endpoint) — no glue code, no lock-in
 - **Persistent project memory (Layer 3)** — `context_manager.py` injects decisions, goals, stack, milestones, and banned patterns into every system prompt so agents always have full project context
 - **v5.0 modules** — Agent VCR (record/replay), comparison runner, coverage reporter, goal DSL, approval inbox, job queue, gRPC/HTTP transport, playground REPL, adapter test harness, and more
 - **Model-interaction lifecycle governance (v5.13)** — `GovernedModelGateway` absorbs the model refusal → fallback → billing chain (cross-model fallback, fallback-credit repricing, effort governance, thinking-block handoff) behind one governed, budgeted, audited call
@@ -46,6 +46,8 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator that adds coordinati
 - A **TypeScript/Node.js library** — `import { createSwarmOrchestrator } from 'network-ai'`
 - An **MCP server** — `npx network-ai-server --port 3001`
 - A **CLI** — `network-ai bb get status` / `network-ai audit tail`
+- A **Claude Code plugin** — `/plugin install network-ai@network-ai`
+- A **Gemini CLI extension** — `gemini extensions install https://github.com/Jovancoding/Network-AI`
 - An **OpenClaw skill** — `clawhub install network-ai`
 
 [**5-minute quickstart →**](QUICKSTART.md) &nbsp;|&nbsp; [**Architecture →**](ARCHITECTURE.md) &nbsp;|&nbsp; [**All adapters →**](#adapter-system) &nbsp;|&nbsp; [**Benchmarks →**](BENCHMARKS.md)
@@ -143,7 +145,7 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | ✅ Token budgets | Hard per-agent ceilings with live spend tracking |
 | ✅ Permission gating | HMAC / Ed25519-signed tokens, scoped per agent and resource |
 | ✅ Append-only audit log | Every write, grant, and transition signed and logged |
-| ✅ 29 framework adapters | LangChain, CrewAI, AutoGen, MCP, Codex, APS, RLM, and 22 more — zero lock-in |
+| ✅ 32 framework adapters | LangChain, CrewAI, AutoGen, MCP, Codex, Gemini, APS, RLM, and 24 more — zero lock-in |
 | ✅ FSM governance | Hard-stop agents at state boundaries, timeout enforcement |
 | ✅ Compliance monitoring | Real-time violation detection (tool abuse, turn-taking, timeouts) |
 | ✅ Claim verification | Tier 1 agent honesty — outcome-bound signed receipts, manifest reconciliation, trust decay for liars |
@@ -193,7 +195,7 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | Race conditions in parallel agents | Atomic blackboard: `propose → validate → commit` with file-system mutex |
 | Agent overspend / runaway costs | `FederatedBudget` — hard per-agent token ceilings with live spend tracking |
 | No visibility into what agents did | HMAC / Ed25519-signed audit log on every write, permission grant, and FSM transition |
-| Locked into one AI framework | 29 adapters — mix LangChain + AutoGen + CrewAI + Codex + MiniMax + NemoClaw + APS + LangGraph + Vertex AI + Hermes + RLM + custom in one swarm |
+| Locked into one AI framework | 32 adapters — mix LangChain + AutoGen + CrewAI + Codex + Gemini + MiniMax + NemoClaw + APS + LangGraph + Vertex AI + Hermes + RLM + custom in one swarm |
 | Agents escalating beyond their scope | `AuthGuardian` — scoped permission tokens required before sensitive operations |
 | Agents lack project context between runs | `ProjectContextManager` (Layer 3) — inject decisions, goals, stack, and milestones into every system prompt |
 | No regression tracking on agent output quality | `QAOrchestratorAgent` — scenario replay, feedback loops, cross-agent contradiction detection, historical trend tracking |
@@ -330,8 +332,26 @@ The repo root carries the standard plugin layout:
 | [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) | Plugin manifest |
 | [`.mcp.json`](.mcp.json) | Registers the Network-AI MCP server (stdio) |
 | [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) | Self-hosted marketplace catalog |
+| [`commands/`](commands/status.md) | Slash commands — `/network-ai:status`, `/network-ai:budget`, `/network-ai:audit`, `/network-ai:blackboard` |
 
 Validate the manifests locally with `claude plugin validate .`.
+
+**Gate Claude Code itself with AuthGuardian (hooks).** Every tool call Claude Code makes — shell commands, file edits, web fetches — can be audited and permission-gated through the same weighted scoring (justification 40%, trust 30%, risk 30%) Network-AI applies to swarm agents:
+
+```jsonc
+// .claude/settings.json — see examples/claude-code-hooks.json for the full config
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash|Write|Edit|WebFetch",
+      "hooks": [{ "type": "command",
+                  "command": "npx -y -p network-ai network-ai hook pre-tool-use --mode enforce" }]
+    }]
+  }
+}
+```
+
+`--mode observe` (default) audits every call to `data/hooks_audit.jsonl` without blocking; `--mode enforce` maps tools to resource types (Bash → `SHELL_EXEC`, Write/Edit → `FILE_SYSTEM`, WebFetch → `EXTERNAL_SERVICE`) and requires an AuthGuardian grant — denied calls escalate to you as an interactive prompt. `--deny "rm -rf"` patterns hard-block regardless of mode.
 
 ---
 
@@ -356,6 +376,35 @@ args = ["-y", "-p", "network-ai", "network-ai-server", "--stdio"]
 ```
 
 Either route exposes the full tool set (`blackboard_read`, `budget_status`, `audit_query`, `token_create`, …) over stdio MCP — no API keys, no running server to manage.
+
+---
+
+## Use with Gemini CLI
+
+Network-AI ships as a [Gemini CLI](https://github.com/google-gemini/gemini-cli) extension — the repo root carries [`gemini-extension.json`](gemini-extension.json), which wires in the stdio MCP server and a [`GEMINI.md`](GEMINI.md) context file automatically:
+
+```bash
+gemini extensions install https://github.com/Jovancoding/Network-AI
+```
+
+Or register just the MCP server directly:
+
+```bash
+gemini mcp add network-ai npx -- -y -p network-ai network-ai-server --stdio
+```
+
+Run `/mcp` inside Gemini CLI to confirm the `network-ai` tools are loaded. For building Gemini-powered swarm agents, use the `GeminiAdapter` (Gemini Developer API / AI Studio) or `VertexAIAdapter` (Vertex AI on GCP) — and for Google's Agent2Agent ecosystem, `A2AServer` exposes this orchestrator as a discoverable A2A agent:
+
+```typescript
+import { A2AServer } from 'network-ai';
+
+const a2a = new A2AServer({
+  name: 'Network-AI Orchestrator',
+  secret: process.env.A2A_SECRET,
+  executor: async (text) => ({ text: await runSwarmTask(text) }),
+});
+a2a.startServer(4310); // serves /.well-known/agent.json + tasks/send
+```
 
 ---
 
@@ -467,7 +516,7 @@ npx ts-node examples/10-nemoclaw-sandbox-swarm.ts
 
 ## Adapter System
 
-29 adapters, zero adapter dependencies. You bring your own SDK objects.
+32 adapters, zero adapter dependencies. You bring your own SDK objects.
 
 | Adapter | Framework / Protocol | Register method |
 |---|---|---|
@@ -532,7 +581,7 @@ Extend `BaseAdapter` (or `StreamingBaseAdapter` for streaming) to add your own i
 npm run test:all          # All suites in sequence
 npm test                  # Core orchestrator
 npm run test:security     # Security module
-npm run test:adapters     # All 29 adapters
+npm run test:adapters     # All 32 adapters
 npm run test:streaming    # Streaming adapters
 npm run test:a2a          # A2A protocol adapter
 npm run test:codex        # Codex adapter
@@ -542,15 +591,15 @@ npm run test:phase9       # Agent runtime, console, strategy agent
 npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate, Route Classifier
 ```
 
-**3,388 passing assertions across 38 test suites** (`npm run test:all`):
+**3,525 passing assertions across 39 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
 | `test-phase4.ts` | 147 | FSM governance, compliance monitor, adapter integration |
 | `test-phase5f.ts` | 127 | SSE transport, `McpCombinedBridge`, extended MCP tools |
 | `test-phase5g.ts` | 121 | CRDT backend, vector clocks, bidirectional sync |
-| `test-phase6.ts` | 121 | MCP server, control-plane tools, audit tools |
-| `test-adapters.ts` | 218 | All 29 adapters, registry routing, integration, edge cases |
+| `test-phase6.ts` | 129 | MCP server, control-plane tools, audit tools |
+| `test-adapters.ts` | 271 | All 32 adapters, registry routing, integration, edge cases |
 | `test-phase5d.ts` | 117 | Pluggable backend (Redis, CRDT, Memory) |
 | `test-standalone.ts` | 88 | Blackboard, auth, integration, persistence, parallelisation, quality gate |
 | `test-phase5e.ts` | 87 | Federated budget tracking |
@@ -568,9 +617,9 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | `test-qa.ts` | 67 | QA orchestrator: scenarios, feedback loop, regression, contradictions |
 | `test-phase7.ts` | 94 | Deferred init, hook middleware, flow control, skill composer, semantic search |
 | `test-phase8.ts` | 146 | Phase pipeline, confidence filter, matcher-based hooks, fan-out/fan-in |
-| `test-phase9.ts` | 280 | Agent runtime, sandbox policy, shell executor, file accessor, approval gate, console UI, orchestrator wiring, pipe mode, strategy agent |
+| `test-phase9.ts` | 293 | Agent runtime, sandbox policy, shell executor, file accessor, approval gate, console UI, orchestrator wiring, pipe mode, strategy agent |
 | `test-phase10.ts` | 153 | Goal decomposer, task DAG validation, topological layers, JSON parsing, team runner, concurrency, timeouts, events, runTeam one-liner, dependency injection, LLM planner |
-| `test-phase11.ts` | 43 | TTL background sweep, WAL crash recovery, CircuitBreaker, `ITelemetryProvider` / OTel hooks |
+| `test-phase11.ts` | 55 | TTL background sweep, WAL crash recovery, CircuitBreaker, `ITelemetryProvider` / OTel hooks |
 | `test-topology.ts` | 304 | WorkTree, ControlPlane, dashboard server, topology visualization, WebSocket protocol |
 | `test-rlm-phases.ts` | 123 | FederatedBudget child spending, blackboard metadata API, best-partial result, HookContext depth, sub-goal recursion, semaphore fan-out, PhasePipeline compaction, RLMAdapter end-to-end |
 | `test-phase12.ts` | 65 | Context Throttler, Partition Planner, Coverage Gate, Route Classifier, EVALUATING FSM state, runTeam integration |
@@ -582,6 +631,7 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | `test-phase15.ts` | 32 | Orchestration resilience: `RetryBudget`, per-sub-agent fallback in `FanOutFanIn` + `TeamRunner`, `EffortPolicy` |
 | `test-phase16.ts` | 21 | `ThinkingBlockManager` lifecycle + reasoning-extraction guard, OWASP Agentic Top 10 coverage matrix |
 | `test-phase17.ts` | 13 | `ApprovalInbox` GHSA-m4jg-6w3q-gm86 fix: read-route auth gating, token validation, backward compatibility, CORS allowlist |
+| `test-phase18.ts` | 85 | `ClaudeHookBridge` observe/enforce gating, MCP elicitation channel + fail-closed approval callback, `A2AServer` agent card / tasks / auth / eviction |
 | `test.ts` | 39 | Core orchestrator smoke tests |
 
 ---
@@ -602,7 +652,7 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | [ADOPTERS.md](ADOPTERS.md) | Known adopters — open a PR to add yourself |
 | [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | End-to-end integration walkthrough with v5.13 modules |
 | [SKILL.md](SKILL.md) | OpenClaw/ClawHub Python skill — setup, orchestrator protocol, OWASP engine coverage, security scan findings |
-| [references/adapter-system.md](references/adapter-system.md) | Adapter architecture, all 29 adapters (incl. `AnthropicMessagesAdapter`), writing custom adapters |
+| [references/adapter-system.md](references/adapter-system.md) | Adapter architecture, all 32 adapters (incl. `AnthropicMessagesAdapter`), writing custom adapters |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission scoring, resource types, `scoreRequest()`, IAuthValidator interface |
 | [references/trust-levels.md](references/trust-levels.md) | Trust level configuration, APS delegation-chain mapping |
 

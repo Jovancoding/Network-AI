@@ -13,7 +13,7 @@ Network-AI has **one production runtime dependency**:
 |---------|---------|---------|---------------|---------------|
 | `commander` | ^14.0.3 | CLI argument parsing | None | None |
 
-That's it. The core library, all 29 adapters, the MCP server, and the blackboard are
+That's it. The core library, all 32 adapters, the MCP server, and the blackboard are
 implemented with Node.js built-ins only.
 
 **BYOC design principle**: Adapters are "Bring Your Own Client". They declare interfaces
@@ -83,7 +83,7 @@ All network I/O is performed by:
 
 ### Adapters: outbound calls only to operator-configured endpoints
 
-The 29 adapters (`adapters/`) may make outbound HTTP calls, but only to endpoints
+The 32 adapters (`adapters/`) may make outbound HTTP calls, but only to endpoints
 explicitly provided by the operator at runtime (BYOC — Bring Your Own Client). No
 adapter hard-codes a URL that is called automatically at import or on first use.
 

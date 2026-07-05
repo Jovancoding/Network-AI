@@ -17,6 +17,7 @@ import { LockedBlackboard } from '../lib/locked-blackboard';
 import { AuthGuardian } from '../index';
 import { FederatedBudget } from '../lib/federated-budget';
 import { EnvironmentManager } from '../lib/env-manager';
+import { ClaudeHookBridge } from '../lib/claude-hooks';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = (() => {
@@ -692,6 +693,78 @@ program.command('inspect <key>')
         console.log(`\naudit trail (${a.length} entries):`);
         a.forEach((e, i) => console.log(`  [${i + 1}] ${JSON.stringify(e)}`));
       }
+    }
+  });
+
+// ── hook (coding-agent hooks bridge) ──────────────────────────────────────────
+
+function readStdinFully(): Promise<string> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    let data = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk: string) => { data += chunk; });
+    process.stdin.on('end', () => resolvePromise(data));
+    process.stdin.on('error', rejectPromise);
+  });
+}
+
+const hookCmd = program.command('hook')
+  .description('Coding-agent hook bridge — audit/gate tool calls through AuthGuardian (Claude Code PreToolUse/PostToolUse)');
+
+hookCmd.command('pre-tool-use')
+  .description('Handle a PreToolUse hook event: reads hook JSON from stdin, writes a permission decision to stdout')
+  .option('--mode <mode>', "'observe' (audit only) or 'enforce' (AuthGuardian-gated)", process.env['NETWORK_AI_HOOKS_MODE'] ?? 'observe')
+  .option('--agent <id>', 'agent identity for permission requests', 'claude-code')
+  .option('--trust <level>', 'trust level for the agent identity (0-1)', (v: string) => parseFloat(v), 0.7)
+  .option('--deny <pattern...>', 'regex pattern(s) — matching tool calls are denied outright')
+  .option('--allow <pattern...>', 'regex pattern(s) — matching tool calls are allowed without gating')
+  .option('--blocked-decision <decision>', "decision when the guardian denies: 'ask' (escalate to human) or 'deny'", 'ask')
+  .action(async (opts: { mode: string; agent: string; trust: number; deny?: string[]; allow?: string[]; blockedDecision: string }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    if (opts.mode !== 'observe' && opts.mode !== 'enforce') die(`invalid --mode: ${opts.mode} (use observe|enforce)`);
+    if (opts.blockedDecision !== 'ask' && opts.blockedDecision !== 'deny') die(`invalid --blocked-decision: ${opts.blockedDecision} (use ask|deny)`);
+    const dataDir = resolveData(g);
+    const bridge = new ClaudeHookBridge({
+      mode: opts.mode,
+      agentId: opts.agent,
+      trustLevel: opts.trust,
+      denyPatterns: opts.deny,
+      allowPatterns: opts.allow,
+      blockedDecision: opts.blockedDecision,
+      auditLogPath: path.join(dataDir, 'hooks_audit.jsonl'),
+      guardianAuditLogPath: path.join(dataDir, 'audit_log.jsonl'),
+      trustConfigPath: path.join(dataDir, 'trust_levels.json'),
+    });
+    try {
+      const raw = await readStdinFully();
+      const input = ClaudeHookBridge.parseInput(raw);
+      const out = await bridge.handlePreToolUse(input);
+      process.stdout.write(JSON.stringify(out) + '\n');
+    } catch (err) {
+      process.stderr.write(`network-ai hook: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+  });
+
+hookCmd.command('post-tool-use')
+  .description('Handle a PostToolUse hook event: reads hook JSON from stdin, appends an audit entry')
+  .option('--agent <id>', 'agent identity recorded in the audit trail', 'claude-code')
+  .action(async (opts: { agent: string }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const dataDir = resolveData(g);
+    const bridge = new ClaudeHookBridge({
+      mode: 'observe',
+      agentId: opts.agent,
+      auditLogPath: path.join(dataDir, 'hooks_audit.jsonl'),
+    });
+    try {
+      const raw = await readStdinFully();
+      const input = ClaudeHookBridge.parseInput(raw);
+      const out = await bridge.handlePostToolUse(input);
+      process.stdout.write(JSON.stringify(out) + '\n');
+    } catch (err) {
+      process.stderr.write(`network-ai hook: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
     }
   });
 

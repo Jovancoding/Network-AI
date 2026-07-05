@@ -2,7 +2,7 @@
 
 ## Overview
 
-The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.13.0, 29 adapters are included.
+The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.14.0, 32 adapters are included.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -777,6 +777,79 @@ const result = await rlm.executeAgent(
 ```
 
 Capabilities: `streaming: false`, `parallel: true`.
+
+### GeminiAdapter (v5.14.0)
+
+Google Gemini Developer API (AI Studio / `generativelanguage.googleapis.com`) — the consumer Gemini path. For Gemini on Google Cloud, use `VertexAIAdapter`. BYOC `@google/genai`-compatible client, or built-in fetch with `GEMINI_API_KEY`.
+
+```typescript
+import { GeminiAdapter } from 'network-ai';
+
+const gemini = new GeminiAdapter();
+await gemini.initialize({});
+gemini.registerAgent('researcher', {
+  model: 'gemini-2.5-flash',
+  systemPrompt: 'You are a meticulous researcher.',
+  thinkingBudget: 2048,          // thinking-capable models
+  // apiKey: '...',              // or GEMINI_API_KEY env var
+  // client: { generateContent } // or BYOC @google/genai
+});
+
+const result = await gemini.executeAgent(
+  'researcher',
+  { action: 'research', params: { topic: 'quantum error correction' } },
+  { agentId: 'orchestrator', taskId: 't1' },
+);
+// result.data → { output, model }; usage in result.metadata.trace
+```
+
+### OpenAIResponsesAdapter (v5.14.0)
+
+OpenAI Responses API (`POST /v1/responses`) — the successor to the deprecated Assistants API. BYOC `openai` SDK client, or built-in fetch with `OPENAI_API_KEY`.
+
+```typescript
+import { OpenAIResponsesAdapter } from 'network-ai';
+
+const responses = new OpenAIResponsesAdapter();
+await responses.initialize({});
+responses.registerAgent('reasoner', {
+  model: 'o4-mini',
+  instructions: 'Think step by step.',
+  reasoningEffort: 'high',       // 'minimal' | 'low' | 'medium' | 'high'
+  // client: { create: (p) => openai.responses.create(p) },  // BYOC
+});
+
+const result = await responses.executeAgent(
+  'reasoner',
+  { action: 'analyze', params: { data: '...' } },
+  { agentId: 'orchestrator', taskId: 't1' },
+);
+```
+
+### ClaudeAgentSDKAdapter (v5.14.0)
+
+Runs full Claude Agent SDK agentic loops (tool use, file edits, shell) as swarm agents. Strictly BYOC — pass the SDK's `query` function; the adapter never imports the SDK.
+
+```typescript
+import { ClaudeAgentSDKAdapter } from 'network-ai';
+import { query } from '@anthropic-ai/claude-agent-sdk';
+
+const sdk = new ClaudeAgentSDKAdapter();
+await sdk.initialize({});
+sdk.registerAgent('coder', {
+  query,
+  options: { maxTurns: 10, allowedTools: ['Read', 'Grep', 'Edit'] },
+  systemPrompt: 'You are a careful refactoring agent.',
+  onMessage: (m) => console.log('turn:', m.type),   // stream progress
+});
+
+const result = await sdk.executeAgent(
+  'coder',
+  { action: 'refactor', params: { target: 'src/parser.ts' } },
+  { agentId: 'orchestrator', taskId: 't1' },
+);
+// result.data → { output, sessionId, numTurns, costUsd }
+```
 
 ### Streaming Variants (v5.0)
 

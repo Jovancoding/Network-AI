@@ -202,6 +202,34 @@ export type {
 export { RLMAdapter } from './rlm-adapter';
 export type { RLMAgentConfig, RLMHttpClient } from './rlm-adapter';
 
+// Gemini adapter (Google Gemini Developer API — BYOC or built-in fetch)
+export { GeminiAdapter } from './gemini-adapter';
+export type {
+  GeminiAgentConfig,
+  GeminiGenerateClient,
+  GeminiGenerateResponse,
+  GeminiContent,
+  GeminiContentPart,
+} from './gemini-adapter';
+
+// OpenAI Responses adapter (Responses API — successor to Assistants)
+export { OpenAIResponsesAdapter } from './openai-responses-adapter';
+export type {
+  OpenAIResponsesAgentConfig,
+  OpenAIResponsesClient,
+  ResponsesApiResult,
+  ResponsesOutputItem,
+  ResponsesReasoningEffort,
+} from './openai-responses-adapter';
+
+// Claude Agent SDK adapter (agentic loop via @anthropic-ai/claude-agent-sdk, BYOC)
+export { ClaudeAgentSDKAdapter } from './claude-agent-sdk-adapter';
+export type {
+  ClaudeAgentSDKConfig,
+  ClaudeAgentQueryFn,
+  ClaudeSDKMessage,
+} from './claude-agent-sdk-adapter';
+
 // Streaming types
 export type { StreamingChunk, IStreamingAdapter, StreamCollector } from '../types/streaming-adapter';
 
