@@ -3,6 +3,7 @@
 > Paste everything below the horizontal rule into a Claude Project's **Custom Instructions** field.
 > No tools or MCP server required for the instruction-following mode.
 > For full tool use (blackboard, permissions, parallel agents), also load `claude-tools.json`.
+> v5.13.4 — includes model-interaction lifecycle governance (refusal → fallback, effort policy, OWASP Agentic Top 10 coverage).
 
 ---
 

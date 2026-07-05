@@ -5,6 +5,22 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.13.4] - 2026-07-05
+
+### Security
+- **`ApprovalInbox` GET read routes remain unauthenticated and wildcard-CORS after the GHSA-mxjx-28vx-xjjj fix** ([GHSA-m4jg-6w3q-gm86](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-m4jg-6w3q-gm86), CWE-862, CWE-352, High) — the v5.12.2 `secret` / `checkAuth()` gate covered only the two mutating routes (`POST /approve`, `POST /deny`), leaving `GET /`, `GET /stats`, `GET /sse`, and `GET /:id` unauthenticated even when a `secret` was configured, disclosing queued high-risk action content (command strings, file paths, justifications). The handler also hardcoded `Access-Control-Allow-Origin: *`.
+  - **Fixed**: `checkAuth()` now gates the entire `routeRequest()` pipeline before route dispatch, covering every route uniformly.
+  - **Fixed**: removed the hardcoded wildcard CORS header; added a new `allowedOrigins?: string[]` option on `ApprovalInboxOptions` — no `Access-Control-Allow-Origin` header is sent unless the request's `Origin` exactly matches an allowlisted entry, and the matched origin is echoed back (never `*`).
+  - Reported by sec-reex via private security advisory.
+  - Regression coverage: `test-phase17.ts` (13 tests) — read-route auth gating, correct/incorrect token handling, backward compatibility (no secret configured), and CORS allowlist behavior.
+- **`APSAdapter` default local verifier accepts any non-empty signature** ([GHSA-3jf7-33vc-hgf4](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-3jf7-33vc-hgf4), CWE-347, High, CVSS 8.6) — with the default `verificationMode: 'local'` and no caller-supplied `verifySignature` callback (the documented canonical `new APSAdapter()` + `initialize({})` setup), `verifyDelegation()` treated **any non-empty string** as a valid cryptographic signature. A forged delegation with an arbitrary `signature` and `scope: ['shell:exec']` could be registered into `AuthGuardian` as trusted and used to obtain a signed `SHELL_EXEC` permission-grant token with no authentication at all.
+  - **Fixed**: `initialize()` now fails closed — it throws if `verificationMode` is `'local'` (the default) and no `verifySignature` callback is configured, forcing an explicit BYOC cryptographic verifier.
+  - **Fixed**: the fallback branch of `verifyDelegation()` now returns `false` instead of `delegation.signature.length > 0`, so an unverified delegation is rejected as defense in depth even if the constructor guard is bypassed.
+  - Regression coverage: `test-adapters.ts` — asserts `initialize({})` throws in default local mode, and that all existing BYOC/custom-verifier trust-mapping behavior is unaffected.
+
+### Fixed
+- **SkillSpector Intent-Code Divergence** — `scripts/blackboard.py` header comment claimed I/O was scoped to `swarm-blackboard.md` / `data/pending_changes/<id>.json` without mentioning that `NETWORK_AI_ENV` / `--env` redirect these under `data/<env>/`. Reworded to document the env-scoped path resolution accurately.
+
 ## [5.13.3] - 2026-06-26
 
 ### Fixed

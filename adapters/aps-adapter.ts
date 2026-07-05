@@ -15,7 +15,11 @@
  *   import { APSAdapter } from 'network-ai';
  *
  *   const aps = new APSAdapter();
- *   await aps.initialize({});
+ *   await aps.initialize({
+ *     // Required in local mode (the default) — supply a real cryptographic
+ *     // verifier. There is no fail-open default (GHSA-3jf7-33vc-hgf4).
+ *     verifySignature: async (delegation) => verifyEd25519(delegation),
+ *   });
  *
  *   // Register an APS-verified agent by providing its delegation chain
  *   const trust = aps.apsDelegationToTrust({
@@ -31,7 +35,7 @@
  *   guardian.registerAgentTrust(trust);
  *
  * Verification modes:
- *   - 'local'  — checks signature + depth + scope locally (default)
+ *   - 'local'  — requires a caller-supplied verifySignature callback (default)
  *   - 'mcp'    — calls an APS MCP server to verify the full chain
  *
  * @module APSAdapter
@@ -168,6 +172,16 @@ export class APSAdapter extends BaseAdapter {
     if (this.verificationMode === 'mcp' && !this.mcpServerUrl) {
       throw new Error('mcpServerUrl is required when verificationMode is "mcp"');
     }
+    if (this.verificationMode === 'local' && !this.verifySignatureFn) {
+      // Fail closed (GHSA-3jf7-33vc-hgf4): the default 'local' mode must never
+      // silently accept an unverified delegation. A caller MUST supply a real
+      // cryptographic verifySignature callback to use local mode.
+      throw new Error(
+        'APSAdapter: verifySignature is required when verificationMode is "local" ' +
+        '(the default). Provide a cryptographic verifySignature callback, or set ' +
+        'verificationMode: "mcp" with a trusted mcpServerUrl.',
+      );
+    }
   }
 
   /**
@@ -259,14 +273,16 @@ export class APSAdapter extends BaseAdapter {
       return this.verifyViaMCP(delegation);
     }
 
-    // Local verification — use BYOC verifier or default signature check
+    // Local verification — requires a BYOC cryptographic verifier. initialize()
+    // enforces that verifySignatureFn is set whenever verificationMode is
+    // 'local', but we fail closed here too as defense in depth
+    // (GHSA-3jf7-33vc-hgf4 — a bare non-empty signature string must never be
+    // treated as verified).
     if (this.verifySignatureFn) {
       return this.verifySignatureFn(delegation);
     }
 
-    // Default: non-empty signature + valid depth = trusted
-    // In production, replace with actual crypto verification
-    return delegation.signature.length > 0;
+    return false;
   }
 
   /**

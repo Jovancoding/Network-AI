@@ -1477,10 +1477,21 @@ async function testAPSAdapter(): Promise<void> {
 
   const { APSAdapter } = await import('./adapters/aps-adapter');
 
-  // 1. Initialize with defaults
+  // 1. Fail closed: default 'local' verificationMode with no verifySignature
+  //    callback must throw, never silently accept unverified delegations
+  //    (GHSA-3jf7-33vc-hgf4 — the old default treated any non-empty
+  //    signature string as verified).
+  let initThrew = false;
+  try {
+    const unconfigured = new APSAdapter();
+    await unconfigured.initialize({});
+  } catch { initThrew = true; }
+  assert(initThrew, 'APS: initialize({}) in default local mode throws without verifySignature (fail-closed, GHSA-3jf7-33vc-hgf4)');
+
+  // 2. Initialize with an explicit BYOC verifier (required for local mode)
   const aps = new APSAdapter();
-  await aps.initialize({});
-  assert(true, 'APS adapter initializes with defaults');
+  await aps.initialize({ verifySignature: async (d) => d.signature.length > 0 });
+  assert(true, 'APS adapter initializes with a BYOC verifySignature callback');
 
   // 2. Root delegation (depth 0) → full base trust
   const root = await aps.apsDelegationToTrust({
@@ -1534,7 +1545,7 @@ async function testAPSAdapter(): Promise<void> {
 
   // 6. Custom baseTrust and depthDecay
   const customAps = new APSAdapter();
-  await customAps.initialize({ baseTrust: 0.9, depthDecay: 0.6 });
+  await customAps.initialize({ baseTrust: 0.9, depthDecay: 0.6, verifySignature: async (d) => d.signature.length > 0 });
   const customResult = await customAps.apsDelegationToTrust({
     delegator: 'root',
     delegatee: 'custom-agent',

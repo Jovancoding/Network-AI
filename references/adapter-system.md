@@ -316,7 +316,11 @@ The `APSAdapter` maps APS (Agent Permission Service) delegation chains to AuthGu
 import { APSAdapter } from 'network-ai';
 
 const aps = new APSAdapter();
-await aps.initialize({});
+await aps.initialize({
+  // Required in local mode (the default) — supply a real cryptographic
+  // verifier. There is no fail-open default (GHSA-3jf7-33vc-hgf4).
+  verifySignature: async (delegation) => verifyEd25519(delegation),
+});
 
 const trust = await aps.apsDelegationToTrust({
   delegator:    'root-orchestrator',
@@ -341,7 +345,7 @@ Defaults: `baseTrust = 0.8`, `depthDecay = 0.4`. Configurable via `initialize({ 
 
 | Mode | Description |
 |------|-------------|
-| `local` (default) | Verifies signature is non-empty |
+| `local` (default) | Requires a caller-supplied `verifySignature` callback — fails closed (throws on `initialize()`) if none is provided (GHSA-3jf7-33vc-hgf4) |
 | `mcp` | Verifies via an external MCP server (`mcpServerUrl` required) |
 | BYOC | Pass a custom `verifySignature` function at initialize |
 

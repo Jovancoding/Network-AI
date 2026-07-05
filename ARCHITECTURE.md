@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.13.0 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,373 tests, 78+ modules.
+Network-AI v5.13.4 — TypeScript/Node.js multi-agent orchestrator with 29 adapters, 3,388 tests, 78+ modules.
 
 > **Two governance layers.** Policy engines govern *what an agent may do* before it acts (pre-wire tool gating). Network-AI adds the layer underneath — **model-interaction lifecycle governance**: when a frontier model returns a classifier refusal, the `GovernedModelGateway` audits it, falls over to another model, reprices the retry with fallback credit, hands off thinking blocks, and accounts the cost — one governed, budgeted, audited call. The two layers are complementary.
 

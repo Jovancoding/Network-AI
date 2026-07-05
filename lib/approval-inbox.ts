@@ -49,10 +49,12 @@ export interface ApprovalEntry {
 /** Options for the ApprovalInbox */
 export interface ApprovalInboxOptions {
   /**
-   * Bearer token required for POST /approve and POST /deny endpoints.
-   * Strongly recommended in production — without a secret, any process that
-   * can reach the HTTP server can approve agent actions (GHSA-mxjx-28vx-xjjj).
-   * Clients must send: `Authorization: Bearer <secret>`.
+   * Bearer token required for every route (GET list/stats/sse/:id and
+   * POST approve/deny) once configured. Strongly recommended in
+   * production — without a secret, any process that can reach the HTTP
+   * server can read queued action details (command strings, file paths,
+   * justifications) and approve/deny agent actions (GHSA-mxjx-28vx-xjjj,
+   * GHSA-m4jg-6w3q-gm86). Clients must send: `Authorization: Bearer <secret>`.
    */
   secret?: string;
   /** Default timeout for approval requests in ms (default: 300000 = 5 min) */
@@ -63,6 +65,16 @@ export interface ApprovalInboxOptions {
   maxHistory?: number;
   /** URL path prefix for HTTP handler (default: '/approvals') */
   pathPrefix?: string;
+  /**
+   * Allowed CORS origins for cross-origin browser requests. If omitted,
+   * no `Access-Control-Allow-Origin` header is sent at all — the safe
+   * default, since without it browsers enforce same-origin and no cross-
+   * site page can read responses. Pass an explicit list of exact origin
+   * strings (e.g. `['https://example.com']`) to opt in to cross-origin
+   * access from those origins only. The wildcard `*` is never emitted
+   * (GHSA-m4jg-6w3q-gm86).
+   */
+  allowedOrigins?: string[];
 }
 
 /** SSE event types */
@@ -114,6 +126,7 @@ export class ApprovalInbox extends EventEmitter {
   private readonly maxHistory: number;
   private readonly pathPrefix: string;
   private readonly secret: string | null;
+  private readonly allowedOrigins: string[] | null;
 
   // Counters for stats (history may be truncated)
   private approvedCount = 0;
@@ -127,6 +140,9 @@ export class ApprovalInbox extends EventEmitter {
     this.maxHistory = options.maxHistory ?? 1000;
     this.pathPrefix = (options.pathPrefix ?? '/approvals').replace(/\/$/, '');
     this.secret = options.secret ?? null;
+    this.allowedOrigins = options.allowedOrigins && options.allowedOrigins.length > 0
+      ? options.allowedOrigins
+      : null;
   }
 
   // --------------------------------------------------------------------------
@@ -261,10 +277,16 @@ export class ApprovalInbox extends EventEmitter {
       const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
       const path = url.pathname;
 
-      // CORS headers
-      res.setHeader('Access-Control-Allow-Origin', '*');
+      // CORS headers — only emitted when the request's Origin is on the
+      // configured allowlist. No allowlist configured => no CORS header at
+      // all (same-origin only). Never emits a wildcard (GHSA-m4jg-6w3q-gm86).
+      const corsOrigin = this.resolveCorsOrigin(req);
+      if (corsOrigin) {
+        res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+        res.setHeader('Vary', 'Origin');
+      }
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
       if (req.method === 'OPTIONS') {
         res.writeHead(204);
@@ -279,8 +301,21 @@ export class ApprovalInbox extends EventEmitter {
       }
       const subPath = path.slice(this.pathPrefix.length) || '/';
 
-      this.routeRequest(req, res, subPath, url);
+      this.routeRequest(req, res, subPath, url, corsOrigin);
     };
+  }
+
+  /**
+   * Resolves the Access-Control-Allow-Origin value for this request.
+   * Returns null (no header) unless `allowedOrigins` is configured and the
+   * request's Origin header exactly matches an entry — the matched origin
+   * is echoed back, never `*` (GHSA-m4jg-6w3q-gm86).
+   */
+  private resolveCorsOrigin(req: IncomingMessage): string | null {
+    if (!this.allowedOrigins) return null;
+    const origin = req.headers.origin;
+    if (typeof origin !== 'string') return null;
+    return this.allowedOrigins.includes(origin) ? origin : null;
   }
 
   /**
@@ -312,13 +347,14 @@ export class ApprovalInbox extends EventEmitter {
   }
 
   /** Register an SSE client */
-  private addSSEClient(res: ServerResponse): void {
-    res.writeHead(200, {
+  private addSSEClient(res: ServerResponse, corsOrigin: string | null): void {
+    const headers: Record<string, string> = {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-    });
+    };
+    if (corsOrigin) headers['Access-Control-Allow-Origin'] = corsOrigin;
+    res.writeHead(200, headers);
     res.write(`event: connected\ndata: ${JSON.stringify({ pending: this.pending.size })}\n\n`);
     this.sseClients.add(res);
 
@@ -375,7 +411,14 @@ export class ApprovalInbox extends EventEmitter {
     }
   }
 
-  private routeRequest(req: IncomingMessage, res: ServerResponse, subPath: string, url: URL): void {
+  private routeRequest(req: IncomingMessage, res: ServerResponse, subPath: string, url: URL, corsOrigin: string | null): void {
+    // Gate the entire pipeline behind the same auth check used for the
+    // mutating routes. When no `secret` is configured this is a no-op
+    // (backward compatible); when a secret IS configured it now also
+    // covers the read routes (GHSA-m4jg-6w3q-gm86 — incomplete fix for
+    // GHSA-mxjx-28vx-xjjj, which only gated /approve and /deny).
+    if (!this.checkAuth(req, res)) return;
+
     // GET / — list
     if (subPath === '/' && req.method === 'GET') {
       const status = (url.searchParams.get('status') ?? 'pending') as ApprovalStatus | 'all';
@@ -391,14 +434,13 @@ export class ApprovalInbox extends EventEmitter {
 
     // GET /sse
     if (subPath === '/sse' && req.method === 'GET') {
-      this.addSSEClient(res);
+      this.addSSEClient(res, corsOrigin);
       return;
     }
 
     // POST /:id/approve
     const approveMatch = subPath.match(/^\/([a-f0-9]+)\/approve$/);
     if (approveMatch && req.method === 'POST') {
-      if (!this.checkAuth(req, res)) return;
       this.readBody(req).then((body) => {
         const approvedBy = typeof body.approvedBy === 'string' ? body.approvedBy : 'anonymous';
         const reason = typeof body.reason === 'string' ? body.reason : undefined;
@@ -417,7 +459,6 @@ export class ApprovalInbox extends EventEmitter {
     // POST /:id/deny
     const denyMatch = subPath.match(/^\/([a-f0-9]+)\/deny$/);
     if (denyMatch && req.method === 'POST') {
-      if (!this.checkAuth(req, res)) return;
       this.readBody(req).then((body) => {
         const deniedBy = typeof body.deniedBy === 'string' ? body.deniedBy : undefined;
         const reason = typeof body.reason === 'string' ? body.reason : undefined;
@@ -449,7 +490,11 @@ export class ApprovalInbox extends EventEmitter {
   }
 
   /**
-   * Validates the Authorization: Bearer <secret> header on mutating requests.
+   * Validates the Authorization: Bearer <secret> header. Gates every route
+   * (GET list/stats/sse/:id and POST approve/deny) when a secret is
+   * configured — closing the read-route disclosure gap from
+   * GHSA-m4jg-6w3q-gm86, an incomplete fix for GHSA-mxjx-28vx-xjjj that
+   * only gated the two POST routes.
    * Returns true if the request is authorized (or no secret is configured).
    * Sends a 401/403 response and returns false if authorization fails.
    * Uses constant-time comparison to prevent timing attacks (GHSA-mxjx-28vx-xjjj).

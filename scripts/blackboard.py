@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 # SECURITY: This script makes NO network calls and spawns NO subprocesses.
 # All I/O is local file operations only:
-#   READS:  swarm-blackboard.md, data/pending_changes/<id>.json
-#   WRITES: swarm-blackboard.md, data/pending_changes/<id>.json
+#   READS:  <data_dir>/swarm-blackboard.md, <data_dir>/pending_changes/<id>.json,
+#           <data_dir>/.blackboard.lock
+#   WRITES: <data_dir>/swarm-blackboard.md, <data_dir>/pending_changes/<id>.json,
+#           <data_dir>/.blackboard.lock
+#   where <data_dir> is "data/" by default, or "data/<env>/" when NETWORK_AI_ENV
+#   is set or --env is passed (env in: dev|st|sit|qa|sandbox|preprod|prod). This
+#   only changes WHICH data/ subdirectory is used — no path outside the project
+#   root is ever read or written (see the --path check below).
 # --path controls the blackboard file path only and is validated against the project
 # root directory; paths outside the project directory are rejected (CWE-22).
-# Lock files and pending-change files always resolve from the global data/ directory
-# regardless of --path; only the main blackboard file path is affected by --path.
+# Lock files and pending-change files always resolve from the active env-scoped
+# data directory regardless of --path; only the main blackboard file path is
+# affected by --path.
 # Imports used: argparse, json, os, re, sys, time, hashlib, datetime, pathlib,
 #               typing, contextlib, fcntl (Unix file-lock only, no network use)
 # No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib

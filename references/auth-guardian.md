@@ -344,7 +344,13 @@ The `APSAdapter` bridges **APS (Agent Permission Service) delegation chains** in
 import { APSAdapter } from 'network-ai';
 
 const aps = new APSAdapter();
-await aps.initialize({ baseTrust: 0.8, depthDecay: 0.4 });
+await aps.initialize({
+  baseTrust: 0.8,
+  depthDecay: 0.4,
+  // Required in local mode (the default) — there is no fail-open default
+  // (GHSA-3jf7-33vc-hgf4). Supply a real cryptographic verifier.
+  verifySignature: async (delegation) => verifyEd25519(delegation),
+});
 
 const trust = await aps.apsDelegationToTrust({
   delegator: 'root', delegatee: 'agent-1',
