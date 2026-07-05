@@ -89,6 +89,18 @@ for (const rel of STAGE_FILES) {
 }
 
 // ── Build clawhub command ─────────────────────────────────────────────────────
+// NOTE: spawnSync(..., { shell: true }) does NOT auto-quote array elements —
+// any argument containing a space is split into multiple shell tokens by
+// cmd.exe, which the clawhub CLI then rejects as extra positional arguments.
+// quoteArg() wraps any element that needs it so it survives the shell hop.
+function quoteArg(arg) {
+  const str = String(arg);
+  if (str === '' || /[\s"()&|<>^]/.test(str)) {
+    return `"${str.replace(/"/g, '\\"')}"`;
+  }
+  return str;
+}
+
 const cmd = ['clawhub', 'skill', 'publish', stage,
   '--slug',    SKILL_SLUG,
   '--name',    SKILL_NAME,
@@ -111,7 +123,8 @@ console.log(`  Staged : ${STAGE_FILES.length} files → ${stage}`);
 console.log(`${'─'.repeat(50)}\n`);
 
 // ── Publish ───────────────────────────────────────────────────────────────────
-const result = spawnSync('npx', cmd, { cwd: ROOT, stdio: 'inherit', shell: true });
+const quotedCmd = process.platform === 'win32' ? cmd.map(quoteArg) : cmd;
+const result = spawnSync('npx', quotedCmd, { cwd: ROOT, stdio: 'inherit', shell: true });
 
 // ── Cleanup ───────────────────────────────────────────────────────────────────
 fs.rmSync(stage, { recursive: true });
