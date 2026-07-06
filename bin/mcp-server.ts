@@ -48,6 +48,7 @@ import {
 import type { McpJsonRpcRequest } from '../lib/mcp-bridge';
 import { ExtendedMcpTools } from '../lib/mcp-tools-extended';
 import { ControlMcpTools } from '../lib/mcp-tools-control';
+import { ContextMcpTools } from '../lib/mcp-tools-context';
 
 // ============================================================================
 // ARGUMENT PARSING
@@ -299,6 +300,14 @@ async function main(): Promise<void> {
   combined.register(blackboardAdapter);
   if (extendedTools) combined.register(extendedTools);
   if (controlTools) combined.register(controlTools);
+
+  // Context tools: token-budgeted context packs + ranked blackboard search
+  // (lexical ranking out of the box; embed a SemanticMemory for semantic mode)
+  const contextTools = new ContextMcpTools({
+    blackboard: blackboard as unknown as import('../lib/mcp-blackboard-tools').IBlackboard,
+  });
+  combined.register(contextTools);
+  console.log(`[network-ai-server] Context tools: context_pack, blackboard_search (lexical mode)`);
 
   const totalTools = combined.allDefinitions().length;
   console.log(`[network-ai-server] Total tools exposed: ${totalTools}`);

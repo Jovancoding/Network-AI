@@ -1,6 +1,6 @@
 {
   "name": "network-ai",
-  "version": "5.14.0",
+  "version": "5.15.0",
   "description": "Multi-agent coordination layer for Gemini CLI — atomic shared blackboard (propose/validate/commit), permission gating with HMAC/Ed25519-signed tokens, federated token-budget tracking, and append-only audit-log queries over MCP.",
   "contextFileName": "GEMINI.md",
   "mcpServers": {

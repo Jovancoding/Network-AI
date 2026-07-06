@@ -3,7 +3,7 @@
 > Paste everything below the horizontal rule into a Claude Project's **Custom Instructions** field.
 > No tools or MCP server required for the instruction-following mode.
 > For full tool use (blackboard, permissions, parallel agents), also load `claude-tools.json`.
-> v5.14.0 — adds Gemini / OpenAI Responses / Claude Agent SDK adapters, Claude Code hooks gating (AuthGuardian), MCP elicitation approvals, and A2A server mode; includes model-interaction lifecycle governance (refusal → fallback, effort policy, OWASP Agentic Top 10 coverage).
+> v5.15.0 — adds ContextComposer + `context_pack` / `blackboard_search` MCP tools (token-budgeted, relevance-ranked context — signal over noise); Gemini / OpenAI Responses / Claude Agent SDK adapters, Claude Code hooks gating (AuthGuardian), MCP elicitation approvals, and A2A server mode; includes model-interaction lifecycle governance (refusal → fallback, effort policy, OWASP Agentic Top 10 coverage).
 
 ---
 

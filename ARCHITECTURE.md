@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.14.0 — TypeScript/Node.js multi-agent orchestrator with 32 adapters, 3,525 tests, 80+ modules.
+Network-AI v5.15.0 — TypeScript/Node.js multi-agent orchestrator with 32 adapters, 3,603 tests, 80+ modules.
 
 > **Two governance layers.** Policy engines govern *what an agent may do* before it acts (pre-wire tool gating). Network-AI adds the layer underneath — **model-interaction lifecycle governance**: when a frontier model returns a classifier refusal, the `GovernedModelGateway` audits it, falls over to another model, reprices the retry with fallback credit, hands off thinking blocks, and accounts the cost — one governed, budgeted, audited call. The two layers are complementary.
 
@@ -417,7 +417,9 @@ Network-AI/
 │   ├── owasp-compliance.ts       # OWASP Agentic Top 10 (2026) matrix + verifyOwaspCoverage() (v5.13)
 │   ├── claude-hooks.ts           # ClaudeHookBridge: AuthGuardian-gated coding-agent tool calls (v5.14)
 │   ├── mcp-elicitation.ts        # StdioElicitationChannel + elicitation ApprovalCallback (v5.14)
-│   └── a2a-server.ts             # A2AServer: agent card + tasks/send — A2A server mode (v5.14)
+│   ├── a2a-server.ts             # A2AServer: agent card + tasks/send — A2A server mode (v5.14)
+│   ├── context-composer.ts       # ContextComposer: token-budgeted, relevance-ranked context packs (v5.15)
+│   └── mcp-tools-context.ts      # context_pack + blackboard_search MCP tools (v5.15)
 ├── scripts/                      # Python helper scripts (local orchestration only)
 │   ├── blackboard.py             # Shared state management with atomic commits
 │   ├── swarm_guard.py            # Handoff tax prevention, budget tracking

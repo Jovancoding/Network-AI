@@ -4,14 +4,14 @@ This file is read automatically by Claude Code when working in this repository.
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.14.0.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.15.0.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 3,525 tests across 39 suites
+npm run test:all              # Run all 3,603 tests across 40 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 32 adapter tests
@@ -44,6 +44,8 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/claude-hooks.ts` — ClaudeHookBridge: AuthGuardian-gated coding-agent tool calls (Claude Code PreToolUse/PostToolUse hooks), observe/enforce modes, `network-ai hook` CLI
 - `lib/mcp-elicitation.ts` — StdioElicitationChannel + createElicitationApprovalCallback: native in-client approval prompts over MCP elicitation (fail closed)
 - `lib/a2a-server.ts` — A2AServer: expose the orchestrator as a Google A2A agent (agent card + tasks/send, Bearer-gated)
+- `lib/context-composer.ts` — ContextComposer: token-budgeted, relevance-ranked context assembly (semantic/lexical × recency half-life × scope affinity, position-aware layout); estimateTokens()
+- `lib/mcp-tools-context.ts` — ContextMcpTools: `context_pack` + `blackboard_search` MCP tools (signal-over-noise retrieval)
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, Gemini, OpenAI Responses, Claude Agent SDK, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)
@@ -70,7 +72,7 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 
 ## MCP Server
 
-Network-AI exposes 22 tools over MCP (stdio and SSE transports):
+Network-AI exposes 24 tools over MCP (stdio and SSE transports):
 
 ```bash
 # Stdio (for Claude Code / Cursor / Glama):

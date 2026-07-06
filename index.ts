@@ -1131,6 +1131,10 @@ export { createElicitationApprovalCallback, StdioElicitationChannel } from './li
 export type { ElicitationCreateParams, ElicitationResult, ElicitationRequestSender, ElicitationRequestedSchema, ElicitationSchemaProperty, ElicitationApprovalOptions } from './lib/mcp-elicitation';
 export { A2AServer } from './lib/a2a-server';
 export type { A2AServerOptions, A2AServerTask, A2AServerTaskState, A2ATaskExecutor } from './lib/a2a-server';
+export { ContextComposer, estimateTokens, createSemanticMemoryRanker } from './lib/context-composer';
+export type { ContextSource, RankedContextItem, ComposedContext, ComposeOptions, ContextComposerOptions, ScoreWeights, SemanticRanker, SemanticSearchLike, ExclusionReason, ExcludedItem } from './lib/context-composer';
+export { ContextMcpTools, CONTEXT_TOOL_DEFINITIONS } from './lib/mcp-tools-context';
+export type { ContextMcpToolsOptions } from './lib/mcp-tools-context';
 export { createAdapterTestSuite } from './lib/adapter-test-harness';
 export type { AdapterTestSuiteConfig, AdapterTestResult, AssertFn, SectionFn } from './lib/adapter-test-harness';
 export { SwarmTransportServer, SwarmTransportClient } from './lib/swarm-transport';

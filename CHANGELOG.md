@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.15.0] - 2026-07-06
+
+### Added
+- **`ContextComposer`** (`lib/context-composer.ts`) — token-budgeted, relevance-ranked context assembly for the "context rot" problem (large windows, smaller effective reasoning windows): scores every candidate entry by relevance (pluggable BYOE `SemanticRanker` with deterministic lexical fallback) × recency (exponential half-life decay) × scope affinity (ContextThrottler tag semantics), enforces a hard token budget, supports pinned always-include sources, drops TTL-expired entries as stale, and assembles position-aware (strongest items first *and* last — "lost in the middle" mitigation). Full observability: included/excluded (with reasons), per-item scores and token estimates, budget utilization. Includes `estimateTokens()` (zero-dependency heuristic) and `createSemanticMemoryRanker()` to adapt a `SemanticMemory` instance.
+- **`ContextMcpTools`** (`lib/mcp-tools-context.ts`) — two new MCP tools registered by default in `network-ai-server` (24 tools total):
+  - **`context_pack`** — "give me everything relevant to task X in ≤ N tokens": returns a curated, ranked, budget-enforced context brief from the agent's scoped blackboard snapshot — use instead of `blackboard_list` + many `blackboard_read` calls.
+  - **`blackboard_search`** — ranked top-K search over blackboard entries; semantic when a `SemanticMemory` is wired, lexical-overlap otherwise (mode reported in the response).
+- **Test suite: `test-phase19.ts`** (78 assertions) — token estimation, ranking/budget/pinning/staleness/serpentine layout, semantic-ranker integration + failure fallback, `fromSnapshot` conversion, both MCP tools incl. scoped snapshots, semantic mode, and argument validation. Full suite: **3,603 tests across 40 suites**.
+
+### Changed
+- `bin/mcp-server.ts` registers `ContextMcpTools` by default (lexical mode; wire a `SemanticMemory` for semantic ranking).
+
 ## [5.14.0] - 2026-07-05
 
 ### Added

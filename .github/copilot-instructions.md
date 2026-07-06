@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.14.0). 3,525 tests across 39 suites.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.15.0). 3,603 tests across 40 suites.
 
 ## Architecture
 
@@ -44,13 +44,15 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, gu
 - `lib/claude-hooks.ts` — ClaudeHookBridge: AuthGuardian-gated coding-agent tool calls (Claude Code PreToolUse/PostToolUse), observe/enforce modes, `network-ai hook` CLI
 - `lib/mcp-elicitation.ts` — StdioElicitationChannel + createElicitationApprovalCallback: native in-client approval prompts over MCP elicitation (fail closed)
 - `lib/a2a-server.ts` — A2AServer: expose the orchestrator as a Google A2A agent (agent card + tasks/send, Bearer-gated)
+- `lib/context-composer.ts` — ContextComposer: token-budgeted, relevance-ranked context assembly; estimateTokens()
+- `lib/mcp-tools-context.ts` — ContextMcpTools: `context_pack` + `blackboard_search` MCP tools
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, Gemini, OpenAI Responses, Claude Agent SDK, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 
 ## Build & Test
 
 ```bash
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # All 3,525 tests across 39 suites
+npm run test:all              # All 3,603 tests across 40 suites
 npm test                      # Core orchestrator tests
 npm run test:adapters         # All 32 adapters
 ```
