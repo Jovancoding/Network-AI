@@ -41,3 +41,12 @@ updates:
       - "github-actions"
     commit-message:
       prefix: "ci"
+    groups:
+      # github/codeql-action ships init/autobuild/analyze/upload-sarif as
+      # separate action paths within one repo/release. They MUST stay on the
+      # same version — the CodeQL CLI hard-fails if init's config-file
+      # version doesn't match the version autobuild/analyze run with. Group
+      # them so Dependabot always proposes (and merges) them atomically.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
