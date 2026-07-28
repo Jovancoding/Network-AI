@@ -159,6 +159,8 @@ operators must address them at the infrastructure layer:
 | `propose → validate → commit` | `lib/locked-blackboard.ts` | Adversary 3.2 |
 | AuthGuardian weighted scoring | `lib/auth-guardian.ts` | Adversary 3.2 |
 | Shell-free command execution (`shell: false` + metacharacter rejection) | `lib/agent-runtime.ts` | Adversary 3.2 |
+| Canonicalized command matching (blocklist/allowlist/approval/risk match the tokenized, quote-stripped form the executor runs — GHSA-9v4f-j8cv-fhxw) | `lib/agent-runtime.ts` | Adversary 3.2 |
+| Full-target deny/allow pattern matching (no truncation before the security decision — GHSA-743h-jr5x-mpcr) | `lib/claude-hooks.ts` | Adversary 3.2 |
 | Justification hardening | `lib/auth-guardian.ts` | Adversary 3.2, 3.3 |
 | BlackboardValidator schema | `lib/blackboard-validator.ts` | Adversary 3.3 |
 | InputSanitizer | `security.ts` | Adversary 3.3 |

@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.15.1] - 2026-07-28
+
+### Security
+- **`ClaudeHookBridge` deny-pattern gate bypass via truncation before the security decision** ([GHSA-743h-jr5x-mpcr](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-743h-jr5x-mpcr), CWE-436, CWE-863, High) — `extractTarget()` truncated the string evaluated for `denyPatterns`/`allowPatterns` to 500 characters, while Claude Code always executes the complete, untruncated tool input. Dangerous content positioned past byte 500 (trivially achievable via leading padding) was invisible to the operator's hard-deny list yet still ran; in the default `observe` mode, `denyPatterns` is the sole hard block, so this was a complete bypass.
+  - **Fixed**: deny/allow pattern matching now runs against the full, untruncated target (`extractFullTarget()`). A new `maxTargetLength` option (default 65,536 chars) denies oversized targets outright instead of matching against them, closing the bypass and bounding regex evaluation cost. Truncation (`truncateForDisplay()`) is applied only afterward, for audit-log/reason-text display.
+  - Regression coverage: `test-phase20.ts` — reproduces the published PoC verbatim, plus oversized-target fail-closed behavior and audit-display truncation.
+- **`SandboxPolicy` blocklist/approval-gate bypass via quote/whitespace mismatch** ([GHSA-9v4f-j8cv-fhxw](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-9v4f-j8cv-fhxw), CWE-436, CWE-863, High) — `isCommandAllowed`'s blocklist/allowlist glob, `requiresApproval`, and `assessRisk` matched the raw, quote-and-whitespace-preserving command string, while the executor tokenizes the command (`tokenizeCommand`/`parseCommandLine`, stripping quotes and collapsing whitespace) before `spawn(..., { shell: false })`. A compromised/constrained agent could quote a destructive command (`rm -rf '/'`) to defeat the blocklist's flagship recursive-delete entry, or quote a gated command (`git "push" origin main`) to skip the human approval gate — both executing identically to their unquoted form. Same validator/executor mismatch class as CVE-2026-54051 / GHSA-qw6v-5fcf-5666, on a distinct code path that fix did not cover.
+  - **Fixed**: `isCommandAllowed`, `requiresApproval`, and `assessRisk` now all match against a canonicalized form (`parseCommandLine` → `argv.join(' ')`) — the exact representation the executor runs — via a new shared `canonicalize()` helper. `requiresApproval`/`assessRisk` fail closed (require approval / assess `'high'` risk) when a command cannot be safely canonicalized.
+  - Regression coverage: `test-phase20.ts` — reproduces both published PoCs (blocklist bypass, approval-gate bypass) verbatim, plus a whitespace-variant case and normal-command non-regression checks.
+- Full suite: **3,638 tests across 41 suites**; `tsc --noEmit` clean.
+
 ## [5.15.0] - 2026-07-06
 
 ### Added

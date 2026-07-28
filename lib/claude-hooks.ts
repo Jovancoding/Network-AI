@@ -112,6 +112,17 @@ export interface ClaudeHookBridgeOptions {
   guardianAuditLogPath?: string;
   /** Trust config path for the auto-created guardian */
   trustConfigPath?: string;
+  /**
+   * Maximum length (in characters) of the extracted target string that will
+   * be evaluated for deny/allow pattern matching. Targets longer than this
+   * are DENIED outright (fail closed) instead of matched. This closes the
+   * truncation-vs-execution mismatch where a security decision made against
+   * a shortened preview could differ from the full command Claude Code
+   * actually executes (GHSA-743h-jr5x-mpcr), and bounds regex evaluation
+   * cost against unbounded attacker-supplied strings. Default: 65536 (64 KiB)
+   * — far beyond any realistic single command/path/URL/prompt field.
+   */
+  maxTargetLength?: number;
   /** Callback invoked with every audit entry */
   onAudit?: (entry: HookAuditEntry) => void;
 }
@@ -157,19 +168,35 @@ const JUSTIFICATION_TEMPLATES: Record<string, (tool: string, target: string) => 
 // HELPERS
 // ============================================================================
 
-/** Extract the most meaningful target string from a tool input */
-function extractTarget(toolName: string, toolInput: Record<string, unknown> | undefined): string {
+/**
+ * Extract the most meaningful target string from a tool input, IN FULL —
+ * used for security-critical deny/allow pattern matching. This MUST NOT be
+ * truncated: Claude Code always executes the complete, untruncated tool
+ * input, so any truncation here would let dangerous content beyond the cut
+ * point evade `denyPatterns` while still running (GHSA-743h-jr5x-mpcr).
+ */
+function extractFullTarget(toolName: string, toolInput: Record<string, unknown> | undefined): string {
   if (!toolInput) return toolName;
   const candidates = ['command', 'file_path', 'filePath', 'path', 'url', 'query', 'pattern', 'prompt'];
   for (const key of candidates) {
     const v = toolInput[key];
-    if (typeof v === 'string' && v.length > 0) return v.slice(0, 500);
+    if (typeof v === 'string' && v.length > 0) return v;
   }
   try {
-    return JSON.stringify(toolInput).slice(0, 300);
+    return JSON.stringify(toolInput);
   } catch {
     return toolName;
   }
+}
+
+/**
+ * Shorten a target string for audit-log / decision-reason DISPLAY only.
+ * Never use this output for security matching — see {@link extractFullTarget}.
+ */
+function truncateForDisplay(target: string, maxLen = 500): string {
+  return target.length > maxLen
+    ? `${target.slice(0, maxLen)}…[+${target.length - maxLen} more chars]`
+    : target;
 }
 
 /** Test a tool name / target against a pattern list */
@@ -200,6 +227,7 @@ export class ClaudeHookBridge {
   private readonly blockedDecision: 'deny' | 'ask';
   private readonly auditLogPath: string | null;
   private readonly onAudit: ((entry: HookAuditEntry) => void) | null;
+  private readonly maxTargetLength: number;
 
   constructor(options: ClaudeHookBridgeOptions = {}) {
     this.agentId = options.agentId ?? 'claude-code';
@@ -210,6 +238,7 @@ export class ClaudeHookBridge {
     this.blockedDecision = options.blockedDecision ?? 'ask';
     this.auditLogPath = options.auditLogPath ? path.resolve(options.auditLogPath) : null;
     this.onAudit = options.onAudit ?? null;
+    this.maxTargetLength = options.maxTargetLength ?? 65_536;
 
     if (options.guardian) {
       this.guardian = options.guardian;
@@ -261,23 +290,35 @@ export class ClaudeHookBridge {
    */
   async handlePreToolUse(input: ClaudeHookInput): Promise<PreToolUseHookOutput> {
     const toolName = input.tool_name ?? 'unknown';
-    const target = extractTarget(toolName, input.tool_input);
+    const fullTarget = extractFullTarget(toolName, input.tool_input);
+    const displayTarget = truncateForDisplay(fullTarget);
 
-    // 1. Hard deny list
-    if (matchesAny(this.denyPatterns, toolName, target)) {
-      return this.decide(input, toolName, target, 'deny',
+    // 0. Fail closed on oversized targets (GHSA-743h-jr5x-mpcr): evaluating
+    // patterns against an unbounded string both reopens truncation-flavored
+    // bypasses and risks pathological regex cost, so deny outright instead
+    // of attempting to match.
+    if (fullTarget.length > this.maxTargetLength) {
+      const blocked = this.mode === 'enforce' ? this.blockedDecision : 'deny';
+      return this.decide(input, toolName, displayTarget, blocked,
+        `Target exceeds maxTargetLength (${fullTarget.length} > ${this.maxTargetLength} chars) — denied for safe evaluation`);
+    }
+
+    // 1. Hard deny list — matched against the FULL, untruncated target so
+    // dangerous content cannot hide past a display-only truncation point.
+    if (matchesAny(this.denyPatterns, toolName, fullTarget)) {
+      return this.decide(input, toolName, displayTarget, 'deny',
         `Blocked by Network-AI deny pattern (tool: ${toolName})`);
     }
 
     // 2. Explicit allow list
-    if (matchesAny(this.allowPatterns, toolName, target)) {
-      return this.decide(input, toolName, target, 'allow',
+    if (matchesAny(this.allowPatterns, toolName, fullTarget)) {
+      return this.decide(input, toolName, displayTarget, 'allow',
         `Allowed by Network-AI allow pattern (tool: ${toolName})`);
     }
 
     // 3. Observe mode: audit, never block
     if (this.mode === 'observe' || !this.guardian) {
-      return this.decide(input, toolName, target, 'allow',
+      return this.decide(input, toolName, displayTarget, 'allow',
         'Network-AI observe mode — call audited, not gated');
     }
 
@@ -285,17 +326,17 @@ export class ClaudeHookBridge {
     const resourceType = this.toolResourceMap[toolName]
       ?? (toolName.startsWith('mcp__') ? 'EXTERNAL_SERVICE' : 'EXTERNAL_SERVICE');
     const template = JUSTIFICATION_TEMPLATES[resourceType] ?? JUSTIFICATION_TEMPLATES['EXTERNAL_SERVICE'];
-    const justification = template(toolName, target);
+    const justification = template(toolName, displayTarget);
 
     const grant = await this.guardian.requestPermission(
       this.agentId, resourceType, justification, toolName
     );
 
     if (grant.granted) {
-      return this.decide(input, toolName, target, 'allow',
+      return this.decide(input, toolName, displayTarget, 'allow',
         `AuthGuardian granted ${resourceType} (restrictions: ${grant.restrictions.join(', ') || 'none'})`);
     }
-    return this.decide(input, toolName, target, this.blockedDecision,
+    return this.decide(input, toolName, displayTarget, this.blockedDecision,
       `AuthGuardian denied ${resourceType}: ${grant.reason ?? 'permission not granted'}`);
   }
 
@@ -305,7 +346,7 @@ export class ClaudeHookBridge {
    */
   async handlePostToolUse(input: ClaudeHookInput): Promise<Record<string, never>> {
     const toolName = input.tool_name ?? 'unknown';
-    const target = extractTarget(toolName, input.tool_input);
+    const target = truncateForDisplay(extractFullTarget(toolName, input.tool_input));
     this.audit({
       timestamp: new Date().toISOString(),
       event: 'PostToolUse',

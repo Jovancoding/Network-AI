@@ -341,19 +341,21 @@ export class SandboxPolicy {
     // Commands run with `shell: false`, but a scoped allowlist entry such as
     // `git *` must never be escapable into arbitrary execution via `;`, `|`,
     // `&&`, `$(...)`, backticks, redirection, or newlines (GHSA-qw6v-5fcf-5666).
-    const parsed = parseCommandLine(trimmed);
-    if (parsed.hasUnquotedMetacharacter || parsed.unterminatedQuote || parsed.argv.length === 0) {
-      return false;
-    }
+    const canonical = this.canonicalize(trimmed);
+    if (canonical === null) return false;
 
-    // Check blocked first (always wins)
-    if (this.matchesAny(trimmed, this.config.blockedCommands)) return false;
+    // Blocklist/allowlist matching operates on the CANONICAL (post-tokenize)
+    // form — quotes stripped, whitespace collapsed — which is exactly what
+    // the executor runs. Matching the raw string here let quoting or extra
+    // whitespace evade both the blocklist and the allowlist while the
+    // tokenized executor ran the identical unquoted command (GHSA-9v4f-j8cv-fhxw).
+    if (this.matchesAny(canonical, this.config.blockedCommands)) return false;
 
     // If no allowedCommands, deny all
     if (this.config.allowedCommands.length === 0) return false;
 
     // Check allowed
-    return this.matchesAny(trimmed, this.config.allowedCommands);
+    return this.matchesAny(canonical, this.config.allowedCommands);
   }
 
   /**
@@ -374,14 +376,45 @@ export class SandboxPolicy {
     return parsed.argv;
   }
 
+  /**
+   * Canonicalize a command into the exact representation the executor will
+   * run: quotes stripped, whitespace collapsed to single spaces, using the
+   * same tokenizer {@link tokenizeCommand} uses. Returns `null` when the
+   * command contains unquoted shell metacharacters, unterminated quoting, or
+   * no tokens at all.
+   *
+   * All security-relevant matching (blocklist, allowlist, approval
+   * requirement, risk assessment) MUST operate on this canonical form, never
+   * on the raw string — quotes and irregular whitespace are literal
+   * characters to the glob matcher but semantically invisible to the
+   * tokenizing executor, letting a crafted command evade blocklist/approval
+   * matching while running identically to its unquoted equivalent
+   * (GHSA-9v4f-j8cv-fhxw).
+   */
+  private canonicalize(command: string): string | null {
+    const parsed = parseCommandLine(command.trim());
+    if (parsed.hasUnquotedMetacharacter || parsed.unterminatedQuote || parsed.argv.length === 0) {
+      return null;
+    }
+    return parsed.argv.join(' ');
+  }
+
   /** Check if a command requires human approval */
   requiresApproval(command: string): boolean {
-    return this.matchesAny(command.trim(), this.config.approvalRequired);
+    const canonical = this.canonicalize(command);
+    // Fail closed: a command that cannot be safely canonicalized will be
+    // rejected by isCommandAllowed/tokenizeCommand regardless, but this
+    // method must never silently answer "no approval needed" for input it
+    // could not parse.
+    if (canonical === null) return true;
+    return this.matchesAny(canonical, this.config.approvalRequired);
   }
 
   /** Assess risk level of a command */
   assessRisk(command: string): 'low' | 'medium' | 'high' {
-    const trimmed = command.trim().toLowerCase();
+    const canonical = this.canonicalize(command);
+    if (canonical === null) return 'high'; // fail closed on unparseable input
+    const trimmed = canonical.toLowerCase();
     const highRisk = ['rm ', 'del ', 'format', 'drop ', 'delete ', 'truncate ', 'git push', 'git reset', 'docker', 'kubectl'];
     const medRisk = ['git ', 'npm ', 'pip ', 'mv ', 'move ', 'cp ', 'copy ', 'chmod ', 'chown '];
 
