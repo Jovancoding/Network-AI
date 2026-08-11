@@ -1,5 +1,7 @@
 # Network-AI
 
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2FJovancoding%2Fnetwork-ai.svg)](https://mcptoplist.com/server/glama%2FJovancoding%2Fnetwork-ai)
+
 **TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination**
 
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
