@@ -28,6 +28,20 @@ export interface DashboardServerOptions {
   host?: string;
   /** Whether to open the browser automatically (default: true) */
   open?: boolean;
+  /**
+   * Accepted `Host` header values (e.g. `'dashboard.internal:4820'`), in
+   * addition to loopback names on the server's port. On a loopback bind the
+   * loopback names are always enforced, blocking DNS-rebinding reads; on a
+   * non-loopback bind the Host header is only enforced when this is set
+   * (GHSA-hr6v-mfxm-4438).
+   */
+  allowedHosts?: string[];
+  /**
+   * Extra exact `Origin` values allowed to open the WebSocket. The dashboard's
+   * own origin is always allowed; any other browser origin is rejected so a
+   * third-party page cannot hijack the stream (GHSA-hr6v-mfxm-4438).
+   */
+  allowedOrigins?: string[];
 }
 
 /** Connected WebSocket client */
@@ -136,8 +150,10 @@ function getDashboardHTML(wsPort: number): string {
  */
 export class DashboardServer extends EventEmitter {
   private readonly tracker: TopologyTracker;
-  private readonly port: number;
+  private port: number;
   private readonly host: string;
+  private readonly allowedHosts: string[];
+  private readonly allowedOrigins: string[];
   private server: ReturnType<typeof createServer> | null = null;
   private clients: Map<string, WSClient> = new Map();
   private pingInterval: ReturnType<typeof setInterval> | null = null;
@@ -150,6 +166,8 @@ export class DashboardServer extends EventEmitter {
     this.tracker = tracker;
     this.port = options?.port ?? 4820;
     this.host = options?.host ?? '127.0.0.1';
+    this.allowedHosts = (options?.allowedHosts ?? []).map(h => h.toLowerCase());
+    this.allowedOrigins = options?.allowedOrigins ?? [];
   }
 
   /**
@@ -170,6 +188,8 @@ export class DashboardServer extends EventEmitter {
 
       server.listen(this.port, this.host, () => {
         this.server = server;
+        const address = server.address();
+        if (address && typeof address === 'object') this.port = address.port;
 
         // Subscribe to topology events and broadcast deltas
         this.eventHandler = (_event: TopologyEvent) => {
@@ -233,11 +253,53 @@ export class DashboardServer extends EventEmitter {
   }
 
   // --------------------------------------------------------------------------
+  // REQUEST VALIDATION (GHSA-hr6v-mfxm-4438)
+  // --------------------------------------------------------------------------
+
+  private isLoopbackBind(): boolean {
+    return this.host === 'localhost' || this.host === '::1' || this.host.startsWith('127.');
+  }
+
+  /**
+   * Reject requests whose Host header is not this server. A DNS-rebound
+   * attacker page is same-origin with its own hostname, so only the Host
+   * header reveals that the request was not meant for the dashboard.
+   */
+  private isAllowedHost(req: IncomingMessage): boolean {
+    const host = req.headers.host?.toLowerCase();
+    if (!host) return false;
+    if (this.allowedHosts.includes(host)) return true;
+    // A wildcard/external bind has no knowable public name; operators must set allowedHosts to enforce.
+    if (!this.isLoopbackBind() && this.allowedHosts.length === 0) return true;
+    const suffix = this.port === 80 ? ['', ':80'] : [`:${this.port}`];
+    return ['127.0.0.1', 'localhost', '[::1]']
+      .some(name => suffix.some(s => host === name + s));
+  }
+
+  /**
+   * Browsers always send Origin on a WebSocket handshake and do not apply
+   * same-origin policy to it, so only the dashboard's own origin (or an
+   * explicit allowlist entry) may connect. Non-browser clients omit Origin.
+   */
+  private isAllowedOrigin(req: IncomingMessage): boolean {
+    const origin = req.headers.origin;
+    if (origin === undefined) return true;
+    if (this.allowedOrigins.includes(origin)) return true;
+    return origin.toLowerCase() === `http://${req.headers.host?.toLowerCase()}`;
+  }
+
+  // --------------------------------------------------------------------------
   // HTTP HANDLER
   // --------------------------------------------------------------------------
 
   private handleHTTP(req: IncomingMessage, res: ServerResponse): void {
     const url = req.url ?? '/';
+
+    if (!this.isAllowedHost(req)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Forbidden: unrecognized Host header');
+      return;
+    }
 
     if (url === '/' || url === '/index.html') {
       res.writeHead(200, {
@@ -286,6 +348,11 @@ export class DashboardServer extends EventEmitter {
     const key = req.headers['sec-websocket-key'];
     if (!key) {
       socket.destroy();
+      return;
+    }
+
+    if (!this.isAllowedHost(req) || !this.isAllowedOrigin(req)) {
+      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       return;
     }
 

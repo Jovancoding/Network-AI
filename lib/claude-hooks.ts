@@ -37,6 +37,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AuthGuardian } from './auth-guardian';
+import { ValidationError } from './errors';
 
 // ============================================================================
 // TYPES
@@ -98,9 +99,15 @@ export interface ClaudeHookBridgeOptions {
   mode?: 'observe' | 'enforce';
   /** Trust level for the auto-created guardian identity (default: 0.7) */
   trustLevel?: number;
-  /** Tool names / targets matching any of these are denied outright (checked first) */
+  /**
+   * Tool names / targets matching any of these are denied outright (checked first).
+   * Invalid, oversized (>512 chars), or nested-quantifier patterns throw at construction.
+   */
   denyPatterns?: Array<string | RegExp>;
-  /** Tool names / targets matching any of these are allowed without gating */
+  /**
+   * Tool names / targets matching any of these are allowed without gating.
+   * Matched against the tool name and primary target only, never other fields.
+   */
   allowPatterns?: Array<string | RegExp>;
   /** Override the tool → resource-type mapping (merged over the defaults) */
   toolResourceMap?: Record<string, string>;
@@ -123,6 +130,13 @@ export interface ClaudeHookBridgeOptions {
    * — far beyond any realistic single command/path/URL/prompt field.
    */
   maxTargetLength?: number;
+  /**
+   * Maximum total characters across all string values in `tool_input` that
+   * deny patterns will inspect. Inputs beyond this (or nested deeper than 32
+   * levels) are denied outright when any deny pattern is configured, since
+   * they cannot be fully checked (GHSA-9p2w-prp8-5722). Default: 1,048,576.
+   */
+  maxInputLength?: number;
   /** Callback invoked with every audit entry */
   onAudit?: (entry: HookAuditEntry) => void;
 }
@@ -190,6 +204,29 @@ function extractFullTarget(toolName: string, toolInput: Record<string, unknown> 
 }
 
 /**
+ * Collect every string value in a tool input, recursively. Deny patterns are
+ * matched against all of them so a payload in a non-primary field (Write
+ * `content`, Edit `new_string`, an MCP tool's `script`) cannot hide behind a
+ * benign primary field (GHSA-9p2w-prp8-5722). Returns false when nesting
+ * exceeds MAX_INPUT_DEPTH, meaning the input could not be fully inspected.
+ */
+function collectInputStrings(value: unknown, out: string[], depth = 0): boolean {
+  if (typeof value === 'string') {
+    out.push(value);
+    return true;
+  }
+  if (value === null || typeof value !== 'object') return true;
+  if (depth >= MAX_INPUT_DEPTH) return false;
+  const children = Array.isArray(value) ? value : Object.values(value as Record<string, unknown>);
+  for (const child of children) {
+    if (!collectInputStrings(child, out, depth + 1)) return false;
+  }
+  return true;
+}
+
+const MAX_INPUT_DEPTH = 32;
+
+/**
  * Shorten a target string for audit-log / decision-reason DISPLAY only.
  * Never use this output for security matching — see {@link extractFullTarget}.
  */
@@ -199,12 +236,85 @@ function truncateForDisplay(target: string, maxLen = 500): string {
     : target;
 }
 
-/** Test a tool name / target against a pattern list */
-function matchesAny(patterns: Array<string | RegExp> | undefined, toolName: string, target: string): boolean {
-  if (!patterns || patterns.length === 0) return false;
-  for (const p of patterns) {
-    const re = typeof p === 'string' ? new RegExp(p, 'i') : p;
-    if (re.test(toolName) || re.test(target)) return true;
+/** Maximum length of a single deny/allow regex pattern source. */
+const MAX_PATTERN_LENGTH = 512;
+
+/**
+ * Reject pattern shapes prone to catastrophic backtracking (ReDoS): a
+ * quantified group that itself contains a quantifier, e.g. `(a+)+`, `(\w*)*`,
+ * `(a|b+){2,}`. Escaped characters and character classes are skipped.
+ */
+function hasNestedQuantifier(source: string): boolean {
+  const groupHasQuantifier: boolean[] = [];
+  let inClass = false;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '\\') { i++; continue; }
+    if (inClass) { if (ch === ']') inClass = false; continue; }
+    if (ch === '[') { inClass = true; continue; }
+    if (ch === '(') { groupHasQuantifier.push(false); continue; }
+    if (ch === ')') {
+      const inner = groupHasQuantifier.pop() ?? false;
+      const next = source[i + 1];
+      const quantified = next === '*' || next === '+' || next === '{' || next === '?';
+      if (inner && quantified && next !== '?') return true;
+      if (inner || quantified) {
+        if (groupHasQuantifier.length > 0) groupHasQuantifier[groupHasQuantifier.length - 1] = true;
+      }
+      continue;
+    }
+    if ((ch === '*' || ch === '+' || ch === '{') && groupHasQuantifier.length > 0) {
+      groupHasQuantifier[groupHasQuantifier.length - 1] = true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Validate an operator-supplied regex source. Deny/allow patterns are
+ * intentionally regexes, so they are validated rather than escaped: throws
+ * on oversized or backtracking-prone sources, otherwise returns it unchanged.
+ */
+function sanitizeRegExp(source: string, label: string): string {
+  if (source.length === 0 || source.length > MAX_PATTERN_LENGTH) {
+    throw new ValidationError(`${label} must be 1-${MAX_PATTERN_LENGTH} characters`);
+  }
+  if (hasNestedQuantifier(source)) {
+    throw new ValidationError(`${label} contains a nested quantifier prone to catastrophic backtracking: ${source}`);
+  }
+  return source;
+}
+
+/**
+ * Compile and validate deny/allow patterns once, up front. A bad pattern
+ * throws so it fails closed instead of silently disabling the deny list or
+ * hanging the hook until it times out (which Claude Code treats as allow).
+ */
+function compilePatterns(patterns: Array<string | RegExp> | undefined, name: string): RegExp[] {
+  if (!patterns) return [];
+  return patterns.map((p, idx) => {
+    const label = `${name}[${idx}]`;
+    if (typeof p !== 'string' && !(p instanceof RegExp)) {
+      throw new ValidationError(`${label} must be a string or RegExp`);
+    }
+    const source = sanitizeRegExp(typeof p === 'string' ? p : p.source, label);
+    // Drop stateful g/y flags: RegExp.test() with them carries lastIndex
+    // across calls, which can make a deny pattern intermittently miss.
+    const flags = typeof p === 'string' ? 'i' : p.flags.replace(/[gy]/g, '');
+    try {
+      return new RegExp(source, flags);
+    } catch (err) {
+      throw new ValidationError(`${label} is not a valid regular expression: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+}
+
+/** Test whether any compiled pattern matches any of the given strings */
+function matchesAny(patterns: RegExp[], values: string[]): boolean {
+  for (const re of patterns) {
+    for (const v of values) {
+      if (re.test(v)) return true;
+    }
   }
   return false;
 }
@@ -221,24 +331,26 @@ export class ClaudeHookBridge {
   private readonly guardian: AuthGuardian | null;
   private readonly agentId: string;
   private readonly mode: 'observe' | 'enforce';
-  private readonly denyPatterns: Array<string | RegExp>;
-  private readonly allowPatterns: Array<string | RegExp>;
+  private readonly denyPatterns: RegExp[];
+  private readonly allowPatterns: RegExp[];
   private readonly toolResourceMap: Record<string, string>;
   private readonly blockedDecision: 'deny' | 'ask';
   private readonly auditLogPath: string | null;
   private readonly onAudit: ((entry: HookAuditEntry) => void) | null;
   private readonly maxTargetLength: number;
+  private readonly maxInputLength: number;
 
   constructor(options: ClaudeHookBridgeOptions = {}) {
     this.agentId = options.agentId ?? 'claude-code';
     this.mode = options.mode ?? 'observe';
-    this.denyPatterns = options.denyPatterns ?? [];
-    this.allowPatterns = options.allowPatterns ?? [];
+    this.denyPatterns = compilePatterns(options.denyPatterns, 'denyPatterns');
+    this.allowPatterns = compilePatterns(options.allowPatterns, 'allowPatterns');
     this.toolResourceMap = { ...DEFAULT_TOOL_RESOURCE_MAP, ...(options.toolResourceMap ?? {}) };
     this.blockedDecision = options.blockedDecision ?? 'ask';
     this.auditLogPath = options.auditLogPath ? path.resolve(options.auditLogPath) : null;
     this.onAudit = options.onAudit ?? null;
     this.maxTargetLength = options.maxTargetLength ?? 65_536;
+    this.maxInputLength = options.maxInputLength ?? 1_048_576;
 
     if (options.guardian) {
       this.guardian = options.guardian;
@@ -303,15 +415,28 @@ export class ClaudeHookBridge {
         `Target exceeds maxTargetLength (${fullTarget.length} > ${this.maxTargetLength} chars) — denied for safe evaluation`);
     }
 
-    // 1. Hard deny list — matched against the FULL, untruncated target so
-    // dangerous content cannot hide past a display-only truncation point.
-    if (matchesAny(this.denyPatterns, toolName, fullTarget)) {
-      return this.decide(input, toolName, displayTarget, 'deny',
-        `Blocked by Network-AI deny pattern (tool: ${toolName})`);
+    // 1. Hard deny list — matched against the tool name, the FULL primary
+    // target, and every string value in the tool input, so dangerous content
+    // can hide neither past a truncation point (GHSA-743h-jr5x-mpcr) nor in a
+    // non-primary field (GHSA-9p2w-prp8-5722).
+    if (this.denyPatterns.length > 0) {
+      const fields: string[] = [];
+      const complete = collectInputStrings(input.tool_input, fields);
+      const totalLength = fields.reduce((n, s) => n + s.length, 0);
+      if (!complete || totalLength > this.maxInputLength) {
+        const blocked = this.mode === 'enforce' ? this.blockedDecision : 'deny';
+        return this.decide(input, toolName, displayTarget, blocked,
+          `Tool input too large or deeply nested to check against deny patterns (${totalLength} chars) — denied for safe evaluation`);
+      }
+      if (matchesAny(this.denyPatterns, [toolName, fullTarget, ...fields])) {
+        return this.decide(input, toolName, displayTarget, 'deny',
+          `Blocked by Network-AI deny pattern (tool: ${toolName})`);
+      }
     }
 
-    // 2. Explicit allow list
-    if (matchesAny(this.allowPatterns, toolName, fullTarget)) {
+    // 2. Explicit allow list — tool name and primary target only; matching
+    // any field would let an attacker add a benign field to earn an allow.
+    if (matchesAny(this.allowPatterns, [toolName, fullTarget])) {
       return this.decide(input, toolName, displayTarget, 'allow',
         `Allowed by Network-AI allow pattern (tool: ${toolName})`);
     }

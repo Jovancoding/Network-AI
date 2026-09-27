@@ -89,16 +89,21 @@ for (const rel of STAGE_FILES) {
 }
 
 // ── Build clawhub command ─────────────────────────────────────────────────────
-// NOTE: spawnSync(..., { shell: true }) does NOT auto-quote array elements —
-// any argument containing a space is split into multiple shell tokens by
-// cmd.exe, which the clawhub CLI then rejects as extra positional arguments.
-// quoteArg() wraps any element that needs it so it survives the shell hop.
+// On Windows, `npx` is a .cmd shim, so spawnSync needs shell: true, and cmd.exe
+// does NOT auto-quote array elements. cmd.exe has no escape for `"` inside a
+// quoted string and expands %VAR% even inside quotes, so those characters
+// cannot be made safe by escaping — they are rejected instead. Inside the
+// quotes, cmd.exe treats & | < > ^ ( ) literally; backslashes are escaped
+// per the MSVC argv rules only where they precede the closing quote.
 function quoteArg(arg) {
   const str = String(arg);
-  if (str === '' || /[\s"()&|<>^]/.test(str)) {
-    return `"${str.replace(/"/g, '\\"')}"`;
+  if (/["%\r\n\0]/.test(str)) {
+    console.error(`${c.red}✖ argument contains a character that cannot be safely passed through cmd.exe (" % or newline): ${JSON.stringify(str)}${c.reset}`);
+    process.exit(1);
   }
-  return str;
+  if (str !== '' && !/[\s()&|<>^]/.test(str)) return str;
+  const trailing = str.match(/\\*$/)[0];
+  return `"${str.slice(0, str.length - trailing.length)}${trailing}${trailing}"`;
 }
 
 const cmd = ['clawhub', 'skill', 'publish', stage,
@@ -123,8 +128,11 @@ console.log(`  Staged : ${STAGE_FILES.length} files → ${stage}`);
 console.log(`${'─'.repeat(50)}\n`);
 
 // ── Publish ───────────────────────────────────────────────────────────────────
-const quotedCmd = process.platform === 'win32' ? cmd.map(quoteArg) : cmd;
-const result = spawnSync('npx', quotedCmd, { cwd: ROOT, stdio: 'inherit', shell: true });
+// Elsewhere, skip the shell entirely so arguments are passed verbatim.
+const isWin = process.platform === 'win32';
+const result = isWin
+  ? spawnSync('npx', cmd.map(quoteArg), { cwd: ROOT, stdio: 'inherit', shell: true })
+  : spawnSync('npx', cmd, { cwd: ROOT, stdio: 'inherit' });
 
 // ── Cleanup ───────────────────────────────────────────────────────────────────
 fs.rmSync(stage, { recursive: true });

@@ -291,8 +291,7 @@ export class McpSseServer {
     }
     this._server = requireHttp().createServer((req, res) => this._handleRequest(req, res));
     // Warn when binding to a non-loopback address — defence-in-depth notice
-    const isLoopback = this._opts.host === '127.0.0.1' || this._opts.host === 'localhost' || this._opts.host === '::1';
-    if (!isLoopback) {
+    if (!this._isLoopbackBind()) {
       process.stderr.write(
         '[network-ai] WARNING: MCP server is binding to ' + this._opts.host +
         ' (non-loopback). Ensure your network perimeter restricts access to' +
@@ -321,6 +320,11 @@ export class McpSseServer {
   /** Number of currently connected SSE clients. */
   get clientCount(): number { return this._sseClients.size; }
 
+
+  private _isLoopbackBind(): boolean {
+    const host = this._opts.host;
+    return host === 'localhost' || host === '::1' || host.startsWith('127.');
+  }
   /**
    * Broadcast an event to every connected SSE client.
    * Useful for pushing agent status updates, budget alerts, etc.
@@ -371,10 +375,11 @@ export class McpSseServer {
 
     const path = parsed.pathname;
 
-    // CORS — restrict to localhost origins only (prevents cross-origin browser attacks)
+    // CORS — reflect localhost origins only on a loopback bind; on any other
+    // bind a localhost Origin no longer implies same-host (GHSA-4pvg-m42h-c3x2).
     const origin = req.headers['origin'] ?? '';
     const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-    if (isLocalOrigin) {
+    if (isLocalOrigin && this._isLoopbackBind()) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
     }

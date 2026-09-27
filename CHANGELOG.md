@@ -5,6 +5,23 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.15.2] - 2026-09-27
+
+### Security
+- **`ClaudeHookBridge` deny gate inspected only the first candidate field** ([GHSA-9p2w-prp8-5722](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-9p2w-prp8-5722), High) — `extractFullTarget()` returned the first present field (`command`, `file_path`, …), so a payload in any other field (`Write.content`, `Edit.new_string`, an MCP tool's `script`) was never checked by `denyPatterns`. Incomplete fix of GHSA-743h-jr5x-mpcr.
+  - **Fixed**: deny patterns now match the tool name, the primary target, and every string value in `tool_input` (recursively). Inputs nested deeper than 32 levels or larger than the new `maxInputLength` option (default 1 MiB) are denied outright when deny patterns are configured. Allow patterns still match only the tool name and primary target, so an extra field cannot earn an allow.
+- **`DashboardServer` cross-site WebSocket hijacking and DNS rebinding** ([GHSA-hr6v-mfxm-4438](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-hr6v-mfxm-4438), Moderate) — the WebSocket handshake and `/api/*` routes had no Origin or Host validation, so any website could read the live agent topology from a locally running dashboard.
+  - **Fixed**: every request must carry a loopback `Host` header on the server's port when bound to loopback (blocks DNS rebinding); the WebSocket handshake additionally rejects any browser `Origin` other than the dashboard's own. New `allowedHosts` / `allowedOrigins` options opt in extra values for proxied or non-loopback deployments.
+- **MCP SSE transport reflected localhost CORS Origin on non-loopback binds** ([GHSA-4pvg-m42h-c3x2](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-4pvg-m42h-c3x2), Low) — `McpSseServer` now reflects a localhost `Origin` only when itself bound to a loopback address.
+- **`ClaudeHookBridge` deny/allow regex patterns now validated and fail closed** (CodeQL `js/regex-injection`, #180) — patterns were compiled per call with no validation. A backtracking-prone pattern (e.g. `(a+)+`) could hang the PreToolUse hook until Claude Code's timeout, and an invalid one made the hook exit 1 — both of which Claude Code treats as *allow*, silently disabling the deny list. Patterns are now compiled once at construction; invalid, empty, oversized (>512 chars), or nested-quantifier patterns throw `ValidationError`, and stateful `g`/`y` flags are stripped so `RegExp.test()` cannot intermittently miss. `network-ai hook pre-tool-use` now exits **2** (the only blocking exit code) on any error. Patterns remain regexes — they are validated, not escaped, so existing deny rules keep working.
+- **`scripts/clawhub-publish.js` argument quoting** (CodeQL `js/incomplete-sanitization`, #179) — Windows quoting escaped `"` as `\"`, which cmd.exe does not honour, so a `--changelog` value containing `"` could break out of quoting and run shell commands. Arguments containing `"`, `%`, or newlines are now rejected, and trailing backslashes are handled correctly. On non-Windows platforms the script no longer uses a shell at all.
+
+### CI
+- **OpenSSF Scorecard** — bumped `ossf/scorecard-action` v2.4.0 → v2.4.4 (SHA-pinned). v2.4.0 pulled its image from `gcr.io`, which now rejects the request; v2.4.4 uses `ghcr.io`.
+
+### Tests
+- Full suite: **3,673 tests across 41 suites**; `tsc --noEmit` clean. `test-phase20.ts` reproduces every published PoC above.
+
 ## [5.15.1] - 2026-07-28
 
 ### Security

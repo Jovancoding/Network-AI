@@ -716,33 +716,38 @@ hookCmd.command('pre-tool-use')
   .option('--mode <mode>', "'observe' (audit only) or 'enforce' (AuthGuardian-gated)", process.env['NETWORK_AI_HOOKS_MODE'] ?? 'observe')
   .option('--agent <id>', 'agent identity for permission requests', 'claude-code')
   .option('--trust <level>', 'trust level for the agent identity (0-1)', (v: string) => parseFloat(v), 0.7)
-  .option('--deny <pattern...>', 'regex pattern(s) — matching tool calls are denied outright')
+  .option('--deny <pattern...>', 'regex pattern(s) — matching tool calls are denied outright (invalid or backtracking-prone patterns block every call)')
   .option('--allow <pattern...>', 'regex pattern(s) — matching tool calls are allowed without gating')
   .option('--blocked-decision <decision>', "decision when the guardian denies: 'ask' (escalate to human) or 'deny'", 'ask')
   .action(async (opts: { mode: string; agent: string; trust: number; deny?: string[]; allow?: string[]; blockedDecision: string }, cmd: Command) => {
     const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
-    if (opts.mode !== 'observe' && opts.mode !== 'enforce') die(`invalid --mode: ${opts.mode} (use observe|enforce)`);
-    if (opts.blockedDecision !== 'ask' && opts.blockedDecision !== 'deny') die(`invalid --blocked-decision: ${opts.blockedDecision} (use ask|deny)`);
-    const dataDir = resolveData(g);
-    const bridge = new ClaudeHookBridge({
-      mode: opts.mode,
-      agentId: opts.agent,
-      trustLevel: opts.trust,
-      denyPatterns: opts.deny,
-      allowPatterns: opts.allow,
-      blockedDecision: opts.blockedDecision,
-      auditLogPath: path.join(dataDir, 'hooks_audit.jsonl'),
-      guardianAuditLogPath: path.join(dataDir, 'audit_log.jsonl'),
-      trustConfigPath: path.join(dataDir, 'trust_levels.json'),
-    });
+    // Claude Code only blocks a PreToolUse call on exit code 2; any other
+    // failure lets the tool run, so every error here must fail closed.
+    function failClosed(msg: string): never {
+      process.stderr.write(`network-ai hook: ${msg}\n`);
+      process.exit(2);
+    }
+    if (opts.mode !== 'observe' && opts.mode !== 'enforce') failClosed(`invalid --mode: ${opts.mode} (use observe|enforce)`);
+    if (opts.blockedDecision !== 'ask' && opts.blockedDecision !== 'deny') failClosed(`invalid --blocked-decision: ${opts.blockedDecision} (use ask|deny)`);
     try {
+      const dataDir = resolveData(g);
+      const bridge = new ClaudeHookBridge({
+        mode: opts.mode,
+        agentId: opts.agent,
+        trustLevel: opts.trust,
+        denyPatterns: opts.deny,
+        allowPatterns: opts.allow,
+        blockedDecision: opts.blockedDecision,
+        auditLogPath: path.join(dataDir, 'hooks_audit.jsonl'),
+        guardianAuditLogPath: path.join(dataDir, 'audit_log.jsonl'),
+        trustConfigPath: path.join(dataDir, 'trust_levels.json'),
+      });
       const raw = await readStdinFully();
       const input = ClaudeHookBridge.parseInput(raw);
       const out = await bridge.handlePreToolUse(input);
       process.stdout.write(JSON.stringify(out) + '\n');
     } catch (err) {
-      process.stderr.write(`network-ai hook: ${err instanceof Error ? err.message : String(err)}\n`);
-      process.exit(1);
+      failClosed(err instanceof Error ? err.message : String(err));
     }
   });
 

@@ -77,6 +77,12 @@ tsconfig.esm.json
 .codex/
 assets/
 boards/
+# Agent-CLI integration files (Gemini CLI extension, MCP registry, Claude Code commands)
+AGENTS.md
+GEMINI.md
+gemini-extension.json
+server.json
+commands/
 
 # ── Secrets & logs (NEVER bundle) ──
 .env
