@@ -24,7 +24,7 @@
  *   npx ts-node examples/07-full-showcase.ts
  */
 
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import OpenAI from 'openai';
@@ -40,6 +40,8 @@ import {
 } from '..';
 import { FederatedBudget } from '../lib/federated-budget';
 import { SecureTokenManager } from '../security';
+
+loadEnv();
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 const c = {

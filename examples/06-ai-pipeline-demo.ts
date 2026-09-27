@@ -21,7 +21,7 @@
  *   npx ts-node examples/06-ai-pipeline-demo.ts
  */
 
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import OpenAI from 'openai';
@@ -31,6 +31,8 @@ import {
   type SynthesisStrategy,
 } from '..';
 import { FederatedBudget } from '../lib/federated-budget';
+
+loadEnv();
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 const c = {
