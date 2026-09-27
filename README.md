@@ -5,9 +5,9 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.15.2-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.15.3-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-3673%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-3679%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-32%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -309,7 +309,7 @@ curl http://localhost:3001/tools    # full tool list
 - `agent_list` / `agent_spawn` / `agent_stop` — agent lifecycle
 - `fsm_transition` — write FSM state transitions to the blackboard
 
-Each tool takes an `agent_id` parameter — all writes are identity-verified and namespace-scoped, exactly as they are in the TypeScript API.
+Each tool takes an `agent_id` parameter, recorded as the source agent of every write. The MCP server's trust boundary is transport authentication (the bearer secret over SSE/HTTP, or local stdio): once a client is admitted, the server writes on its behalf with a server-held random identity, so any `agent_id` works and no shared token needs to be known. Caller-supplied `agent_token` values are ignored over MCP. In-process TypeScript code keeps per-agent tokens and namespaces via `registerAgent()`.
 
 Options: `--no-budget`, `--no-token`, `--no-control`, `--ceiling <n>`, `--board <name>`, `--audit-log <path>`.
 
@@ -594,7 +594,7 @@ npm run test:phase9       # Agent runtime, console, strategy agent
 npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate, Route Classifier
 ```
 
-**3,673 passing assertions across 41 test suites** (`npm run test:all`):
+**3,679 passing assertions across 41 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -636,7 +636,7 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | `test-phase17.ts` | 13 | `ApprovalInbox` GHSA-m4jg-6w3q-gm86 fix: read-route auth gating, token validation, backward compatibility, CORS allowlist |
 | `test-phase18.ts` | 85 | `ClaudeHookBridge` observe/enforce gating, MCP elicitation channel + fail-closed approval callback, `A2AServer` agent card / tasks / auth / eviction |
 | `test-phase19.ts` | 78 | `ContextComposer` ranking/budget/pinning/staleness/layout, `estimateTokens`, `context_pack` + `blackboard_search` MCP tools (lexical + semantic modes) |
-| `test-phase20.ts` | 70 | Security regressions: `ClaudeHookBridge` full-target and all-field deny matching (GHSA-743h-jr5x-mpcr, GHSA-9p2w-prp8-5722), deny/allow regex validation + fail-closed hook exit code, `SandboxPolicy` canonicalized command matching (GHSA-9v4f-j8cv-fhxw), `DashboardServer` Origin/Host validation (GHSA-hr6v-mfxm-4438), MCP SSE loopback-only CORS (GHSA-4pvg-m42h-c3x2) |
+| `test-phase20.ts` | 76 | Security regressions: `ClaudeHookBridge` full-target and all-field deny matching (GHSA-743h-jr5x-mpcr, GHSA-9p2w-prp8-5722), deny/allow regex validation + fail-closed hook exit code, `SandboxPolicy` canonicalized command matching (GHSA-9v4f-j8cv-fhxw), `DashboardServer` Origin/Host validation (GHSA-hr6v-mfxm-4438), MCP SSE loopback-only CORS (GHSA-4pvg-m42h-c3x2), per-instance orchestrator token + MCP server-held identity |
 | `test.ts` | 39 | Core orchestrator smoke tests |
 
 ---

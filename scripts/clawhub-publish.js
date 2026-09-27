@@ -22,7 +22,7 @@
 const fs   = require('fs');
 const os   = require('os');
 const path = require('path');
-const { execSync, spawnSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -62,13 +62,14 @@ const version   = skillJson.version;
 if (!version) { console.error(`${c.red}skill.json missing "version"${c.reset}`); process.exit(1); }
 
 // ── Read git provenance ───────────────────────────────────────────────────────
-function git(cmd) {
-  try { return execSync(`git -C "${ROOT}" ${cmd}`, { stdio: ['pipe','pipe','pipe'] }).toString().trim(); }
+function git(...args) {
+  try { return execFileSync('git', ['-C', ROOT, ...args], { stdio: ['pipe','pipe','pipe'] }).toString().trim(); }
   catch { return undefined; }
 }
-const sourceCommit = git('rev-parse --short HEAD');
-const sourceRef    = git('describe --tags --exact-match HEAD') ? `refs/tags/${git('describe --tags --exact-match HEAD')}` : git('rev-parse --abbrev-ref HEAD');
-const remoteUrl    = git('remote get-url origin') || '';
+const sourceCommit = git('rev-parse', '--short', 'HEAD');
+const exactTag     = git('describe', '--tags', '--exact-match', 'HEAD');
+const sourceRef    = exactTag ? `refs/tags/${exactTag}` : git('rev-parse', '--abbrev-ref', 'HEAD');
+const remoteUrl    = git('remote', 'get-url', 'origin') || '';
 const repoMatch    = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
 const sourceRepo   = repoMatch ? repoMatch[1] : undefined;
 
@@ -89,12 +90,9 @@ for (const rel of STAGE_FILES) {
 }
 
 // ── Build clawhub command ─────────────────────────────────────────────────────
-// On Windows, `npx` is a .cmd shim, so spawnSync needs shell: true, and cmd.exe
-// does NOT auto-quote array elements. cmd.exe has no escape for `"` inside a
-// quoted string and expands %VAR% even inside quotes, so those characters
-// cannot be made safe by escaping — they are rejected instead. Inside the
-// quotes, cmd.exe treats & | < > ^ ( ) literally; backslashes are escaped
-// per the MSVC argv rules only where they precede the closing quote.
+// On Windows `npx` is a .cmd shim that only runs through cmd.exe, which has no
+// escape for `"` and expands %VAR% inside quotes, so those are rejected; other
+// metacharacters are literal inside quotes. Non-Windows runs with no shell.
 function quoteArg(arg) {
   const str = String(arg);
   if (/["%\r\n\0]/.test(str)) {
@@ -128,9 +126,7 @@ console.log(`  Staged : ${STAGE_FILES.length} files → ${stage}`);
 console.log(`${'─'.repeat(50)}\n`);
 
 // ── Publish ───────────────────────────────────────────────────────────────────
-// Elsewhere, skip the shell entirely so arguments are passed verbatim.
-const isWin = process.platform === 'win32';
-const result = isWin
+const result = process.platform === 'win32'
   ? spawnSync('npx', cmd.map(quoteArg), { cwd: ROOT, stdio: 'inherit', shell: true })
   : spawnSync('npx', cmd, { cwd: ROOT, stdio: 'inherit' });
 

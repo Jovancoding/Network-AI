@@ -7,14 +7,14 @@
     "url": "https://github.com/Jovancoding/Network-AI",
     "source": "github"
   },
-  "version": "5.15.2",
+  "version": "5.15.3",
   "websiteUrl": "https://network-ai.org",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "network-ai",
-      "version": "5.15.2",
+      "version": "5.15.3",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

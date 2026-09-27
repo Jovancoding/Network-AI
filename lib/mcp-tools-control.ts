@@ -166,7 +166,6 @@ const CONTROL_TOOL_DEFINITIONS: MCPToolDefinition[] = [
  *   config: CONFIG,              // live reference — mutations take effect immediately
  *   agentRegistry: agentMap,
  *   blackboard: orchestrator.getBlackboard(),
- *   systemToken: 'system-orchestrator-token',
  * });
  *
  * combined.register(controlTools);
@@ -176,14 +175,14 @@ export class ControlMcpTools implements McpToolProvider {
   private readonly _config: IConfig;
   private readonly _agentRegistry?: Map<string, IAgentStatus>;
   private readonly _blackboard?: IControlBlackboard;
-  private readonly _systemToken: string;
+  private readonly _systemToken: string | undefined;
   private readonly _stoppedAgents: Map<string, string> = new Map(); // agentId -> reason
 
   constructor(options: ControlMcpToolsOptions) {
     this._config = options.config;
     this._agentRegistry = options.agentRegistry;
     this._blackboard = options.blackboard;
-    this._systemToken = options.systemToken ?? 'system-orchestrator-token';
+    this._systemToken = options.systemToken;
   }
 
   getDefinitions(): MCPToolDefinition[] {

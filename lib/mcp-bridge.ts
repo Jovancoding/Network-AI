@@ -57,12 +57,56 @@
  * @license MIT
  */
 
+import { randomUUID } from 'crypto';
 import {
   BlackboardMCPTools,
   type IBlackboard,
   type MCPToolDefinition,
   type BlackboardToolResult,
 } from './mcp-blackboard-tools';
+
+/** Blackboard surface needed to act on behalf of MCP callers. */
+export interface IdentityRegisteringBlackboard extends IBlackboard {
+  registerAgent(agentId: string, verificationToken: string, allowedNamespaces?: string[]): void;
+}
+
+/**
+ * Wrap a blackboard so an MCP server writes on behalf of its callers with a
+ * server-held random token.
+ *
+ * Transport authentication (bearer secret or local stdio) is the trust
+ * boundary: once a caller is admitted, each `agent_id` it uses is registered
+ * with full access and recorded as the entry's source agent. Caller-supplied
+ * `agent_token` values are ignored, so no shared constant has to be known.
+ *
+ * @param board - Blackboard to expose (e.g. `orchestrator.getBlackboard(name)`)
+ * @returns An `IBlackboard` for the MCP tool providers
+ */
+export function createServerIdentityBlackboard(board: IdentityRegisteringBlackboard): IBlackboard {
+  if (!board || typeof board.registerAgent !== 'function' || typeof board.write !== 'function') {
+    throw new TypeError('createServerIdentityBlackboard requires a blackboard with registerAgent() and write()');
+  }
+  const serverToken = randomUUID();
+  const registered = new Set<string>();
+  const ensure = (agentId: string): void => {
+    if (typeof agentId !== 'string' || agentId.trim() === '' || registered.has(agentId)) return;
+    board.registerAgent(agentId, serverToken, ['*']);
+    registered.add(agentId);
+  };
+  return {
+    read: (key) => board.read(key),
+    exists: (key) => board.exists(key),
+    getSnapshot: () => board.getSnapshot(),
+    write: (key, value, sourceAgent, ttl) => {
+      ensure(sourceAgent);
+      return board.write(key, value, sourceAgent, ttl, serverToken);
+    },
+    ...(board.delete ? { delete: (key: string) => board.delete!(key) } : {}),
+    ...(board.getScopedSnapshot
+      ? { getScopedSnapshot: (agentId: string) => { ensure(agentId); return board.getScopedSnapshot!(agentId); } }
+      : {}),
+  };
+}
 
 // ============================================================================
 // JSON-RPC 2.0 TYPES

@@ -1,7 +1,7 @@
 /**
  * test-phase20.ts
  *
- * v5.15.1 / v5.15.2 — Security advisory regression tests:
+ * v5.15.1 / v5.15.2 / v5.15.3 — Security advisory regression tests:
  *
  *   GHSA-743h-jr5x-mpcr — ClaudeHookBridge deny-pattern gate bypass via
  *     500-char extractTarget truncation before the security decision.
@@ -30,6 +30,9 @@ import { ClaudeHookBridge } from './lib/claude-hooks';
 import { DashboardServer } from './lib/dashboard-server';
 import { TopologyTracker } from './lib/topology';
 import { McpSseServer } from './lib/mcp-transport-sse';
+import { createSwarmOrchestrator } from './index';
+import { McpBlackboardBridge, createServerIdentityBlackboard } from './lib/mcp-bridge';
+import type { IdentityRegisteringBlackboard } from './lib/mcp-bridge';
 import type { ClaudeHookInput } from './lib/claude-hooks';
 import { SandboxPolicy } from './lib/agent-runtime';
 
@@ -431,6 +434,43 @@ function testGhsa4pvgSseCorsLoopbackOnly() {
 }
 
 // ---------------------------------------------------------------------------
+// Hardcoded orchestrator token removed — MCP server-held identity
+// ---------------------------------------------------------------------------
+
+async function testNoPublicOrchestratorToken() {
+  header('Orchestrator token is per-instance; MCP writes use server-held identity');
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'na-phase20-token-'));
+  const cwd = process.cwd();
+  process.chdir(dir);
+  try {
+    const board = createSwarmOrchestrator().getBlackboard('tok');
+    let rejected = false;
+    try { board.write('k:1', 'x', 'orchestrator', undefined, 'system-orchestrator-token'); } catch { rejected = true; }
+    assert(rejected, 'former public constant no longer authenticates as orchestrator');
+
+    const raw = new McpBlackboardBridge(board, { name: 'raw' });
+    const rawWrite = await raw.callTool('blackboard_write', { key: 'task:1', value: '"x"', agent_id: 'planner' }) as { ok: boolean };
+    assert(!rawWrite.ok, 'unwrapped board still enforces identity/namespace checks');
+
+    const served = new McpBlackboardBridge(
+      createServerIdentityBlackboard(board as unknown as IdentityRegisteringBlackboard), { name: 'served' });
+    const w1 = await served.callTool('blackboard_write', { key: 'task:1', value: '"x"', agent_id: 'planner' }) as { ok: boolean };
+    assert(w1.ok, 'MCP caller with any agent_id can write through the server identity');
+    const w2 = await served.callTool('blackboard_write',
+      { key: 'task:2', value: '"y"', agent_id: 'orchestrator', agent_token: 'system-orchestrator-token' }) as { ok: boolean };
+    assert(w2.ok, 'legacy callers still sending the old token keep working (token ignored)');
+    const r = await served.callTool('blackboard_read', { key: 'task:1', agent_id: 'reviewer' }) as { ok: boolean; data?: { value?: unknown; sourceAgent?: string; source_agent?: string } | null };
+    assert(r.ok && r.data?.value === 'x', 'another agent_id can read the shared key');
+    const source = r.data?.sourceAgent ?? r.data?.source_agent;
+    assert(source === 'planner', 'entry records the real calling agent_id', String(source));
+  } finally {
+    process.chdir(cwd);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
@@ -457,6 +497,7 @@ async function main() {
   await testGhsa9p2wDenyInspectsAllFields();
   await testGhsaHr6vDashboardOriginAndHost();
   testGhsa4pvgSseCorsLoopbackOnly();
+  await testNoPublicOrchestratorToken();
 
   process.stdout.write(`\n${passed + failed} checks — ${passed} passed, ${failed} failed\n`);
   if (failed > 0) {

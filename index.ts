@@ -106,6 +106,8 @@ export class SwarmOrchestrator implements OpenClawSkill {
   private blackboard: SharedBlackboard;
   private authGuardian: AuthGuardian;
   private taskDecomposer: TaskDecomposer;
+  /** Per-instance secret proving writes come from this orchestrator; never a shared constant. */
+  private readonly systemToken: string = randomUUID();
   private agentRegistry: Map<string, AgentStatus> = new Map();
   private gateway: SecureSwarmGateway;
   private qualityGate: QualityGateAgent;
@@ -151,7 +153,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
       resourceProfiles: options?.resourceProfiles,
     });
     this.adapters = adapterRegistry ?? new AdapterRegistry();
-    this.taskDecomposer = new TaskDecomposer(this.blackboard, this.authGuardian, this.adapters);
+    this.taskDecomposer = new TaskDecomposer(this.blackboard, this.authGuardian, this.adapters, { systemToken: this.systemToken });
     this.gateway = new SecureSwarmGateway();
     this.qualityGate = new QualityGateAgent({
       validationConfig: options?.validationConfig,
@@ -169,7 +171,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
     this.lifecycleHooks = new OrchestratorLifecycleHooks();
 
     // Register the orchestrator agent on the blackboard with full access
-    this.blackboard.registerAgent('orchestrator', 'system-orchestrator-token', ['*']);
+    this.blackboard.registerAgent('orchestrator', this.systemToken, ['*']);
   }
 
   /**
@@ -251,7 +253,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
         this.blackboard.write(`trace:${traceId}`, {
           action,
           startTime: new Date().toISOString(),
-        }, context.agentId, undefined, 'system-orchestrator-token');
+        }, context.agentId, undefined, this.systemToken);
       } catch {
         // Non-fatal -- tracing failure shouldn't block execution
       }
@@ -562,7 +564,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
       }
 
       // Approved -- cache result
-      this.blackboard.write(cacheKey, sanitizedResult, context.agentId, 1800, 'system-orchestrator-token'); // 30 min TTL
+      this.blackboard.write(cacheKey, sanitizedResult, context.agentId, 1800, this.systemToken); // 30 min TTL
       this.metrics.delegationDurationMs.observe({ agent: targetAgent }, Date.now() - delegationStartMs);
       this.heatmap.record(targetAgent, {
         durationMs: Date.now() - delegationStartMs,
@@ -826,7 +828,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
       };
     }
 
-    this.blackboard.write(key, value, context.agentId, ttl, 'system-orchestrator-token');
+    this.blackboard.write(key, value, context.agentId, ttl, this.systemToken);
 
     return {
       success: true,
@@ -874,7 +876,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
       entry = this.qualityGate.approveQuarantined(quarantineId);
       if (entry) {
         // Write the approved entry to the blackboard
-        this.blackboard.write(`approved:${quarantineId}`, entry, 'orchestrator', undefined, 'system-orchestrator-token');
+        this.blackboard.write(`approved:${quarantineId}`, entry, 'orchestrator', undefined, this.systemToken);
       }
     } else {
       entry = this.qualityGate.rejectQuarantined(quarantineId);
@@ -965,7 +967,7 @@ export class SwarmOrchestrator implements OpenClawSkill {
     // Register the orchestrator agent on this board
     board.registerAgent(
       'orchestrator',
-      'system-orchestrator-token',
+      this.systemToken,
       options?.allowedNamespaces ?? ['*'],
     );
 
@@ -1243,6 +1245,7 @@ export {
   McpBridgeClient,
   McpBridgeRouter,
   McpInProcessTransport,
+  createServerIdentityBlackboard,
 } from './lib/mcp-bridge';
 export type {
   McpJsonRpcRequest,

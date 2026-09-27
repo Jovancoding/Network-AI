@@ -45,7 +45,8 @@ import {
   McpCombinedBridge,
   McpBlackboardBridgeAdapter,
 } from '../lib/mcp-transport-sse';
-import type { McpJsonRpcRequest } from '../lib/mcp-bridge';
+import type { McpJsonRpcRequest, IdentityRegisteringBlackboard } from '../lib/mcp-bridge';
+import { createServerIdentityBlackboard } from '../lib/mcp-bridge';
 import { ExtendedMcpTools } from '../lib/mcp-tools-extended';
 import { ControlMcpTools } from '../lib/mcp-tools-control';
 import { ContextMcpTools } from '../lib/mcp-tools-context';
@@ -225,7 +226,9 @@ async function main(): Promise<void> {
   // 1. Create orchestrator + blackboard
   // --------------------------------------------------------------------------
   const orchestrator = createSwarmOrchestrator();
-  const blackboard = orchestrator.getBlackboard(args.board);
+  const blackboard = createServerIdentityBlackboard(
+    orchestrator.getBlackboard(args.board) as unknown as IdentityRegisteringBlackboard,
+  );
 
   // --------------------------------------------------------------------------
   // 2. Create MCP bridge for blackboard tools (5 tools)
@@ -287,7 +290,6 @@ async function main(): Promise<void> {
     controlTools = new ControlMcpTools({
       config: configProxy,
       blackboard: blackboard as unknown as import('../lib/mcp-tools-control').IControlBlackboard,
-      systemToken: 'system-orchestrator-token',
     });
 
     console.log(`[network-ai-server] Control tools: config (2), agent (3), fsm (1), info (1)`);

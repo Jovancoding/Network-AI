@@ -1,0 +1,13 @@
+# HOL plugin-scanner configuration (https://hol.org/guard).
+# Excludes only intentional fixtures: test suites use fake credentials and
+# vulnerable snippets as inputs, and examples/05 is a code-review demo whose
+# subject code is deliberately insecure. Shipped code (lib/, bin/, adapters/,
+# scripts/) is always scanned.
+[scanner]
+ignore_paths = [
+  "test.ts",
+  "test-*.ts",
+  "examples/05-code-review-swarm.ts",
+  "CHANGELOG.md",
+  "BENCHMARKS.md",
+]

@@ -31,12 +31,13 @@ export class TaskDecomposer {
   private adapterRegistry: AdapterRegistry;
   /** Maximum number of tasks to run concurrently (0 = unlimited). */
   private maxConcurrency: number;
+  private systemToken: string | undefined;
 
   constructor(
     blackboard: SharedBlackboard,
     authGuardian: AuthGuardian,
     adapterRegistry: AdapterRegistry,
-    options?: { maxConcurrency?: number }
+    options?: { maxConcurrency?: number; systemToken?: string }
   ) {
     if (!blackboard || !(blackboard instanceof SharedBlackboard)) {
       throw new ValidationError('blackboard must be an instance of SharedBlackboard');
@@ -51,6 +52,7 @@ export class TaskDecomposer {
     this.authGuardian = authGuardian;
     this.adapterRegistry = adapterRegistry;
     this.maxConcurrency = options?.maxConcurrency ?? 5;
+    this.systemToken = options?.systemToken;
   }
 
   /**
@@ -115,7 +117,7 @@ export class TaskDecomposer {
         // Cache successful results
         if (result.success) {
           const cacheKey = `task:${task.agentType}:${this.hashPayload(task.taskPayload)}`;
-          this.blackboard.write(cacheKey, result.result, context.agentId, 3600, 'system-orchestrator-token'); // 1 hour TTL
+          this.blackboard.write(cacheKey, result.result, context.agentId, 3600, this.systemToken); // 1 hour TTL
         }
       }
     }

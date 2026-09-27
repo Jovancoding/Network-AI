@@ -5,6 +5,22 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.15.3] - 2026-09-27
+
+### Security
+- **Public hardcoded orchestrator token replaced with per-instance secrets** — `SwarmOrchestrator` registered its `orchestrator` identity (full `*` namespace access) on every blackboard with the constant `'system-orchestrator-token'`, which was also hardcoded in `bin/mcp-server.ts`, `TaskDecomposer`, and `ControlMcpTools`. Anyone who could call a blackboard with that string could act as the orchestrator, which made per-agent identity and namespace scoping meaningless. Not remotely exploitable on its own: the MCP transports already require the bearer secret (SSE/HTTP) or local stdio.
+  - **Fixed**: each orchestrator now generates a random token (`randomUUID()`) and threads it to `TaskDecomposer`; `ControlMcpTools` no longer defaults to the constant. The old string no longer authenticates anywhere.
+  - **MCP server identity**: new `createServerIdentityBlackboard()` (`lib/mcp-bridge.ts`) makes `network-ai-server` write on behalf of admitted callers with a server-held random token. Transport authentication is the trust boundary; each caller `agent_id` is registered on first use and recorded as the entry's source agent.
+  - **Also fixes**: over MCP, every normal `agent_id` was rejected with a namespace error. The only working write path was impersonating `orchestrator` with the public token. Any `agent_id` now works as the README documents.
+  - **Migration**: no client change needed. Callers still sending `agent_token: "system-orchestrator-token"` keep working because the MCP server ignores caller-supplied tokens. Library code that passed the literal string to `SharedBlackboard.write()` must use its own `registerAgent()` token instead.
+
+### Changed
+- `scripts/clawhub-publish.js` reads git provenance with `execFileSync('git', [...args])` instead of a shell command string.
+- Added `.plugin-scanner.toml` (HOL plugin-scanner) excluding only test fixtures, the intentionally vulnerable code-review demo, and changelog/benchmark prose. Shipped code is always scanned; current score 95/100, no high or critical findings.
+
+### Tests
+- Full suite: **3,679 tests across 41 suites**; `tsc --noEmit` clean. `test-phase20.ts` adds per-instance token and MCP server-identity coverage.
+
 ## [5.15.2] - 2026-09-27
 
 ### Security

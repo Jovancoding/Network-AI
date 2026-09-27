@@ -3,7 +3,7 @@
 > Paste everything below the horizontal rule into a Claude Project's **Custom Instructions** field.
 > No tools or MCP server required for the instruction-following mode.
 > For full tool use (blackboard, permissions, parallel agents), also load `claude-tools.json`.
-> v5.15.2 — fixes GHSA-9p2w-prp8-5722 (ClaudeHookBridge deny patterns inspect every tool-input field), GHSA-hr6v-mfxm-4438 (DashboardServer Origin/Host validation), and GHSA-4pvg-m42h-c3x2 (MCP SSE loopback-only CORS); v5.15.1 fixed GHSA-743h-jr5x-mpcr and GHSA-9v4f-j8cv-fhxw; adds ContextComposer + `context_pack` / `blackboard_search` MCP tools (token-budgeted, relevance-ranked context — signal over noise); Gemini / OpenAI Responses / Claude Agent SDK adapters, Claude Code hooks gating (AuthGuardian), MCP elicitation approvals, and A2A server mode; includes model-interaction lifecycle governance (refusal → fallback, effort policy, OWASP Agentic Top 10 coverage).
+> v5.15.3 — replaces the public hardcoded orchestrator token with per-instance secrets and gives the MCP server a server-held identity (any `agent_id` can write); v5.15.2 fixed GHSA-9p2w-prp8-5722 (ClaudeHookBridge deny patterns inspect every tool-input field), GHSA-hr6v-mfxm-4438 (DashboardServer Origin/Host validation), and GHSA-4pvg-m42h-c3x2 (MCP SSE loopback-only CORS); v5.15.1 fixed GHSA-743h-jr5x-mpcr and GHSA-9v4f-j8cv-fhxw; adds ContextComposer + `context_pack` / `blackboard_search` MCP tools (token-budgeted, relevance-ranked context — signal over noise); Gemini / OpenAI Responses / Claude Agent SDK adapters, Claude Code hooks gating (AuthGuardian), MCP elicitation approvals, and A2A server mode; includes model-interaction lifecycle governance (refusal → fallback, effort policy, OWASP Agentic Top 10 coverage).
 
 ---
 
