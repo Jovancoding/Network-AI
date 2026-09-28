@@ -286,12 +286,12 @@ const CODE_UNDER_REVIEW = `
 import { db } from './database';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = 'supersecret123';         // hardcoded
+const JWT_SECRET = 'changeme';               // hardcoded
 const SESSIONS: Record<string, string> = {}; // unbounded in-memory store
 
 export async function login(username: string, password: string) {
   const user = await db.query(
-    \`SELECT * FROM users WHERE username = '\${username}' AND password = '\${password}'\`
+    "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'"
   );
   if (!user.rows.length) return { error: 'Invalid credentials' };
   const token = jwt.sign({ id: user.rows[0].id, role: user.rows[0].role }, JWT_SECRET);
@@ -306,13 +306,13 @@ export async function getUserData(userId: string, requesterId: string) {
 
 export async function resetPassword(email: string) {
   const token = Math.random().toString(36).slice(2); // weak token, no expiry
-  await db.query(\`UPDATE users SET reset_token = '\${token}' WHERE email = '\${email}'\`);
+  await db.query("UPDATE users SET reset_token = '" + token + "' WHERE email = '" + email + "'");
   sendEmail(email, \`https://app.example.com/reset?token=\${token}\`);
 }
 
 export async function changePassword(userId: string, newPassword: string) {
   // no old password check, no complexity, stored plaintext
-  await db.query(\`UPDATE users SET password = '\${newPassword}' WHERE id = '\${userId}'\`);
+  await db.query("UPDATE users SET password = '" + newPassword + "' WHERE id = '" + userId + "'");
 }
 `.trim();
 

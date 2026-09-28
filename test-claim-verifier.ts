@@ -17,6 +17,7 @@ import { ClaimVerifier } from './lib/claim-verifier';
 import type { ActionManifest } from './lib/claim-verifier';
 import { ComplianceMonitor } from './lib/compliance-monitor';
 import { AuthGuardian } from './lib/auth-guardian';
+import { randomBytes } from 'crypto';
 
 // Use full path to the node executable so spawn works on Windows with shell:false
 const NODE = process.execPath;
@@ -156,7 +157,7 @@ async function testShellResultHasReceipt() {
   assert(typeof result.receipt!.outputHash === 'string' && result.receipt!.outputHash.length === 64, 'outputHash is 64-char SHA-256 hex');
 
   // Validate the receipt with an instance using an explicit different secret — should fail
-  const otherMgr = new SecureTokenManager({ tokenSecret: 'completely-different-secret-xyz' });
+  const otherMgr = new SecureTokenManager({ tokenSecret: randomBytes(32).toString('hex') });
   const crossValidation = otherMgr.validateReceipt(result.receipt!);
   assert(!crossValidation.valid, 'receipt from different secret does not validate cross-instance');
 }

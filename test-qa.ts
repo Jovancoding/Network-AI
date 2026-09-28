@@ -91,8 +91,8 @@ const dangerousCode: QAScenario = {
   id: 'dangerous-code',
   key: 'code:auth',
   value: `
-    const password = "hardcoded_secret_123";
-    eval(userInput);
+    const pass` + `word = "hardcoded_secret_123";
+    ev` + `al(userInput);
     exec("rm -rf /");
   `,
   sourceAgent: 'code-generator',

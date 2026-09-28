@@ -33,6 +33,7 @@ import { LandscapeAgent } from './lib/landscape-agent';
 import type { EnvironmentHealth, LandscapeAgentOptions } from './lib/landscape-agent';
 import { AgentPool } from './lib/strategy-agent';
 import type { AgentTemplate } from './lib/strategy-agent';
+import { randomBytes } from 'crypto';
 
 // ============================================================================
 // TEST UTILITIES
@@ -179,7 +180,7 @@ class MockAuthGuardian {
   async requestPermission(agentId: string, resource: string, justification: string, _scope?: string) {
     this.calls.push({ agentId, resource, justification });
     if (this.shouldGrant) {
-      return { granted: true, grantToken: 'mock-token', expiresAt: null, restrictions: [] };
+      return { granted: true, grantToken: randomBytes(8).toString('hex'), expiresAt: null, restrictions: [] };
     }
     return { granted: false, grantToken: null, expiresAt: null, restrictions: [], reason: this.denyReason };
   }

@@ -79,7 +79,7 @@ for (const reviewer of REVIEWERS) {
 
 ```typescript
 const localClient = new OpenAI({
-  apiKey : 'not-needed',
+  apiKey : 'ollama',
   baseURL: 'http://localhost:11434/v1',   // Ollama, vLLM, llama.cpp
 });
 

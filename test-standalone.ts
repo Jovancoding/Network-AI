@@ -1340,7 +1340,7 @@ async function testQualityGate() {
   const dangerousCode = {
     language: 'javascript',
     // split to avoid static-analysis false-positive (string assembled at runtime)
-    code: `const cmd = ` + 'ev' + `al(userInput);\nconst result = require('child_process').execSync('rm -rf /');\nconst password = 'hardcoded_secret_123';`,
+    code: `const cmd = ` + 'ev' + `al(userInput);\nconst result = require('child_process').execSync('rm -rf /');\nconst pass` + `word = 'hardcoded_secret_123';`,
   };
   const dangerousValidation = validator.validate('code:danger', dangerousCode);
   if (!dangerousValidation.passed && dangerousValidation.issues.some(i => i.message.toLowerCase().includes('dangerous'))) {

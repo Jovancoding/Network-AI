@@ -20,6 +20,7 @@ import { StdioElicitationChannel, createElicitationApprovalCallback } from './li
 import type { ElicitationCreateParams, ElicitationResult } from './lib/mcp-elicitation';
 import { A2AServer } from './lib/a2a-server';
 import type { ApprovalRequest } from './lib/agent-runtime';
+import { randomBytes } from 'crypto';
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -450,9 +451,10 @@ async function testA2AServerFailuresAndAuth() {
   }
 
   // Bearer auth on tasks; card stays public
+  const a2aSecret = randomBytes(16).toString('hex');
   const secured = await startA2A({
     name: 'Secured',
-    secret: 'a2a-secret',
+    secret: a2aSecret,
     executor: async (text) => ({ text }),
   });
   try {
@@ -476,7 +478,7 @@ async function testA2AServerFailuresAndAuth() {
 
     const okAuth = await fetch(`${secured.base}/tasks`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer a2a-secret' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${a2aSecret}` },
       body: rpc('tasks/send', { message: { role: 'user', parts: [{ type: 'text', text: 'hello' }] } }),
     });
     assert(okAuth.status === 200, 'tasks with correct token → 200');

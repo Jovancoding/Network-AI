@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Fixed**: each orchestrator now generates a random token (`randomUUID()`) and threads it to `TaskDecomposer`; `ControlMcpTools` no longer defaults to the constant. The old string no longer authenticates anywhere.
   - **MCP server identity**: new `createServerIdentityBlackboard()` (`lib/mcp-bridge.ts`) makes `network-ai-server` write on behalf of admitted callers with a server-held random token. Transport authentication is the trust boundary; each caller `agent_id` is registered on first use and recorded as the entry's source agent.
   - **Also fixes**: over MCP, every normal `agent_id` was rejected with a namespace error. The only working write path was impersonating `orchestrator` with the public token. Any `agent_id` now works as the README documents.
-  - **Migration**: no client change needed. Callers still sending `agent_token: "system-orchestrator-token"` keep working because the MCP server ignores caller-supplied tokens. Library code that passed the literal string to `SharedBlackboard.write()` must use its own `registerAgent()` token instead.
+  - **Migration**: no client change needed. Callers still sending the former public orchestrator token as `agent_token` keep working because the MCP server ignores caller-supplied tokens. Library code that passed the literal string to `SharedBlackboard.write()` must use its own `registerAgent()` token instead.
 
 ### Changed
 - `scripts/clawhub-publish.js` reads git provenance with `execFileSync('git', [...args])` instead of a shell command string.
@@ -1905,7 +1905,7 @@ No functional changes. All 2,834 tests pass.
 - **Test registration** -- core test suite registers agents with proper tokens and namespace access
 
 ### Not Real Vulnerabilities (marked as ignore)
-- Test file fake secrets (`test-secret-key-for-testing-only`, `sk-1234567890`, `password: 'secret123'`) -- intentional test data, not real credentials
+- Test file fake secrets (`test-secret-key-for-testing-only`, `sk-1234567890`, a `secret123` password) -- intentional test data, not real credentials
 
 ### Stats
 - 251 tests passing (79 + 33 + 139)

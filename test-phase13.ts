@@ -10,6 +10,7 @@
 
 import { join } from 'path';
 import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { randomBytes } from 'crypto';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -102,7 +103,7 @@ async function testStreamableServerInstantiates() {
   const bridge = new McpCombinedBridge('test-bridge');
   const server = new McpStreamableServer(bridge, {
     port: 3099,
-    secret: 'test-secret-xyz',
+    secret: randomBytes(16).toString('hex'),
   });
 
   assert(server instanceof McpStreamableServer, 'McpStreamableServer instantiates');

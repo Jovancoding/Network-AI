@@ -32,6 +32,7 @@ import { ExtendedMcpTools } from './lib/mcp-tools-extended';
 import { ControlMcpTools } from './lib/mcp-tools-control';
 import { FederatedBudget } from './lib/federated-budget';
 import { getConfig, setConfig } from './index';
+import { randomBytes } from 'crypto';
 
 // ============================================================================
 // TEST HARNESS
@@ -403,7 +404,7 @@ async function testControlTools(): Promise<void> {
   const tools = new ControlMcpTools({
     config: liveConfig,
     blackboard: bb as unknown as import('./lib/mcp-tools-control').IControlBlackboard,
-    systemToken: 'test-token',
+    systemToken: randomBytes(16).toString('hex'),
   });
 
   // config_get — all
@@ -496,7 +497,7 @@ async function testControlTools(): Promise<void> {
 // ============================================================================
 
 const TEST_PORT = 3099;
-const SSE_TEST_SECRET = 'test-server-secret-xyz789';
+const SSE_TEST_SECRET = randomBytes(16).toString('hex');
 
 async function testSseServer(): Promise<void> {
   suite('McpSseServer + McpSseTransport (real HTTP on port 3099)');
@@ -594,7 +595,7 @@ async function testSseServer(): Promise<void> {
 // ============================================================================
 
 const AUTH_TEST_PORT = 3098;
-const TEST_SECRET = 'test-secret-abc123';
+const TEST_SECRET = randomBytes(16).toString('hex');
 
 async function testSseServerAuth(): Promise<void> {
   suite('McpSseServer — bearer token authentication (port 3098)');

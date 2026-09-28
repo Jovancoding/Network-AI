@@ -25,6 +25,7 @@ import {
   type AnthropicMessagesApiClient,
 } from './adapters/anthropic-messages-adapter';
 import type { AgentContext } from './types/agent-adapter';
+import { randomBytes } from 'crypto';
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -149,7 +150,7 @@ async function testGatewayThinkingStripVsCredit() {
   let stripCallsB = 0;
   const seenB: ModelRequest[] = [];
   const gwB = new GovernedModelGateway({
-    caller: async (req) => { seenB.push(req); return req.model === PRIMARY ? refusal(req.model, { creditToken: 'credit-xyz' }) : served(req.model); },
+    caller: async (req) => { seenB.push(req); return req.model === PRIMARY ? refusal(req.model, { creditToken: randomBytes(8).toString('hex') }) : served(req.model); },
     primaryModel: PRIMARY,
     fallbackModels: [FALLBACK],
     thinking: { stripForModelSwitch: (m) => { stripCallsB++; return m; } },

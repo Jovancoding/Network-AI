@@ -16,6 +16,7 @@ import {
   SecureSwarmGateway,
   SecurityError,
 } from './security';
+import { randomBytes } from 'crypto';
 
 // ============================================================================
 // TEST UTILITIES
@@ -64,7 +65,7 @@ async function testSecureTokenManager() {
   
   // Intentional test-only values -- not real secrets
   const tokenManager = new SecureTokenManager({
-    tokenSecret: 'test-secret-key-for-testing-only', // nosemgrep, snyk:ignore
+    tokenSecret: randomBytes(32).toString('hex'),
     maxTokenAge: 5000, // 5 seconds for testing
   });
   
@@ -432,7 +433,7 @@ async function testSecureAuditLogger() {
   const auditLogger = new SecureAuditLogger({
     auditLogPath,
     signAuditLogs: true,
-    tokenSecret: 'audit-secret-key',
+    tokenSecret: randomBytes(32).toString('hex'),
   });
   
   // Test: Log security events
@@ -478,7 +479,7 @@ async function testSecureSwarmGateway() {
   const gateway = new SecureSwarmGateway({
     maxRequestsPerMinute: 10,
     maxFailedAuthAttempts: 3,
-    tokenSecret: 'gateway-test-secret',
+    tokenSecret: randomBytes(32).toString('hex'),
     auditLogPath: gatewayLogPath,
   });
   
@@ -543,7 +544,7 @@ async function testSecureSwarmGateway() {
   // Test: Data encryption through gateway
   log('\n  [SEC] Testing gateway encryption...', 'blue');
   // Intentional fake test data -- not real credentials
-  const sensitiveData = { apiKey: 'sk-1234567890', password: 'secret123' }; // nosemgrep, snyk:ignore
+  const sensitiveData = { apiKey: randomBytes(12).toString('hex'), password: randomBytes(12).toString('hex') };
   const encrypted = gateway.encryptSensitiveData(sensitiveData);
   const decrypted = gateway.decryptSensitiveData<typeof sensitiveData>(encrypted);
   

@@ -31,6 +31,7 @@ import type {
   PolicyEndpoint,
 } from './adapters/nemoclaw-adapter';
 import type { AgentPayload, AgentContext } from './types/agent-adapter';
+import { randomBytes } from 'crypto';
 
 // ─── Colours ─────────────────────────────────────────────────────────────────
 
@@ -482,15 +483,16 @@ async function runTests(): Promise<void> {
   const exec19 = makeMockExecutor();
   const a19 = new NemoClawAdapter();
   await a19.initialize({ options: { executor: exec19 } });
+  const nvidiaKey = randomBytes(8).toString('hex');
   a19.registerSandboxAgent('env-agent', {
     sandboxName: 'env-sandbox',
-    env: { NVIDIA_API_KEY: 'test-key', CUSTOM_VAR: 'custom-value' },
+    env: { NVIDIA_API_KEY: nvidiaKey, CUSTOM_VAR: 'custom-value' },
   });
 
   await a19.executeAgent('env-agent', defaultPayload, defaultContext);
   const envCall = exec19.calls.find(c => c.subcommand === 'sandbox' && c.args[0] === 'connect');
   const envVars = envCall?.options?.['env'] as Record<string, string> | undefined;
-  assert(envVars?.['NVIDIA_API_KEY'] === 'test-key', 'NVIDIA_API_KEY forwarded');
+  assert(envVars?.['NVIDIA_API_KEY'] === nvidiaKey, 'NVIDIA_API_KEY forwarded');
   assert(envVars?.['CUSTOM_VAR'] === 'custom-value', 'CUSTOM_VAR forwarded');
 
   // ── 20. Pre-init registration ─────────────────────────────────────────────
