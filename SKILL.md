@@ -1,22 +1,23 @@
 ---
 name: network-ai
 description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. The bundled Python scripts make no network calls and have zero third-party dependencies. The parent repository also contains a TypeScript engine (not included in this skill bundle)."
+allowed-tools: Read Bash(python3 scripts/blackboard.py:*) Bash(python3 scripts/check_permission.py:*) Bash(python3 scripts/context_manager.py:*) Bash(python3 scripts/swarm_guard.py:*) Bash(python3 scripts/validate_token.py:*) Bash(python3 scripts/revoke_token.py:*)
 metadata:
   openclaw:
     emoji: "\U0001F41D"
     homepage: https://network-ai.org
     capabilities:
-      filesystem: "read/write — project root `swarm-blackboard.md` (blackboard state), `data/pending_changes/<id>.json` (WAL entries), `data/audit_log.jsonl`, `data/active_grants.json`, `data/.signing_key`, `data/project-context.json`, `data/task_tracking.json`, `data/agent_health.json`, `data/budget_tracking.json`. All paths are local; no data leaves the local filesystem. When NETWORK_AI_ENV is set, data paths are rooted at `data/<env>/` instead of `data/`. The `--path` argument in blackboard.py is validated against the project root at runtime — paths outside the project directory are rejected (CWE-22)."
-      env_vars: "read — NETWORK_AI_ENV (environment routing), NETWORK_AI_MCP_SECRET (MCP bearer auth), NETWORK_AI_MINIMAL (minimal-mode flag). No env vars are written."
-      shell_exec: "optional — AgentRuntime (lib/agent-runtime.ts) with SandboxPolicy and ApprovalGate; disabled by default. Never auto-enabled by this skill. auto_approve must NOT be set in production (see auto_approve_warning below)."
-      tcp_port: "optional — MCP SSE server (bin/mcp-server.ts) binds 127.0.0.1 only when explicitly started by the operator. Requires a non-empty bearer-token secret. Never auto-started by this skill or any bundled Python script."
+      filesystem: "read/write — project root `swarm-blackboard.md` (blackboard state), `data/pending_changes/<id>.json` (WAL entries), `data/audit_log.jsonl`, `data/active_grants.json`, `data/.signing_key`, `data/project-context.json`, `data/task_tracking.json`, `data/agent_health.json`, `data/budget_tracking.json`, `data/swarm_budgets.json`, `data/heartbeats.json`, `data/.blackboard.lock`. All paths are local; no data leaves the local filesystem. When NETWORK_AI_ENV is set, data paths are rooted at `data/<env>/` instead of `data/`. The `--path` argument in blackboard.py is validated against the project root at runtime — paths outside the project directory are rejected (CWE-22)."
+      env_vars: "read — NETWORK_AI_ENV only (environment routing for data paths). No other env vars are read and none are written."
+      tools: "Only the six bundled scripts, run via python3 (see allowed-tools), plus reading local state files. No other commands, binaries, or tools are required or invoked."
+      shell_exec: "none — the bundled scripts spawn no subprocesses and execute no shell commands."
+      tcp_port: "none — the bundled scripts open no sockets and bind no ports."
+      autonomous_actions: "none — every script is a single invocation by the calling agent or operator; nothing is scheduled, auto-approved, or run in the background. Permission grants are advisory scores the caller must enforce."
     bundle_scope:
       clawhub_python_scripts: "Python stdlib only — scripts/*.py (blackboard.py, check_permission.py, context_manager.py, swarm_guard.py, validate_token.py, revoke_token.py). Zero network calls, zero subprocesses, zero third-party packages. This is the scope scanned by SkillSpector."
-      npm_full_package: "The npm package (npm install network-ai) adds: TypeScript library modules, CLI (bin/cli.ts), and optional MCP SSE server (bin/mcp-server.ts). The MCP SSE server exposes a TCP port and is NOT activated by installing or importing the package — it must be explicitly started by the operator."
+      not_in_bundle: "The separate npm package (network-ai: TypeScript library, CLI, optional MCP server) is not part of this skill. This skill never installs, imports, or starts it."
     network_calls:
       python_scripts: none
-      typescript_library: "none — BYOC (bring your own client); zero outbound calls from library code; all LLM/API clients are injected by the caller"
-      mcp_sse_server: "optional — binds 127.0.0.1:<port> when explicitly started by the operator; all connections require a bearer-token secret (NETWORK_AI_MCP_SECRET); never auto-started"
     inter_agent_comms: "none — this skill does not implement, invoke, or control inter-agent messaging or sessions_send. All coordination is via local file-based blackboard only."
     sessions_send: "NOT implemented or invoked by this skill. sessions_send is a host-platform built-in entirely outside this skill's control. See data-flow notice below."
     sessions_ops: "platform-provided — outside this skill's control"
@@ -34,13 +35,12 @@ metadata:
       data_directory:
         path: data/
         scope: local-only
-        files: ["audit_log.jsonl", "active_grants.json", ".signing_key", "project-context.json", "task_tracking.json", "agent_health.json", "budget_tracking.json", "pending_changes/<id>.json"]
+        files: ["audit_log.jsonl", "active_grants.json", ".signing_key", "project-context.json", "task_tracking.json", "agent_health.json", "budget_tracking.json", "swarm_budgets.json", "heartbeats.json", ".blackboard.lock", "pending_changes/<id>.json"]
         description: "All persistent state is local-only. No data leaves the local filesystem."
       blackboard_file:
         path: swarm-blackboard.md
         scope: local-only
         description: "Shared coordination state written by scripts/blackboard.py (project root). Contains task results, grant tokens, status flags, and TTL-scoped cache entries. Access should be restricted to the local user running the swarm."
-      auto_approve_warning: "ApprovalGate.auto_approve (lib/agent-runtime.ts) must NOT be enabled in production or untrusted environments. It is only appropriate in explicitly isolated CI/dev sandboxes where all commands executed by the runtime are known and trusted in advance."
 ---
 
 # Swarm Orchestrator Skill
@@ -51,7 +51,7 @@ metadata:
 
 > **Data-flow notice (host platform — not this skill):** This skill does NOT implement, invoke, or control `sessions_send` or any inter-agent messaging. All bundled Python scripts are local-only tools (budget guard, blackboard, permission scorer, context manager). If your platform has a `sessions_send` built-in, whether and how it is used is entirely the **host platform’s** responsibility and is outside this skill’s scope. If you need to prevent external network calls, disable or reroute delegation in your **platform settings** before installing this skill.
 
-> **Context file integrity:** The `context_manager.py inject` command now validates `data/project-context.json` for injection patterns and oversized fields before printing the context block. Review any warnings printed to stderr before passing the output to an agent system prompt.
+> **Context file integrity:** `context_manager.py` validates every field of `data/project-context.json` (project, goals, stack, milestones, decisions, banned approaches, agents) for prompt-injection and role-delimiter patterns, size, and nesting. `init` and `update` reject unsafe values before they are written; `inject` blocks on any warning and emits the context as single-line values inside a `<project_context type="reference-data">` block that labels it as data, not instructions. Treat injected context as untrusted reference material.
 
 > **PII / sensitive-data warning:** The `justification` field in permission requests and the audit log (`data/audit_log.jsonl`) store free-text strings provided by agents. **Do not include PII, secrets, or credentials in justification text.** Consider restricting file permissions on `data/` or running this skill in an isolated workspace.
 
@@ -65,7 +65,7 @@ metadata:
 # Prerequisite: python3 (any version ≥ 3.8)
 python3 --version
 
-# That's it. Run any script directly:
+# Run only the six bundled scripts (no other tools are needed):
 python3 scripts/blackboard.py list
 python3 scripts/swarm_guard.py budget-init --task-id "task_001" --budget 10000
 
@@ -740,11 +740,10 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Permission manifest** | `metadata.openclaw` in SKILL.md frontmatter explicitly declares `bundle_scope` (Python scripts: local-only; full npm package: includes optional MCP SSE server), `network_calls` (Python scripts: none; MCP SSE server: TCP, operator-started, bearer-token required), `requires.bins: [python3]` — no API credentials, no external services in core |
-| **Least-privilege resource gating** | `check_permission.py` uses a weighted scoring model (justification 40 %, trust 30 %, risk 30 %); PAYMENTS and FILE_EXPORT require `--confirm-high-risk` acknowledgment before any token is issued; `--scope` limits every grant to minimum required access |
+| **Permission manifest** | `metadata.openclaw` in SKILL.md frontmatter explicitly declares `capabilities` (filesystem paths, `NETWORK_AI_ENV` only, no shell, no ports, no autonomous actions), `bundle_scope`, `network_calls: none`, and `requires.bins: [python3]`; `allowed-tools` limits the tool scope to the six bundled scripts plus `Read` — no API credentials, no external services |
+| **Least-privilege resource gating** | `check_permission.py` uses a weighted scoring model (justification 40 %, trust 30 %, risk 30 %); PAYMENTS, DATABASE, and FILE_EXPORT (`HIGH_RISK_RESOURCES`) require `--confirm-high-risk` acknowledgment before any token is issued; `--scope` limits every grant to minimum required access |
 | **Abstract resource labels only** | PAYMENTS, DATABASE, EMAIL, FILE_EXPORT are local scoring labels — no external credentials exist in the skill; there is nothing to leak to an external service |
 | **HMAC-signed grant tokens** | Since v5.5.2, every grant record carries `_sig` (HMAC-SHA256 over canonical fields); `validate_token.py` rejects tampered records — privilege escalation via forged grants is detected at validation time |
-| **SandboxPolicy + FileAccessor** | AgentRuntime's `SandboxPolicy` enforces command allowlists/blocklists; `FileAccessor` restricts all file I/O to `data/<env>/`; out-of-scope access throws `SourceProtectionError` and returns `{success: false}` without leaking path details |
 | **Advisory-only tokens** | All grant tokens are explicitly marked `advisory: true`; downstream systems must add a separate authenticated identity check and human approval before any real sensitive action — documented in frontmatter and throughout SKILL.md |
 
 ### AST06 — Weak Isolation · Severity: High
@@ -753,13 +752,12 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Zero network calls (Python scripts)** | All bundled Python scripts use Python stdlib only, spawn no subprocesses, and make no network calls — declared in `metadata.openclaw.network_calls` and `bundle_scope`. The optional TypeScript MCP server (`bin/mcp-server.ts`) is not part of the ClawHub bundle; it must be explicitly started by the operator via `npx network-ai-server` and requires a non-empty bearer-token secret. |
-| **AgentRuntime sandbox** | `ShellExecutor` enforces per-command timeout and output-size limits; `SandboxPolicy` allowlist/blocklist prevents unapproved shell commands from running at all |
-| **ClaimVerifier (Tier 1 agent honesty)** | `AgentRuntime` issues HMAC-signed outcome-bound receipts (`ExecutionReceipt`) on every `exec()` and `writeFile()`; `ClaimVerifier` (`lib/claim-verifier.ts`) reconciles agent-declared manifests against the audit log — `UNSUPPORTED_CLAIM` and `UNDISCLOSED_ACTION` violations surface through `ComplianceMonitor`; repeated fabrication decays `AuthGuardian` trust and forces `ApprovalGate` supervision |
-| **Source protection** | `SandboxPolicy.sourceProtection` constrains `FileAccessor.read/write/list` to `data/<env>/` only; any attempt to read outside that boundary throws `SourceProtectionError` — the agent receives `{success: false}`, no path details leak |
+| **Zero network calls, no shell** | All bundled Python scripts use Python stdlib only, spawn no subprocesses, execute no shell commands, open no sockets, and make no network calls — declared in `metadata.openclaw.capabilities`, `network_calls`, and `bundle_scope`. No server, runtime, or package is installed or started by this skill. |
 | **Environment isolation** | `NETWORK_AI_ENV` / `--env` routes all state to `data/<env>/`; dev, staging, and production state are fully separated; live state (`audit_log.jsonl`, `active_grants.json`) never promotes across environments |
-| **ApprovalGate** | High-risk shell or file operations require explicit human or callback approval before execution; auto-approve only in explicitly trusted environments |
-| **No hot-reload surface** | Bundled scripts do not implement or respond to a SkillsWatcher; skill updates require explicit `clawhub install` or `npm install` — no mid-session reload is possible |
+| **Human-driven execution** | Every script is a single, explicit invocation; nothing is scheduled, run in the background, or auto-approved. Permission grants are advisory scores that the caller (or a human) must decide to enforce. |
+| **No hot-reload surface** | Bundled scripts do not implement or respond to a SkillsWatcher; skill updates require explicit `clawhub install` — no mid-session reload is possible |
+
+> Sandboxed shell execution (`AgentRuntime`, `SandboxPolicy`, `ApprovalGate` — manual approval by default) lives only in the separate TypeScript npm package and is not part of this skill bundle.
 
 ### AST07 — Update Drift · Severity: Medium
 
@@ -767,7 +765,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.15.3"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.15.4"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |
@@ -785,16 +783,36 @@ This skill is scanned on every publish. The following Notes are flagged by desig
 | **ASI03** Identity and Privilege Abuse (local grant state) | Low | The permission system creates persistent local state (`active_grants.json`, `audit_log.jsonl`, `.signing_key`) — security-relevant files that are purpose-aligned but accessible to anyone with `data/` access | Keep the skill directory private; back up or delete local grant state when no longer needed; do not share `data/` casually; restrict OS-level permissions on `data/` on shared machines |
 | **ASI03** Identity and Privilege Abuse (token integrity) | ~~High~~ Resolved | Token payload had no integrity protection — active_grants.json could be edited to forge elevated grants | Fixed in v5.5.2 — `check_permission.py` HMAC-SHA256 signs each grant (`_sig` field, stdlib `hmac`+`hashlib`, key at `data/.signing_key`); `validate_token.py` verifies before accepting; tampered tokens rejected with `"Token signature invalid"` |
 | **ASI03** Identity and Privilege Abuse (env-scoped paths) | ~~High~~ Resolved | `revoke_token.py` resolved `GRANTS_FILE`/`AUDIT_LOG` at module load from root `data/`, ignoring `NETWORK_AI_ENV` — revoking tokens in one env could silently miss env-specific grant files | Fixed in v5.5.1 — `_resolve_data_dir()` added, `--env` CLI argument introduced, paths re-resolved in `main()` before file I/O; consistent with `check_permission.py` and `validate_token.py` |
-| **ASI06** Memory and Context Poisoning (project context) | Medium | Persistent `data/project-context.json` is injected into every agent session by design — inaccurate or malicious context could steer future agent behavior | `_validate_context()` runs injection-pattern detection before every inject; do not store secrets/credentials; review `data/project-context.json` before use; clear `data/` between projects |
+| **ASI06** Memory and Context Poisoning (project context) | Medium | Persistent `data/project-context.json` is injected into every agent session by design — inaccurate or malicious context could steer future agent behavior | `_validate_context()` scans every field and key (injection and role-delimiter patterns, size, nesting, types) and `inject` blocks on any warning; since v5.15.4 `init`/`update` also reject unsafe values before writing, and injected values are flattened to single lines inside a `<project_context type="reference-data">` block. Do not store secrets; review `data/project-context.json` before use; clear `data/` between projects |
 | **ASI06** Memory and Context Poisoning (audit log free text) | Low | `justification` field in permission requests and `data/audit_log.jsonl` store agent-provided free-text strings locally — PII or secrets placed there will persist on disk | Do not include PII, secrets, or credentials in justification text; restrict access to `data/` on shared machines; rotate/delete `audit_log.jsonl` when no longer needed |
 | **ASI07** Insecure Inter-Agent Communication | High | Blackboard is local file-based; origin/identity depends on local file access, not authenticated messaging | Run in a trusted workspace; restrict file permissions on `data/`; review blackboard changes before relying on them for important decisions |
 | **ASI08** Cascading Failures | ~~High~~ Resolved | `os` was referenced before import in `swarm_guard.py` — fixed in v5.4.4; `import os` now present | Fixed — `swarm_guard.py` now imports `os` at module level; budget/health guard starts correctly |
 | **SkillSpector** Description-Behavior Mismatch (`McpStreamableServer` network exposure) | ~~Medium~~ Resolved | The trigger was `comment.txt` — an in-progress draft GitHub-issue note describing the optional `McpStreamableServer` HTTP/MCP server (a native server binding a TCP port) — being bundled into the published ClawHub skill. Its prose contradicted the bundle's 'zero network calls' / local-only positioning. | Fixed in v5.12.7 — `comment.txt` added to `.clawhubignore` (the ignore file ClawHub actually honours; the earlier `.clawignore` entry was never read by the CLI). New `scripts/clawhub-check.js` guard (`npm run clawhub:check`) fails the release if any non-allowlisted file would be bundled, so draft notes can no longer leak. The Python skill bundle itself still makes zero network calls; `McpStreamableServer` is in the optional npm package only and is never auto-started. |
-| **SkillSpector** Context-Inappropriate Capability (MCP control surface breadth) | ~~Medium~~ Resolved | Same root cause — `comment.txt` enumerated the HTTP MCP server's 22 privileged tools (blackboard write, token ops, agent_spawn, fsm_transition, audit_query), which the scanner read as a broad remote-control surface inside a local skill. | Fixed in v5.12.7 — `comment.txt` excluded from the bundle (see row above) and enforced by the `clawhub:check` guard. The HTTP MCP server itself remains opt-in: it requires a non-empty bearer secret before `listen()` binds (fail-closed), runs only via `NETWORK_AI_MCP_SECRET=<secret> npx network-ai-server`, binds `127.0.0.1` by default, and is documented in `SUPPLY_CHAIN.md §5a`. |
+| **SkillSpector** Context-Inappropriate Capability (MCP control surface breadth) | ~~Medium~~ Resolved | Same root cause — `comment.txt` enumerated the HTTP MCP server's 22 privileged tools (blackboard write, token ops, agent_spawn, fsm_transition, audit_query), which the scanner read as a broad remote-control surface inside a local skill. | Fixed in v5.12.7 — `comment.txt` excluded from the bundle (see row above) and enforced by the `clawhub:check` guard. The HTTP MCP server is not part of this skill; it lives in the separate npm package, requires a non-empty bearer secret before `listen()` binds (fail-closed), binds `127.0.0.1` by default, and is documented in `SUPPLY_CHAIN.md §5a`. |
 | **SkillSpector** Context-Inappropriate Capability (`_load_signing_key()` token minting) | Medium, 92% | `scripts/check_permission.py` mints, HMAC-signs, persists, and lists grant tokens — a de facto local authorization artifact that downstream components may be tempted to treat as real credentials. | Token advisory-only warnings appear in source, SKILL.md, and SECURITY.md. Every grant response includes the advisory notice. Tokens are labeled `grant_{uuid4().hex}`; the HMAC signature only proves local origin, not external identity. Platform-level authentication is required before any destructive action (PAYMENTS, DATABASE, FILE_EXPORT). See ASI03 rows above. |
 | **SkillSpector** Intent-Code Divergence (`FILE_EXPORT` missing from `HIGH_RISK_RESOURCES`) | ~~Low~~ Resolved | Comment stated `FILE_EXPORT` requires `--confirm-high-risk` but `HIGH_RISK_RESOURCES` only contained `PAYMENTS` and `DATABASE`; file export requests could receive advisory grants without the extra acknowledgment | Fixed in v5.11.0 — `FILE_EXPORT` added to `HIGH_RISK_RESOURCES` in `check_permission.py`; now requires `--confirm-high-risk` consistent with the documented policy |
 | **SkillSpector** YARA `agent_skill_mcp_tool_poisoning_metadata` (MCP/tool metadata poisoning indicators) | ~~High~~ Resolved | SKILL.md frontmatter `description:` retained an older phrasing that referenced the optional TypeScript network server alongside "zero network calls" — a combination the YARA rule flags. A privacy-note sentence also used wording adjacent to file/data references that the exfiltration sub-rule flagged. | Fixed in v5.13.1 — frontmatter `description:` confirmed clean (server reference removed; TypeScript engine noted as parent repository only). Privacy note reworded to remove the flagged phrase. VirusTotal 64/64 clean throughout. |
 | **SkillSpector** Description-Behavior Mismatch (`ensure_data_dir()` ignoring env scope) | ~~Medium~~ Resolved | `ensure_data_dir()` always created the fixed top-level `data/` directory instead of the active env-specific path, breaking environment isolation when `NETWORK_AI_ENV` is set | Fixed in v5.11.0 — `ensure_data_dir()` now delegates to `_resolve_data_dir()` so audit log and grant files are always written to the correct env-scoped directory |
+| **A.I.G T02** Agent Memory Poisoning (`context_manager.py`) | ~~High~~ Resolved | `update`/`init` stored values without validation, and `_validate_context()` only scanned goals, decisions, and banned approaches, so `project`, `stack`, `milestones`, and `agents` could carry injected instructions into every session | Fixed in v5.15.4: write-time validation with type checks, recursive scanning of every field and key, role-delimiter patterns, size/nesting/count caps, and delimited single-line `inject` output (see ASI06 row) |
+| **SkillSpector** Tp4 Description-Behavior Mismatch (`check_permission.py`) | ~~High~~ Resolved | Docstring said the script "evaluates permission requests for accessing sensitive resources", which reads as real access to databases or payments | Fixed in v5.15.4: docstring and `--help` state it is an advisory local scorer over abstract labels that holds no credentials and touches no real resource |
+| **SkillSpector** Intent-Code Divergence (`--confirm-high-risk` help text) | ~~Low~~ Resolved | Help text listed only PAYMENTS and DATABASE, while `HIGH_RISK_RESOURCES` also contains FILE_EXPORT | Fixed in v5.15.4: help text, comments, and the AST03 table list PAYMENTS, DATABASE, and FILE_EXPORT |
+| **SkillSpector** Undeclared Tool Scope / Unrestricted Tool Access | ~~Medium~~ Resolved | No `allowed-tools` declaration, and Setup said "run any script directly" | Fixed in v5.15.4: `allowed-tools` limits the scope to the six bundled scripts plus `Read`; Setup text scoped to the bundled scripts |
+| **SkillSpector** Autonomous Decision Making | ~~Medium~~ Resolved | Frontmatter declared npm-only `shell_exec` and `auto_approve` runtime capabilities that are not in this bundle | Fixed in v5.15.4: capabilities declare `shell_exec: none`, `tcp_port: none`, `autonomous_actions: none`; npm-only runtime details removed from the bundle manifest |
+| **SkillSpector** Rp1 Unpinned package execution (`npx network-ai-server`) | ~~Medium~~ Resolved | SKILL.md showed unpinned `npx` commands for the separate npm server | Fixed in v5.15.4: `npx` references removed; this skill never installs or runs an npm package |
+| **SkillSpector** Ae1 Referenced artifact not completely inspected | Info | The scanner inspects a bounded portion of each referenced script, so it cannot confirm the behavior of the uninspected remainder | Each script's full I/O surface is declared in its header comment and in the Bundled Script Inventory below; all scripts are Python stdlib only and can be reviewed in full in the public repository |
+
+## Bundled Script Inventory
+
+Complete I/O surface of every file in this skill. No script makes network calls, opens sockets, spawns subprocesses, or reads environment variables other than `NETWORK_AI_ENV`. Paths below are under `data/` (or `data/<env>/` when `NETWORK_AI_ENV` / `--env` is set).
+
+| Script | Purpose | Reads | Writes |
+|---|---|---|---|
+| `scripts/blackboard.py` | Shared blackboard with propose / validate / commit | `swarm-blackboard.md`, `pending_changes/*.json`, `.blackboard.lock` | `swarm-blackboard.md`, `pending_changes/*.json`, `.blackboard.lock` |
+| `scripts/check_permission.py` | Advisory permission scoring over abstract labels | `active_grants.json`, `audit_log.jsonl`, `.signing_key` | `active_grants.json`, `audit_log.jsonl`, `.signing_key` (first run) |
+| `scripts/validate_token.py` | Verify an advisory grant's HMAC signature and expiry | `active_grants.json`, `.signing_key` | none |
+| `scripts/revoke_token.py` | Revoke advisory grants, remove expired ones | `active_grants.json`, `audit_log.jsonl` | `active_grants.json`, `audit_log.jsonl` |
+| `scripts/context_manager.py` | Validated project context (Layer-3 memory) | `project-context.json` | `project-context.json`, `audit_log.jsonl` |
+| `scripts/swarm_guard.py` | Budget, handoff, and health guards | `swarm_budgets.json`, `heartbeats.json`, `task_tracking.json`, `agent_health.json`, `budget_tracking.json`, `audit_log.jsonl` | same six files |
 
 ## References
 

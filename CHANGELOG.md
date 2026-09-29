@@ -5,6 +5,25 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.15.4] - 2026-09-29
+
+### Security
+- **Project-context memory poisoning in the ClawHub skill** (`scripts/context_manager.py`, A.I.G T02) — `update` and `init` saved values without validation, and `_validate_context()` only scanned goals, decisions, and banned approaches. Text placed in `project`, `stack`, `milestones`, or `agents` reached every agent's system prompt through `inject` unchecked.
+  - **Fixed**: `init` and `update` validate before writing and reject unsafe values, with type checks per section (`project` accepts only name/description/version; `stack` only scalar values; decisions only a string or `{decision, rationale}`). A rejected write leaves the file and the audit log unchanged.
+  - `_validate_context()` now scans every field and key recursively, adds role and prompt-delimiter patterns (`</system>`, `<|im_start|>`, `[INST]`, `assistant:` lines), and caps field length, key length, nesting depth, entry count, and total size (256 KiB). `inject` still blocks on any warning.
+  - `inject` output is flattened to one line per value and wrapped in a `<project_context type="reference-data">` block marked as data, not instructions.
+
+### Changed
+- `scripts/check_permission.py`: docstring and `--help` now describe an advisory local scorer over abstract labels that holds no credentials. `--confirm-high-risk` help lists PAYMENTS, DATABASE, and FILE_EXPORT, matching `HIGH_RISK_RESOURCES`.
+- `SKILL.md`: new `allowed-tools` declaration limits the skill to its six bundled scripts plus `Read`. `capabilities` now declares only `NETWORK_AI_ENV`, `shell_exec: none`, `tcp_port: none`, and `autonomous_actions: none`; npm-only runtime details and unpinned `npx` commands were removed from the skill. Added a Bundled Script Inventory listing each script's reads and writes.
+- `.clawhubignore` excludes Python bytecode caches (`__pycache__/`, `*.pyc`).
+
+### CI
+- New `.github/workflows/hol-scanner.yml` runs the HOL plugin-scanner on every push and pull request with the same gate as the awesome-ai-plugins listing (score ≥ 80, fail on high, repository policy not trusted). Read-only permissions, SHA-pinned actions, no PR comments or SARIF upload.
+
+### Tests
+- Full suite: **3,679 tests across 41 suites**; `tsc --noEmit` clean.
+
 ## [5.15.3] - 2026-09-27
 
 ### Security

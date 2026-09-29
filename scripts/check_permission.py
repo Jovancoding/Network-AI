@@ -16,10 +16,16 @@
 # shown at issuance time; listing commands (--active-grants) always mask tokens
 # to a short prefix.
 """
-AuthGuardian Permission Checker
+AuthGuardian Permission Checker (advisory, local-only)
 
-Evaluates permission requests for accessing sensitive resources
-(DATABASE, PAYMENTS, EMAIL, FILE_EXPORT).
+Scores permission requests against abstract local resource labels
+(DATABASE, PAYMENTS, EMAIL, FILE_EXPORT) using a weighted model
+(justification 40%, trust 30%, risk 30%) and records advisory grant tokens in
+local files. It holds no credentials and never touches a real database,
+payment system, mailbox, or export target: the output is a scoring decision for
+the caller to enforce, not an authorization. The caller-supplied --agent
+identity is not verified. PAYMENTS, DATABASE, and FILE_EXPORT additionally
+require --confirm-high-risk.
 
 Usage:
     python check_permission.py --agent AGENT_ID --resource RESOURCE_TYPE \
@@ -75,7 +81,7 @@ AUDIT_LOG = _DATA_DIR / "audit_log.jsonl"
 # of identity, and SHOULD require a separate authenticated session or human
 # approval before honouring access to sensitive resources.
 #
-# For PAYMENTS, DATABASE (write), and FILE_EXPORT the caller must also pass
+# For PAYMENTS, DATABASE (any scope), and FILE_EXPORT the caller must also pass
 # --confirm-high-risk to acknowledge the advisory-only nature of the grant.
 
 # Default trust levels for known agents
@@ -782,7 +788,10 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AuthGuardian Permission Checker",
+        description=(
+            "AuthGuardian Permission Checker — advisory local scoring over abstract "
+            "resource labels. Issues advisory tokens only; holds no credentials."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -846,7 +855,8 @@ Examples:
         action="store_true",
         dest="confirm_high_risk",
         help=(
-            "Required for PAYMENTS and DATABASE resources. Acknowledges that the issued "
+            "Required for PAYMENTS, DATABASE, and FILE_EXPORT resources (any scope). "
+            "Acknowledges that the issued "
             "token is advisory only and that the caller-supplied agent identity was not "
             "cryptographically verified."
         ),
