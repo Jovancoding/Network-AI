@@ -127,7 +127,7 @@
     "python": ">=3.9"
   },
   "devDependencies": {
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.4",
     "dotenv": "^18.0.5",
     "openai": "^7.27.0",
     "ts-node": "^10.9.2",
