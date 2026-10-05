@@ -129,7 +129,7 @@
   "devDependencies": {
     "@types/node": "^26.6.3",
     "dotenv": "^18.0.4",
-    "openai": "^7.23.0",
+    "openai": "^7.27.0",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   },
