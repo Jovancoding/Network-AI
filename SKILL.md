@@ -9,6 +9,7 @@ metadata:
     capabilities:
       filesystem: "read/write — project root `swarm-blackboard.md` (blackboard state), `data/pending_changes/<id>.json` (WAL entries), `data/pending_changes/archive/<id>.<status>.json` (committed/aborted change records), `data/audit_log.jsonl`, `data/active_grants.json`, `data/.signing_key`, `data/project-context.json`, `data/task_tracking.json`, `data/agent_health.json`, `data/budget_tracking.json`, `data/swarm_budgets.json`, `data/heartbeats.json`, `data/.blackboard.lock`. All paths are local; no data leaves the local filesystem. When NETWORK_AI_ENV is set, data paths are rooted at `data/<env>/` instead of `data/`. The `--path` argument in blackboard.py is validated against the project root at runtime — paths outside the project directory are rejected (CWE-22)."
       env_vars: "read — NETWORK_AI_ENV only (environment routing for data paths). No other env vars are read and none are written."
+      filesystem_operations: "Local persistent state, all under the project root and data/ (or data/<env>/): create directories; create and overwrite the state files listed above; append to audit_log.jsonl; blackboard.py archives each committed or aborted change to pending_changes/archive/ and then deletes the pending file, and deletes stale .blackboard.lock markers; revoke_token.py removes revoked or expired entries from active_grants.json. Nothing outside these paths is read, written, or deleted."
       tools: "Only the six bundled scripts, run via python3 (see allowed-tools), plus reading local state files. No other commands, binaries, or tools are required or invoked."
       shell_exec: "none — the bundled scripts spawn no subprocesses and execute no shell commands."
       tcp_port: "none — the bundled scripts open no sockets and bind no ports."
@@ -68,14 +69,13 @@ python3 --version
 # Run only the six bundled scripts (no other tools are needed):
 python3 scripts/blackboard.py list
 python3 scripts/swarm_guard.py budget-init --task-id "task_001" --budget 10000
-
-# Optional: for cross-platform file locking on Windows production hosts
-pip install filelock  # only needed if you see locking issues on Windows
 ```
+
+File locking is built in: `blackboard.py` uses `fcntl` on Unix and an atomic lock-marker file on Windows. Nothing needs to be installed on any platform.
 
 The `data/` directory is created automatically on first run. No configuration files, environment variables, or credentials are required.
 
-> **Multi-environment support (v5.4.0):** All five Python scripts now read the `NETWORK_AI_ENV` environment variable at startup and accept a `--env <name>` CLI argument. When set, all data paths are routed to `data/<env>/` instead of the root `data/` directory. Use this to isolate dev, staging, and production state.
+> **Multi-environment support (v5.4.0):** All six Python scripts read the `NETWORK_AI_ENV` environment variable at startup and accept a `--env <name>` CLI argument. When set, all data paths are routed to `data/<env>/` instead of the root `data/` directory. Use this to isolate dev, staging, and production state.
 >
 > ```bash
 > # Run against the dev environment
@@ -600,7 +600,7 @@ with open(audit_file, "a") as f:
 
 ## 🧹 TTL Enforcement (Token Lifecycle)
 
-Expired permission tokens are automatically tracked. Run periodic cleanup:
+Expired tokens stop validating on their own: `validate_token.py` rejects any grant past its `expires_at`. Removing expired entries from `data/active_grants.json` is a manual step:
 
 ```bash
 # Validate a grant token
@@ -765,7 +765,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.15.5"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.15.6"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |

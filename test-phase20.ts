@@ -692,7 +692,12 @@ async function testSwarmTransportAuth() {
     assert((await post({ ...sent, meta: { ...sent.meta, ttlMs: 0 } })).error?.code === -32002, 'changing ttlMs breaks the signature');
     assert((await post({ ...sent, meta: { ...sent.meta, signature: undefined } })).error?.code === -32003, 'unsigned request rejected');
     const { sourceNode: _drop, ...noSource } = sent.meta;
-    assert((await post({ ...sent, meta: noSource })).error?.code === -32001, 'omitting sourceNode no longer bypasses the allowlist');
+    assert((await post({ ...sent, meta: noSource })).error?.code === -32002, 'omitting sourceNode is rejected at authentication');
+    assert((await post(null)).error?.code === -32003, 'non-object body rejected before any envelope branch');
+
+    let foreignCode: unknown;
+    try { await new SwarmTransportClient({ url, sharedSecret: secret, nodeId: 'node-b' }).call('run', {}); } catch (e) { foreignCode = (e as Record<string, unknown>).code; }
+    assert(foreignCode === -32001, 'validly signed request from a non-allowlisted node is rejected');
 
     const stale = new SwarmTransportClient({ url, sharedSecret: secret, nodeId: 'node-a' });
     const realNow = Date.now;

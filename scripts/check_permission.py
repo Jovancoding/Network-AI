@@ -18,6 +18,11 @@
 """
 AuthGuardian Permission Checker (advisory, local-only)
 
+The permission-gating component of the Network-AI skill. Blackboard
+coordination, token budgets, and project context live in the sibling scripts
+(blackboard.py, swarm_guard.py, context_manager.py); this script only scores
+requests, records advisory grants, and summarizes the audit log.
+
 Scores permission requests against abstract local resource labels
 (DATABASE, PAYMENTS, EMAIL, FILE_EXPORT) using a weighted model
 (justification 40%, trust 30%, risk 30%) and records advisory grant tokens in
@@ -61,6 +66,7 @@ GRANT_TOKEN_TTL_MINUTES = 5
 def _resolve_data_dir(env: str = "") -> "Path":
     """Return the active data directory, scoped to <env> when set."""
     import re as _re
+    # NETWORK_AI_ENV only selects which data/<env>/ folder holds the local state files.
     _env = env or os.environ.get("NETWORK_AI_ENV", "")
     base = Path(__file__).parent.parent / "data"
     if _env:
@@ -552,7 +558,8 @@ def evaluate_permission(
 
 def list_active_grants(agent_filter: Optional[str] = None, as_json: bool = False) -> int:
     """
-    Show which agents currently hold access to which APIs with expiry times.
+    Show which agents currently hold advisory grants for which abstract resource
+    labels (DATABASE, PAYMENTS, EMAIL, FILE_EXPORT), with expiry times.
 
     Reads data/active_grants.json, filters out expired grants,
     and displays remaining grants with TTL.

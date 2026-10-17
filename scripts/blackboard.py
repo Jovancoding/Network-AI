@@ -6,6 +6,8 @@
 #   WRITES: <data_dir>/swarm-blackboard.md, <data_dir>/pending_changes/<id>.json,
 #           <data_dir>/pending_changes/archive/<id>.<committed|aborted>.json,
 #           <data_dir>/.blackboard.lock
+#   DELETES: <data_dir>/pending_changes/<id>.json (after archiving it),
+#            stale <data_dir>/.blackboard.lock markers
 #   where <data_dir> is "data/" by default, or "data/<env>/" when NETWORK_AI_ENV
 #   is set or --env is passed (env in: dev|st|sit|qa|sandbox|preprod|prod). This
 #   only changes WHICH data/ subdirectory is used — no path outside the project

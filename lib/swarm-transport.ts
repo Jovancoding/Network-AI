@@ -251,6 +251,16 @@ export class SwarmTransportServer extends EventEmitter {
       const body = await this.readBody(req);
       const envelope = JSON.parse(body) as TransportEnvelope;
 
+      // Authenticate before any request-controlled branch, so no field of an
+      // unauthenticated request can decide whether verification runs.
+      if (this.config.sharedSecret) {
+        const authError = this.verifySigned(envelope);
+        if (authError) {
+          this.sendResponse(res, { jsonrpc: '2.0', id: '', error: authError });
+          return;
+        }
+      }
+
       // Validate envelope
       if (envelope.jsonrpc !== '2.0' || !envelope.method || !envelope.id) {
         this.sendResponse(res, {
@@ -268,15 +278,6 @@ export class SwarmTransportServer extends EventEmitter {
             jsonrpc: '2.0', id: envelope.id,
             error: { code: -32001, message: 'Source node not allowed' },
           });
-          return;
-        }
-      }
-
-      // Verify HMAC, freshness, and replay
-      if (this.config.sharedSecret) {
-        const authError = this.verifySigned(envelope);
-        if (authError) {
-          this.sendResponse(res, { jsonrpc: '2.0', id: envelope.id, error: authError });
           return;
         }
       }
@@ -341,7 +342,7 @@ export class SwarmTransportServer extends EventEmitter {
   }
 
   private verifySigned(envelope: TransportEnvelope): TransportResponse['error'] | null {
-    const meta = envelope.meta;
+    const meta = envelope !== null && typeof envelope === 'object' ? envelope.meta : undefined;
     if (!meta || typeof meta.signature !== 'string' || meta.signature === '') {
       return { code: -32003, message: 'Signature required' };
     }

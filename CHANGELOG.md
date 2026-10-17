@@ -5,6 +5,17 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.15.6] - 2026-10-17
+
+### Security
+- **CodeQL #184, #185, #186** (`js/user-controlled-bypass`, `lib/swarm-transport.ts`) - the envelope-shape check ran before HMAC verification, so request-controlled fields decided whether the request reached `verifySigned()`. Not exploitable (that branch only rejected), but `SwarmTransportServer` now authenticates first: with a shared secret configured, `verifySigned()` runs immediately after JSON parsing, before any envelope or allowlist branch, and rejects non-object bodies.
+
+### Changed
+- ClawHub skill (5.15.5 scan follow-up): removed the contradictory `pip install filelock` advice (locking is built in); corrected "five" to six scripts; token-expiry wording now matches behavior (`validate_token.py` rejects expired grants, removal is a manual `--cleanup`); new `filesystem_operations` capability and `blackboard.py` header declare deletions and archival; `check_permission.py` docstrings state its permission-gating scope and the abstract resource labels.
+
+### Tests
+- Full suite: **3,740 tests across 41 suites**; `tsc --noEmit` clean.
+
 ## [5.15.5] - 2026-10-17
 
 ### Security

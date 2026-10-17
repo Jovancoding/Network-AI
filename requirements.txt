@@ -9,9 +9,8 @@
 #
 # Standard library modules used:
 #   argparse, json, os, re, sys, time, hashlib, uuid, datetime, pathlib,
-#   typing, contextlib, fcntl (Unix; file-lock fallback on Windows)
+#   typing, contextlib, fcntl (Unix; built-in lock-marker fallback on Windows)
 #
 # ── OPTIONAL (for development only, not required to run the skill) ──────────
-# filelock>=3.0.0  # Cross-platform file locking (Windows production)
 # mypy>=1.0.0      # Static type checking
 # pytest>=7.0.0    # Running the test suite
