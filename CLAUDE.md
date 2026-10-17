@@ -4,14 +4,14 @@ This file is read automatically by Claude Code when working in this repository.
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.15.6.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.16.0.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 3,740 tests across 41 suites
+npm run test:all              # Run all 3,888 tests across 42 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 32 adapter tests
@@ -46,6 +46,7 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/a2a-server.ts` — A2AServer: expose the orchestrator as a Google A2A agent (agent card + tasks/send, Bearer-gated)
 - `lib/context-composer.ts` — ContextComposer: token-budgeted, relevance-ranked context assembly (semantic/lexical × recency half-life × scope affinity, position-aware layout); estimateTokens()
 - `lib/mcp-tools-context.ts` — ContextMcpTools: `context_pack` + `blackboard_search` MCP tools (signal-over-noise retrieval)
+- `lib/asi/` — ASI Strict Mode (opt-in `ASI_STRICT_MODE=audit|enforce`): ProofGate, ConsensusEngine, auditor receipts, HaltCoordinator kill switch, trust-tiered context, cognitive caps, canaries, HashChainSink
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, Gemini, OpenAI Responses, Claude Agent SDK, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)

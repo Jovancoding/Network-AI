@@ -25,6 +25,8 @@
  */
 
 import type { ModelMessage, ModelContentBlock } from './model-gateway';
+import { capThinkingBudget } from './asi/policies';
+import type { CognitiveBudget } from './asi/types';
 
 /** Block types tied to the producing model — dropped on a model switch. */
 const MODEL_BOUND_BLOCK_TYPES = new Set(['thinking', 'redacted_thinking']);
@@ -95,6 +97,17 @@ export class ThinkingBlockManager {
     return messages.some(
       (m) => Array.isArray(m.content) && (m.content as ModelContentBlock[]).some((b) => b && typeof b === 'object' && MODEL_BOUND_BLOCK_TYPES.has(b.type)),
     );
+  }
+
+  /**
+   * Cap a thinking-token budget to an ASI strict-mode {@link CognitiveBudget}.
+   * Without a budget the request passes through unchanged.
+   *
+   * @param requested  The requested thinking budget (tokens).
+   * @param budget     The caller's tier budget, if any.
+   */
+  capThinkingBudget(requested: number | undefined, budget: CognitiveBudget | undefined): number | undefined {
+    return capThinkingBudget(requested, budget);
   }
 
   /**

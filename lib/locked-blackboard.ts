@@ -34,6 +34,9 @@ import { randomUUID, createHash } from 'crypto';
 import { Logger } from './logger';
 import { LockAcquisitionError } from './errors';
 import type { SecureAuditLogger } from '../security';
+import { asiViolation, getAsiConfig, isAsiActive, trustRank } from './asi/config';
+import type { BlackboardValidator, ReceiptSigner } from './asi/receipts';
+import type { AsiStrictConfig, TrustResolver, ValidationReceipt } from './asi/types';
 
 const log = Logger.create('LockedBlackboard');
 
@@ -76,6 +79,22 @@ export interface LockedBlackboardOptions {
    * environments where fast startup is more important than crash recovery.
    */
   disableWal?: boolean;
+  /**
+   * ASI strict mode: changes proposed by agents at or below
+   * `config.requireReceiptAtOrBelow` commit only with a signed receipt from a
+   * designated auditor. Inert unless strict mode is on.
+   */
+  asi?: LockedBlackboardAsiOptions;
+}
+
+/** ASI strict-mode options for {@link LockedBlackboard}. */
+export interface LockedBlackboardAsiOptions {
+  /** Maps the proposing agent to its trust tier */
+  trustOf: TrustResolver;
+  /** Verifies auditor receipts */
+  receipts: ReceiptSigner;
+  /** Explicit config (default: the process-wide `ASI_STRICT_MODE` config) */
+  config?: AsiStrictConfig;
 }
 
 export interface BlackboardEntry {
@@ -410,6 +429,7 @@ export class LockedBlackboard {
   private walOpCounter = 0;
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
   private disableWal = false;
+  private asi: (LockedBlackboardAsiOptions & { config: AsiStrictConfig }) | undefined;
 
   constructor(basePath: string = '.', auditLoggerOrOptions?: SecureAuditLogger | LockedBlackboardOptions, options?: LockedBlackboardOptions) {
     // Resolve to an absolute path to prevent insecure relative/temp-dir path propagation
@@ -420,18 +440,27 @@ export class LockedBlackboard {
     //   new LockedBlackboard(path, auditLogger, options)
     //   new LockedBlackboard(path, options)
     let env: string | undefined;
-    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && ('conflictResolution' in auditLoggerOrOptions || 'throttleMs' in auditLoggerOrOptions || 'env' in auditLoggerOrOptions || 'disableWal' in auditLoggerOrOptions)) {
+    let asi: LockedBlackboardAsiOptions | undefined;
+    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && ('conflictResolution' in auditLoggerOrOptions || 'throttleMs' in auditLoggerOrOptions || 'env' in auditLoggerOrOptions || 'disableWal' in auditLoggerOrOptions || 'asi' in auditLoggerOrOptions)) {
       const opts = auditLoggerOrOptions as LockedBlackboardOptions;
       this.conflictResolution = opts.conflictResolution ?? 'first-commit-wins';
       this.throttleMs = opts.throttleMs ?? 0;
       env = opts.env;
       this.disableWal = opts.disableWal ?? false;
+      asi = opts.asi;
     } else {
       this.auditLogger = auditLoggerOrOptions as SecureAuditLogger | undefined;
       this.conflictResolution = options?.conflictResolution ?? 'first-commit-wins';
       this.throttleMs = options?.throttleMs ?? 0;
       env = options?.env;
       this.disableWal = options?.disableWal ?? false;
+      asi = options?.asi;
+    }
+    if (asi) {
+      if (typeof asi.trustOf !== 'function' || !asi.receipts) {
+        throw new TypeError('LockedBlackboard: asi.trustOf and asi.receipts are required');
+      }
+      this.asi = { ...asi, config: asi.config ?? getAsiConfig() };
     }
 
     // Respect NETWORK_AI_MINIMAL env var for CI/test fast startup
@@ -698,6 +727,20 @@ ${cacheContent}
   }
 
   /**
+   * Kill-switch hook (ASI `HaltCoordinator`): pause writes and abort every
+   * pending change. Reads keep working. Call {@link resume} to re-enable writes.
+   *
+   * @returns The number of pending changes aborted.
+   */
+  halt(reason: string): number {
+    this.paused = true;
+    const ids = [...this.pendingChanges.keys()];
+    for (const id of ids) this.abort(id);
+    this.audit('BLACKBOARD_HALT', 'system', 'halt', 'success', { reason, aborted: ids.length });
+    return ids.length;
+  }
+
+  /**
    * Set the minimum interval between write/commit operations.
    * @param ms Milliseconds between writes (0 to disable throttling)
    */
@@ -874,10 +917,38 @@ ${cacheContent}
   }
 
   /**
+   * Have an auditor review a pending change (ASI strict mode). On approval the
+   * change is validated under the auditor's id; pass the returned receipt to
+   * {@link commit}.
+   *
+   * @param changeId   The pending change.
+   * @param validator  An auditor validator (see `createAuditorValidator`).
+   */
+  async validateWithAuditor(changeId: string, validator: BlackboardValidator): Promise<{ validated: boolean; receipt?: ValidationReceipt }> {
+    const change = this.pendingChanges.get(changeId);
+    if (!change || change.status !== 'pending') return { validated: false };
+    const receipt = await validator(change);
+    if (receipt.verdict !== 'approved') return { validated: false, receipt };
+    return { validated: this.validate(changeId, receipt.validatorId), receipt };
+  }
+
+  /** Strict-mode receipt requirement for `change`; returns the rejection reason or `null`. */
+  private receiptRejection(change: PendingChange, receipt: ValidationReceipt | undefined): string | null {
+    const asi = this.asi;
+    if (!asi || !isAsiActive(asi.config)) return null;
+    if (trustRank(asi.trustOf(change.source_agent)) > trustRank(asi.config.requireReceiptAtOrBelow)) return null;
+    const reason = asi.receipts.check(receipt, change);
+    if (reason) return reason;
+    if (!receipt || !asi.config.auditors.includes(receipt.validatorId)) return 'receipt is not from a designated auditor';
+    if (receipt.validatorId === change.source_agent) return 'an agent cannot audit its own change';
+    return null;
+  }
+  /**
    * STEP 3a: Commit a validated change (applies to blackboard).
+   * @param receipt Auditor receipt — required in ASI strict mode for low-trust proposers.
    * @returns CommitResult with success status
    */
-  commit(changeId: string): CommitResult {
+  commit(changeId: string, receipt?: ValidationReceipt): CommitResult {
     this.enforceFlowControl();
     const change = this.pendingChanges.get(changeId);
     const lockStart = Date.now();
@@ -896,6 +967,14 @@ ${cacheContent}
         change_id: changeId,
         message: `Change ${changeId} is ${change.status}, must be validated first`
       };
+    }
+
+    if (this.asi) {
+      const rejection = this.receiptRejection(change, receipt);
+      if (rejection && asiViolation(this.asi.config, { kind: 'blackboard', agentId: change.source_agent, reason: rejection, details: { changeId, key: change.key } })) {
+        this.audit('BLACKBOARD_COMMIT', change.source_agent, 'commit', 'failure', { changeId, key: change.key, reason: 'asi_receipt', detail: rejection });
+        return { success: false, change_id: changeId, message: `ASI strict mode: ${rejection}` };
+      }
     }
 
     // Acquire lock and apply change atomically

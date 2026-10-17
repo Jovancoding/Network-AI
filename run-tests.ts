@@ -50,6 +50,7 @@ const SUITES = [
   'test-phase18.ts',
   'test-phase19.ts',
   'test-phase20.ts',
+  'test-asi.ts',
 ];
 
 const WIDTH = 60;

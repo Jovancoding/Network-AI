@@ -1137,6 +1137,8 @@ export { ContextComposer, estimateTokens, createSemanticMemoryRanker } from './l
 export type { ContextSource, RankedContextItem, ComposedContext, ComposeOptions, ContextComposerOptions, ScoreWeights, SemanticRanker, SemanticSearchLike, ExclusionReason, ExcludedItem } from './lib/context-composer';
 export { ContextMcpTools, CONTEXT_TOOL_DEFINITIONS } from './lib/mcp-tools-context';
 export type { ContextMcpToolsOptions } from './lib/mcp-tools-context';
+// ASI Strict Mode — opt-in controls for highly capable agents (ASI_STRICT_MODE=audit|enforce)
+export * from './lib/asi';
 export { createAdapterTestSuite } from './lib/adapter-test-harness';
 export type { AdapterTestSuiteConfig, AdapterTestResult, AssertFn, SectionFn } from './lib/adapter-test-harness';
 export { SwarmTransportServer, SwarmTransportClient } from './lib/swarm-transport';
@@ -1214,7 +1216,7 @@ export type {
 export type { OpenClawSkill, SkillContext, SkillResult } from './lib/orchestrator-types';
 
 // Phase 3: Priority & Preemption types
-export type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions, BlackboardEntryMetadata } from './lib/locked-blackboard';
+export type { ConflictResolutionStrategy, AgentPriority, LockedBlackboardOptions, LockedBlackboardAsiOptions, BlackboardEntryMetadata } from './lib/locked-blackboard';
 // LockedBlackboard WAL / sweep public API
 export { LockedBlackboard } from './lib/locked-blackboard';
 
@@ -1854,6 +1856,8 @@ export type {
   ThinkingSink,
   EffortSink,
   RefusalTelemetrySink,
+  CognitiveSink,
+  GatewayAsiOptions,
   GovernedModelGatewayConfig,
   GatewayAttempt,
   GovernedSendRequest,

@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.15.6 — TypeScript/Node.js multi-agent orchestrator with 32 adapters, 3,740 tests, 80+ modules.
+Network-AI v5.16.0 — TypeScript/Node.js multi-agent orchestrator with 32 adapters, 3,888 tests, 80+ modules.
 
 > **Two governance layers.** Policy engines govern *what an agent may do* before it acts (pre-wire tool gating). Network-AI adds the layer underneath — **model-interaction lifecycle governance**: when a frontier model returns a classifier refusal, the `GovernedModelGateway` audits it, falls over to another model, reprices the retry with fallback credit, hands off thinking blocks, and accounts the cost — one governed, budgeted, audited call. The two layers are complementary.
 
@@ -355,6 +355,34 @@ DEFAULT_TRUST_LEVELS = {
 }
 GRANT_TOKEN_TTL_MINUTES = 5
 ```
+
+---
+
+## ASI Strict Mode (`lib/asi/`)
+
+Opt-in (`ASI_STRICT_MODE=audit|enforce`, default off). With strict mode off, every integration point costs one boolean check and behaviour is unchanged. Components accept an explicit `config` so the process-wide setting never has to be touched in tests or embedders.
+
+```
+                 ┌───────────── HaltCoordinator (PAS kill switch) ─────────────┐
+ input ──screen──▶ GovernedModelGateway ──caps──▶ model ──canary/consensus──▶ output
+                 │   ▲ EffortPolicy / ThinkingBlockManager (tier budgets)        │
+ agent ──────────▶ AgentRuntime / McpCombinedBridge ──ProofGate──▶ tool          │
+ agent ──propose─▶ LockedBlackboard ──auditor receipt──▶ commit                  │
+                 └──────── AsiEvent ──▶ HashChainSink ──▶ ExternalAuthority ─────┘
+```
+
+| Module | Role |
+|---|---|
+| `config.ts` | Parse `ASI_STRICT_MODE` once (unknown values → `enforce`), deep-freeze; `tightenAsiConfig` only moves stricter; `asiViolation` returns block/allow by mode and emits `denied`/`would-deny` |
+| `trust.ts` | AuthGuardian score → `AgentTrustLevel` (LOW/HIGH); AUDITOR only by operator designation |
+| `proof-gate.ts` | `ActionBinding` (tool, canonical-args hash, agent, nonce, expiry); `ProofGate` checks binding, freshness, replay, BYO verifier, optional `ExternalAuthority.authorize`; `CapabilityIssuer` mints HMAC/Ed25519 capabilities |
+| `consensus.ts` | Weiszfeld geometric median, CP-WBFT confidence weights, 3f+1 quorum, outlier bound, model-family diversity, `BallotSigner` |
+| `receipts.ts` | `ReceiptSigner` binds auditor verdicts to change id, key, value hash, base hash; `claimVerifierCheck` |
+| `shutdown.ts` | `HaltCoordinator`: salted-HMAC token, constant-time match, input redaction, latch, `AbortSignal`, fan-out halt with timeouts, signal + HTTP channels, separate resume key |
+| `policies.ts` | Tier context policy (budget, score floor, scopes, excluded producers) and cognitive budget (effort, thinking, output, depth) |
+| `canary.ts`, `authority.ts` | Decoy leak detection; SHA-256 hash-chained event export with `verifyEventChain` |
+
+Threat assumptions: at most f faulty and independent consensus evaluators; signing keys, shutdown token, and receipt secret held outside the agents' reach. Strict mode does not contain an agent that can execute arbitrary code on the host — use OS isolation and an out-of-process authority for that.
 
 ---
 

@@ -26,6 +26,13 @@
  * @license MIT
  */
 
+import { asiViolation, AsiPolicyError, getAsiConfig, isAsiActive } from './asi/config';
+import { capThinkingBudget } from './asi/policies';
+import type { ConsensusEngine } from './asi/consensus';
+import type { CanaryRegistry } from './asi/canary';
+import type { HaltCoordinator } from './asi/shutdown';
+import type { AsiStrictConfig, CognitiveBudget, ConsensusEvaluator, ConsensusResult } from './asi/types';
+
 // ============================================================================
 // NORMALIZED MODEL I/O (provider-agnostic)
 // ============================================================================
@@ -90,6 +97,8 @@ export interface ModelRequest {
   effort?: EffortLevel;
   /** When set, the caller should redeem this credit on the retry. */
   fallbackCreditToken?: string;
+  /** Thinking-token budget (capped per trust tier in ASI strict mode). */
+  thinkingBudgetTokens?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -147,6 +156,28 @@ export interface RefusalTelemetrySink {
   recordFallbackServed(info: { requestedModel: string; servedModel: string; agentId?: string }): void;
 }
 
+/** Per-agent reasoning caps for ASI strict mode. {@link EffortPolicy} satisfies this. */
+export interface CognitiveSink {
+  cognitiveBudget(agentId: string | undefined): CognitiveBudget | undefined;
+}
+
+/** ASI strict-mode collaborators. All optional; inert unless strict mode is on. */
+export interface GatewayAsiOptions {
+  /** Explicit config (default: the process-wide `ASI_STRICT_MODE` config) */
+  config?: AsiStrictConfig;
+  /** Kill switch: inbound messages are screened before any model sees them */
+  halt?: HaltCoordinator;
+  /** Canary leak detection on model output */
+  canaries?: CanaryRegistry;
+  /** Multi-evaluator consensus for high-stakes turns */
+  consensus?: {
+    engine: ConsensusEngine;
+    evaluators: readonly ConsensusEvaluator[];
+    /** Which turns need consensus (default: tool use, effort xhigh/max, or `metadata.highStakes`) */
+    when?: (request: GovernedSendRequest) => boolean;
+  };
+}
+
 // ============================================================================
 // GATEWAY CONFIG & RESULT
 // ============================================================================
@@ -175,6 +206,10 @@ export interface GovernedModelGatewayConfig {
   thinking?: ThinkingSink;
   /** Effort governance policy. */
   effort?: EffortSink;
+  /** Per-agent reasoning caps (ASI strict mode). */
+  cognitive?: CognitiveSink;
+  /** ASI strict-mode controls (opt-in). */
+  asi?: GatewayAsiOptions;
 }
 
 /** A single attempt in the fallback chain — the source of truth for billing. */
@@ -197,6 +232,10 @@ export interface GovernedSendRequest {
   effort?: EffortLevel;
   /** Used for audit/telemetry/budget attribution. */
   agentId?: string;
+  /** Requested thinking-token budget (capped per trust tier in ASI strict mode). */
+  thinkingBudgetTokens?: number;
+  /** Sub-agent nesting depth of the caller (0 = top-level agent). */
+  depth?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -216,6 +255,13 @@ export interface GovernedModelResult {
   refusalCategories: RefusalCategory[];
   /** Sum of attempt costs when a budget is configured. */
   totalCostUsd?: number;
+  /** ASI strict-mode outcome, present only when strict mode acted on this turn. */
+  asi?: {
+    /** Set when strict mode withheld the response */
+    blocked?: 'consensus' | 'canary';
+    consensus?: ConsensusResult;
+    cognitive?: CognitiveBudget;
+  };
 }
 
 // ============================================================================
@@ -261,6 +307,9 @@ export class GovernedModelGateway {
   private readonly telemetry: RefusalTelemetrySink | undefined;
   private readonly thinking: ThinkingSink | undefined;
   private readonly effortPolicy: EffortSink | undefined;
+  private readonly cognitive: CognitiveSink | undefined;
+  private readonly asi: GatewayAsiOptions | undefined;
+  private readonly asiConfig: AsiStrictConfig;
 
   constructor(config: GovernedModelGatewayConfig) {
     if (typeof config.caller !== 'function') {
@@ -280,6 +329,9 @@ export class GovernedModelGateway {
     this.telemetry = config.telemetry;
     this.thinking = config.thinking;
     this.effortPolicy = config.effort;
+    this.cognitive = config.cognitive;
+    this.asi = config.asi;
+    this.asiConfig = config.asi?.config ?? getAsiConfig();
   }
 
   /**
@@ -295,6 +347,14 @@ export class GovernedModelGateway {
   async send(request: GovernedSendRequest): Promise<GovernedModelResult> {
     if (!request || !Array.isArray(request.messages)) {
       throw new TypeError('GovernedModelGateway.send: request.messages must be an array');
+    }
+
+    const strict = isAsiActive(this.asiConfig);
+    let budget: CognitiveBudget | undefined;
+    if (strict) {
+      const prepared = this.prepareStrict(request);
+      request = prepared.request;
+      budget = prepared.budget;
     }
 
     const agentId = request.agentId;
@@ -327,6 +387,7 @@ export class GovernedModelGateway {
         tools: request.tools,
         effort,
         fallbackCreditToken: creditToken,
+        thinkingBudgetTokens: request.thinkingBudgetTokens,
         metadata: request.metadata,
       };
 
@@ -370,7 +431,7 @@ export class GovernedModelGateway {
             agentId,
           });
         }
-        return {
+        const served: GovernedModelResult = {
           response,
           servedModel: response.model,
           refused: false,
@@ -379,6 +440,7 @@ export class GovernedModelGateway {
           refusalCategories: categories,
           totalCostUsd,
         };
+        return strict ? this.reviewStrict(request, served, budget) : served;
       }
 
       // Refusal: record the signal (refusal !== error), capture credit, continue.
@@ -425,6 +487,90 @@ export class GovernedModelGateway {
       return this.effortPolicy.resolve(requested ?? this.defaultEffort, { agentId });
     }
     return requested ?? this.defaultEffort;
+  }
+
+  /**
+   * Strict-mode pre-flight: kill-switch screening (before any model sees the
+   * input), then per-tier caps on output, thinking, and sub-agent depth.
+   */
+  private prepareStrict(request: GovernedSendRequest): { request: GovernedSendRequest; budget?: CognitiveBudget } {
+    const halt = this.asi?.halt;
+    if (halt) {
+      halt.assertNotHalted();
+      const screened = halt.screenInput({ messages: request.messages, system: request.system });
+      if (screened.halted) halt.assertNotHalted();
+      request = { ...request, messages: screened.sanitized.messages, system: screened.sanitized.system };
+    }
+
+    const budget = this.cognitive?.cognitiveBudget(request.agentId);
+    if (!budget) return { request };
+
+    const depth = request.depth ?? 0;
+    if (budget.maxSubAgentDepth !== undefined && depth > budget.maxSubAgentDepth) {
+      const block = asiViolation(this.asiConfig, {
+        kind: 'cognitive',
+        agentId: request.agentId,
+        reason: `sub-agent depth ${depth} exceeds ${budget.maxSubAgentDepth}`,
+      });
+      if (block) throw new AsiPolicyError(`Sub-agent depth ${depth} exceeds the strict-mode limit of ${budget.maxSubAgentDepth}`, 'ASI_DEPTH_EXCEEDED');
+    }
+    const maxTokens = budget.maxOutputTokens === undefined
+      ? request.maxTokens
+      : Math.min(request.maxTokens ?? budget.maxOutputTokens, budget.maxOutputTokens);
+    return {
+      request: { ...request, maxTokens, thinkingBudgetTokens: capThinkingBudget(request.thinkingBudgetTokens, budget) },
+      budget,
+    };
+  }
+
+  /** Strict-mode post-flight: canary leak detection, then consensus on high-stakes turns. */
+  private async reviewStrict(
+    request: GovernedSendRequest,
+    result: GovernedModelResult,
+    budget: CognitiveBudget | undefined,
+  ): Promise<GovernedModelResult> {
+    const asi: NonNullable<GovernedModelResult['asi']> = budget ? { cognitive: budget } : {};
+    const withheld = (reason: 'consensus' | 'canary'): GovernedModelResult => ({
+      ...result,
+      response: { ...result.response, content: [], stopReason: `asi_${reason}_blocked` },
+      asi: { ...asi, blocked: reason },
+    });
+
+    if (this.asi?.canaries?.check(result.response.content, request.agentId, 'model output')) {
+      return withheld('canary');
+    }
+
+    const consensus = this.asi?.consensus;
+    const highStakes = consensus && (consensus.when
+      ? consensus.when(request)
+      : (request.tools?.length ?? 0) > 0
+        || request.effort === 'xhigh' || request.effort === 'max'
+        || request.metadata?.['highStakes'] === true);
+    if (consensus && highStakes) {
+      const proposal = result.response.content
+        .map((b) => (typeof b.text === 'string' ? b.text : JSON.stringify(b)))
+        .join('\n');
+      const lastUser = [...request.messages].reverse().find((m) => m.role === 'user');
+      asi.consensus = await consensus.engine.decide(
+        {
+          agentId: request.agentId,
+          proposal,
+          context: lastUser ? (typeof lastUser.content === 'string' ? lastUser.content : JSON.stringify(lastUser.content)) : undefined,
+          metadata: request.metadata,
+        },
+        consensus.evaluators,
+      );
+      if (!asi.consensus.accepted) {
+        const block = asiViolation(this.asiConfig, {
+          kind: 'consensus',
+          agentId: request.agentId,
+          reason: asi.consensus.reason ?? 'consensus not reached',
+        });
+        if (block) return withheld('consensus');
+      }
+    }
+
+    return Object.keys(asi).length > 0 ? { ...result, asi } : result;
   }
 
   private async auditAttempt(

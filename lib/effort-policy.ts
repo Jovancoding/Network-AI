@@ -17,6 +17,9 @@
  */
 
 import type { EffortLevel } from './model-gateway';
+import { getAsiConfig, isAsiActive } from './asi/config';
+import { cognitiveBudgetFor } from './asi/policies';
+import type { AsiStrictConfig, CognitiveBudget, TrustResolver } from './asi/types';
 
 /** Effort tiers, lowest to highest. */
 const ORDER: EffortLevel[] = ['low', 'medium', 'high', 'xhigh', 'max'];
@@ -42,6 +45,11 @@ export interface EffortPolicyOptions {
   perAgent?: Record<string, EffortLevel>;
   /** Effort at or above this tier requires a non-empty justification. */
   requireJustificationAtOrAbove?: EffortLevel;
+  /**
+   * ASI strict mode: per-trust-tier effort and thinking caps from
+   * `config.cognitive`. Inert unless strict mode is on.
+   */
+  strict?: { trustOf: TrustResolver; config?: AsiStrictConfig };
 }
 
 /** Outcome of {@link EffortPolicy.gate}. */
@@ -74,12 +82,26 @@ export class EffortPolicy {
   private readonly defaultLevel: EffortLevel;
   private readonly perAgent: Record<string, EffortLevel>;
   private readonly justificationThreshold: EffortLevel | undefined;
+  private readonly strict: { trustOf: TrustResolver; config: AsiStrictConfig } | undefined;
 
   constructor(options: EffortPolicyOptions = {}) {
     this.ceiling = options.ceiling ?? 'max';
     this.defaultLevel = options.default ?? 'high';
     this.perAgent = options.perAgent ?? {};
     this.justificationThreshold = options.requireJustificationAtOrAbove;
+    this.strict = options.strict
+      ? { trustOf: options.strict.trustOf, config: options.strict.config ?? getAsiConfig() }
+      : undefined;
+  }
+
+  /**
+   * The ASI strict-mode reasoning budget for `agentId`, from its trust tier.
+   * `undefined` when strict mode is off or no budget is configured.
+   * Satisfies `CognitiveSink`.
+   */
+  cognitiveBudget(agentId: string | undefined): CognitiveBudget | undefined {
+    if (!this.strict || !isAsiActive(this.strict.config)) return undefined;
+    return cognitiveBudgetFor(this.strict.trustOf(agentId), this.strict.config);
   }
 
   /**
@@ -133,9 +155,10 @@ export class EffortPolicy {
     return { granted, downgraded: rank(granted) < rank(want), reason };
   }
 
-  /** The effort ceiling that applies to `agentId` (per-agent, else global). */
+  /** The effort ceiling that applies to `agentId` (per-agent, else global, lowered by any strict-mode tier cap). */
   private ceilingFor(agentId?: string): EffortLevel {
-    if (agentId && this.perAgent[agentId]) return this.perAgent[agentId];
-    return this.ceiling;
+    const base = agentId && this.perAgent[agentId] ? this.perAgent[agentId] : this.ceiling;
+    const budget = this.cognitiveBudget(agentId);
+    return budget ? minLevel(base, budget.effortCeiling) : base;
   }
 }

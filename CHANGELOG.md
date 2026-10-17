@@ -5,6 +5,25 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.16.0] - 2026-10-17
+
+### Added — ASI Strict Mode (opt-in)
+- **`ASI_STRICT_MODE`** (`lib/asi/`) — opt-in controls for highly capable agents. Unset/`false` = off (unchanged behaviour, one boolean check per integration point); `audit` = every check runs and reports `would-deny` without blocking; `enforce` (and any unrecognized value — fails closed) = block. Read once and deep-frozen; `tightenAsiConfig()` can only make it stricter (mode, LOW-trust threshold, receipt tier; auditors and policies cannot be added or replaced once set).
+- **Proof-carrying actions** — `ProofGate` requires a proof bound to the exact tool, canonical-argument hash, agent, single-use nonce, and expiry. Bring-your-own `ProofVerifier` (zkVM receipts, formal-verification certificates); `CapabilityIssuer` + `SignedAttestationVerifier` provide short-lived HMAC-SHA256 / Ed25519 capability tokens for deployments without a prover; optional out-of-process `ExternalAuthority.authorize` co-signer. Wired into `AgentRuntime.exec`/`writeFile` (`shell_exec`, `file_write`; `shellProofArgs()` / `writeProofArgs()` give the binding arguments) and `McpCombinedBridge` (`useProofGate()`, tools marked `requires_formal_proof`, proof in `arguments.__proof`).
+- **BFT consensus** — `ConsensusEngine`: Weiszfeld geometric median, CP-WBFT confidence weighting, 3f+1 quorum, outlier bound, minimum model-family diversity, `BallotSigner`, per-evaluator timeouts; evaluators cannot vote as each other. `GovernedModelGateway` runs it on high-stakes turns (tool use, `xhigh`/`max` effort, or `metadata.highStakes`) and withholds rejected responses.
+- **Auditor receipts** — `LockedBlackboard` `asi` option: changes by agents at or below `requireReceiptAtOrBelow` commit only with a `ReceiptSigner` receipt from an operator-designated auditor, bound to change id, key, value hash, and base version. New `validateWithAuditor()`, `commit(changeId, receipt?)`, `createAuditorValidator()`, `claimVerifierCheck()`.
+- **Password-Activated Shutdown** — `HaltCoordinator`: salted-HMAC shutdown token detected in the input stream (redacted before any model sees it), on an OS signal, or via a rate-limited HTTP handler; fans out to registered components (`halt()`/`stop()`/`close()`) with timeouts, aborts an `AbortSignal`, latches, and resumes only with a separate key. `LockedBlackboard.halt()` and `AgentRuntime.halt()` (kills child processes) added.
+- **Trust tiers** — `AgentTrustLevel` (LOW/HIGH/AUDITOR; AUDITOR only by operator designation), `createTrustResolver(authGuardian)`. `ContextComposer` `agentTrust` option applies per-tier context policies (budget, score floor, item cap, allowed scopes, excluded producers; exclusions reported as `trust`).
+- **Cognitive caps** — `EffortPolicy` `strict` option and `cognitiveBudget()`; `ThinkingBlockManager.capThinkingBudget()`; `GovernedModelGateway` caps effort, `maxTokens`, new `thinkingBudgetTokens`, and sub-agent `depth`.
+- **Canaries & tamper-evident export** — `CanaryRegistry` flags decoy values in model output; `HashChainSink` hash-chains strict-mode events to an external append-only store, `verifyEventChain()` detects edits and drops.
+- In `enforce` mode `AgentRuntime` forces `sourceProtection` and withholds secret-like environment variables from child processes.
+
+### Changed
+- `MCPToolDefinition` gains optional `requires_formal_proof` and `risk_tier`. `SandboxPolicy.canonicalCommand()` is public.
+
+### Tests
+- New `test-asi.ts` (147 checks). Full suite: **3,888 tests across 42 suites**; `tsc --noEmit` clean.
+
 ## [5.15.6] - 2026-10-17
 
 ### Security

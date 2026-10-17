@@ -30,6 +30,13 @@ export interface MCPToolDefinition {
   name: string;
   description: string;
   inputSchema: MCPJsonSchema;
+  /**
+   * ASI strict mode: calls must carry a formal proof (`arguments.__proof`)
+   * accepted by the bridge's `ProofGate`. Ignored when strict mode is off.
+   */
+  requires_formal_proof?: boolean;
+  /** Informational risk tier for policy and UI. */
+  risk_tier?: 'low' | 'medium' | 'high' | 'critical';
 }
 
 /** Normalised result returned by every blackboard tool call. */

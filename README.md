@@ -5,9 +5,9 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.15.6-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.16.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-3740%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-3888%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-32%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -104,6 +104,46 @@ Verify programmatically with `verifyOwaspCoverage()` (exported from `network-ai`
 | ASI-08 Cascading Failures | ✅ Covered | CircuitBreaker + budgets + RetryBudget |
 | ASI-09 Human-Agent Trust Exploitation | ✅ Covered | ApprovalGate + tamper-evident audit trail |
 | ASI-10 Rogue Agents | ✅ Covered | ComplianceMonitor + circuit-breaker kill switch |
+
+### 🔒 ASI Strict Mode (opt-in)
+
+For deployments running highly capable agents, `ASI_STRICT_MODE` adds controls that assume an agent may be smarter than its overseers. It is **off by default**; when off, every code path is unchanged (a single boolean check).
+
+| Setting | Behaviour |
+|---|---|
+| unset / `false` | Off — today's behaviour |
+| `audit` | Every check runs and reports would-be denials (`outcome: 'would-deny'`) without blocking — measure before you enforce |
+| `enforce` (or any other value — fails closed) | Violations are blocked |
+
+The setting is read once and frozen; at runtime it can only be **tightened** (`tightenAsiConfig`), never loosened.
+
+| Control | What it does |
+|---|---|
+| **Proof-carrying actions** (`ProofGate`) | Gated tools (`shell_exec`, `file_write`, MCP tools marked `requires_formal_proof`) run only with a proof bound to the exact tool, canonical arguments, agent, single-use nonce, and expiry. BYO verifiers (zkVM receipts, formal-verification certificates); built-in short-lived HMAC/Ed25519 capability tokens (`CapabilityIssuer`) for deployments without a prover; optional out-of-process co-signer (`ExternalAuthority.authorize`). |
+| **BFT consensus** (`ConsensusEngine`) | High-stakes `GovernedModelGateway` turns are judged by ≥ 3f+1 independent evaluators; robust geometric median (Weiszfeld) with CP-WBFT confidence weighting, outlier detection, signed ballots, and a minimum number of distinct **model families** (correlated models fail together). |
+| **Auditor receipts** (`LockedBlackboard`) | LOW-trust agents' changes commit only with a signed receipt from an operator-designated AUDITOR, bound to the change id, key, value hash, and base version. `claimVerifierCheck` lets `ClaimVerifier` be the auditor's check. |
+| **Kill switch** (`HaltCoordinator`) | Password-Activated Shutdown: a salted-hash token detected in the input stream (redacted before any model sees it), an OS signal, or an authenticated HTTP call halts every registered component, aborts in-flight work, and latches until a separate resume key is presented. |
+| **Trust-tiered context** (`ContextComposer`) | Per-tier context policies: smaller budgets, higher score floors, allowed scopes, excluded producers. AUDITOR is never derived from a score. |
+| **Cognitive caps** (`EffortPolicy`, `ThinkingBlockManager`) | Per-tier effort ceiling, thinking-token budget, output cap, and sub-agent depth limit. |
+| **Canaries & export** (`CanaryRegistry`, `HashChainSink`) | Decoy values that flag exfiltration when they appear in output; strict-mode events hash-chained to an append-only store outside the agents' process. |
+
+In `enforce` mode `AgentRuntime` also forces `sourceProtection` and withholds secret-like environment variables from child processes.
+
+```typescript
+import { createAsiConfig, ProofGate, CapabilityIssuer, SignedAttestationVerifier, AgentRuntime } from 'network-ai';
+
+const config = createAsiConfig({ mode: 'enforce', auditors: ['auditor-1'] });
+const key = { name: 'ops', alg: 'hmac-sha256' as const, key: process.env.CAPABILITY_KEY! };
+const proofGate = new ProofGate({ gatedTools: ['shell_exec', 'file_write'], verifiers: [new SignedAttestationVerifier([key])] }, config);
+const runtime = new AgentRuntime({ policy: { basePath: '.', allowedCommands: ['npm *'] }, asi: { proofGate, config } });
+
+// The approval service (outside the agent's process) mints a one-shot capability:
+const issuer = new CapabilityIssuer('ops', { alg: 'hmac-sha256', secret: process.env.CAPABILITY_KEY! });
+const proof = issuer.issue('shell_exec', runtime.shellProofArgs('npm test'), 'agent-7');
+await runtime.exec('npm test', 'agent-7', { proof });
+```
+
+> **Limits.** Strict mode raises the cost of misbehaviour; it is not a containment proof. An agent with arbitrary code execution on the same host can restart the process with different settings — pair strict mode with OS-level isolation and an out-of-process `ExternalAuthority`. Consensus assumes at most f faulty, independent evaluators.
 
 ---
 
@@ -594,7 +634,7 @@ npm run test:phase9       # Agent runtime, console, strategy agent
 npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate, Route Classifier
 ```
 
-**3,740 passing assertions across 41 test suites** (`npm run test:all`):
+**3,888 passing assertions across 42 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|

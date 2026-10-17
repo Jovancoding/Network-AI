@@ -16,12 +16,17 @@
  */
 
 import { spawn } from 'child_process';
+import type { ChildProcess } from 'child_process';
 import { createHash } from 'crypto';
 import { readFile, writeFile, readdir, stat, mkdir } from 'fs/promises';
 import { join, normalize, isAbsolute, resolve, dirname, sep } from 'path';
 import { EventEmitter } from 'events';
 import type { ExecutionReceipt } from '../security';
 import { SecureTokenManager } from '../security';
+import { getAsiConfig, isAsiActive, isAsiEnforcing, AsiPolicyError } from './asi/config';
+import type { ProofGate } from './asi/proof-gate';
+import type { HaltCoordinator } from './asi/shutdown';
+import type { AsiStrictConfig, FormalProof } from './asi/types';
 
 // ============================================================================
 // ERRORS
@@ -81,6 +86,8 @@ export interface ShellOptions {
   requiresApproval?: boolean;
   /** Agent ID requesting execution */
   agentId?: string;
+  /** ASI strict mode: proof for a gated `shell_exec` call (see `AgentRuntime.shellProofArgs`) */
+  proof?: FormalProof;
 }
 
 /** File operation result */
@@ -186,6 +193,16 @@ export interface AgentRuntimeOptions {
   policy: Partial<SandboxPolicyConfig> & { basePath: string };
   onApproval?: ApprovalCallback;
   autoApproveAll?: boolean;
+  /**
+   * ASI strict mode. Gated tools are `shell_exec` and `file_write`. In
+   * `enforce` mode `sourceProtection` is forced on and secret-like
+   * environment variables are withheld from child processes.
+   */
+  asi?: {
+    proofGate?: ProofGate;
+    halt?: HaltCoordinator;
+    config?: AsiStrictConfig;
+  };
 }
 
 // ============================================================================
@@ -399,6 +416,14 @@ export class SandboxPolicy {
     return parsed.argv.join(' ');
   }
 
+  /**
+   * The canonical form of `command` (what the executor runs), or `null` if
+   * it is unsafe. Proofs and approvals must bind to this, not the raw string.
+   */
+  canonicalCommand(command: string): string | null {
+    return this.canonicalize(command);
+  }
+
   /** Check if a command requires human approval */
   requiresApproval(command: string): boolean {
     const canonical = this.canonicalize(command);
@@ -527,9 +552,25 @@ export class SandboxPolicy {
 export class ShellExecutor {
   private readonly policy: SandboxPolicy;
   private activeProcesses = 0;
+  private readonly children = new Set<ChildProcess>();
+  private readonly scrubEnv: boolean;
 
-  constructor(policy: SandboxPolicy) {
+  /**
+   * @param policy  Sandbox policy.
+   * @param opts.scrubEnv  Withhold secret-like environment variables from child processes.
+   */
+  constructor(policy: SandboxPolicy, opts: { scrubEnv?: boolean } = {}) {
     this.policy = policy;
+    this.scrubEnv = opts.scrubEnv ?? false;
+  }
+
+  /** Terminate every running child process. Returns how many were signalled. */
+  killAll(): number {
+    let n = 0;
+    for (const child of this.children) {
+      if (child.kill('SIGKILL')) n++;
+    }
+    return n;
   }
 
   /** Execute a shell command within policy constraints */
@@ -587,13 +628,15 @@ export class ShellExecutor {
       const file = argv[0]!;
       const args = argv.slice(1);
 
+      const baseEnv = this.scrubEnv ? scrubSecretEnv(process.env) : process.env;
       const child = spawn(file, args, {
         cwd,
-        env: env ? { ...process.env, ...env } : process.env,
+        env: env ? { ...baseEnv, ...env } : baseEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
         shell: false,
       });
+      this.children.add(child);
 
       let stdout = '';
       let stderr = '';
@@ -627,6 +670,7 @@ export class ShellExecutor {
 
       child.on('close', (code) => {
         clearTimeout(timer);
+        this.children.delete(child);
         resolvePromise({
           exitCode: code ?? (timedOut ? 124 : 1),
           stdout,
@@ -639,12 +683,24 @@ export class ShellExecutor {
 
       child.on('error', (err) => {
         clearTimeout(timer);
+        this.children.delete(child);
         reject(new RuntimeExecutionError(`Failed to spawn: ${err.message}`));
       });
 
       const startTime = Date.now();
     });
   }
+}
+
+const SECRET_ENV = /^ASI_|SECRET|TOKEN|PASSW(OR)?D|API_?KEY|PRIVATE_?KEY|CREDENTIAL|_AUTH$/i;
+
+/** Copy of `env` without secret-like variables. */
+function scrubSecretEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (!SECRET_ENV.test(k)) out[k] = v;
+  }
+  return out;
 }
 
 // ============================================================================
@@ -891,11 +947,15 @@ export class AgentRuntime extends EventEmitter {
   readonly gate: ApprovalGate;
   private auditLog: RuntimeAuditEntry[] = [];
   private readonly receiptManager = new SecureTokenManager();
+  private readonly asi: AgentRuntimeOptions['asi'] & { config: AsiStrictConfig } | undefined;
 
   constructor(opts: AgentRuntimeOptions) {
     super();
-    this.policy = new SandboxPolicy(opts.policy);
-    this.shell = new ShellExecutor(this.policy);
+    const asiConfig = opts.asi ? (opts.asi.config ?? getAsiConfig()) : undefined;
+    const enforcing = asiConfig !== undefined && isAsiEnforcing(asiConfig);
+    this.asi = opts.asi && asiConfig ? { ...opts.asi, config: asiConfig } : undefined;
+    this.policy = new SandboxPolicy(enforcing ? { ...opts.policy, sourceProtection: true } : opts.policy);
+    this.shell = new ShellExecutor(this.policy, { scrubEnv: enforcing });
     this.files = new FileAccessor(this.policy);
     this.gate = new ApprovalGate(opts.onApproval, opts.autoApproveAll);
 
@@ -921,12 +981,15 @@ export class AgentRuntime extends EventEmitter {
    * Returns ShellResult on success, throws on policy violation.
    */
   async exec(command: string, agentId: string, opts: ShellOptions = {}): Promise<ShellResult> {
+    this.asi?.halt?.assertNotHalted();
     // Policy check
     if (!this.policy.isCommandAllowed(command)) {
       this.emit('policy:violation', agentId, command, 'Command not allowed by policy');
       this.audit({ action: 'shell_execute', agentId, target: command, result: 'blocked' });
       throw new RuntimePolicyError(`Command blocked by policy: ${command}`);
     }
+
+    await this.checkProof('shell_exec', this.shellProofArgs(command), agentId, command, opts.proof);
 
     // Approval check
     const needsApproval = opts.requiresApproval ?? this.policy.requiresApproval(command);
@@ -992,12 +1055,23 @@ export class AgentRuntime extends EventEmitter {
     return result;
   }
 
-  /** Write a file with policy + approval */
-  async writeFile(filePath: string, content: string, agentId: string): Promise<FileResult> {
+  /**
+   * Write a file with policy + approval.
+   * @param opts.proof  ASI strict mode: proof for a gated `file_write` (see {@link writeProofArgs}).
+   */
+  async writeFile(filePath: string, content: string, agentId: string, opts: { proof?: FormalProof } = {}): Promise<FileResult> {
+    this.asi?.halt?.assertNotHalted();
     if (!this.policy.isPathAllowed(filePath)) {
       this.emit('policy:violation', agentId, filePath, 'Path not allowed');
       this.audit({ action: 'file_write', agentId, target: filePath, result: 'blocked' });
       return { success: false, path: filePath, error: 'Path not allowed by policy', durationMs: 0 };
+    }
+
+    try {
+      await this.checkProof('file_write', this.writeProofArgs(filePath, content), agentId, filePath, opts.proof);
+    } catch (err) {
+      if (err instanceof AsiPolicyError) return { success: false, path: filePath, error: err.message, durationMs: 0 };
+      throw err;
     }
 
     const decision = await this.gate.request({
@@ -1042,6 +1116,37 @@ export class AgentRuntime extends EventEmitter {
   /** Get the internal audit log */
   getAuditLog(): ReadonlyArray<RuntimeAuditEntry> {
     return this.auditLog;
+  }
+
+  /** Arguments a `shell_exec` proof must bind to: the canonical command. */
+  shellProofArgs(command: string): { command: string } {
+    return { command: this.policy.canonicalCommand(command) ?? command };
+  }
+
+  /** Arguments a `file_write` proof must bind to: resolved path and content hash. */
+  writeProofArgs(filePath: string, content: string): { path: string; sha256: string } {
+    return {
+      path: this.policy.resolvePath(filePath) ?? filePath,
+      sha256: createHash('sha256').update(content).digest('hex'),
+    };
+  }
+
+  /** Kill-switch hook (ASI `HaltCoordinator`): terminate running child processes. */
+  halt(reason: string): number {
+    const killed = this.shell.killAll();
+    this.audit({ action: 'shell_execute', agentId: 'system', target: 'halt', result: 'blocked', details: { reason, killed } });
+    return killed;
+  }
+
+  private async checkProof(tool: string, args: unknown, agentId: string, target: string, proof: FormalProof | undefined): Promise<void> {
+    const gate = this.asi?.proofGate;
+    if (!gate || !isAsiActive(this.asi!.config) || !gate.requiresProof(tool)) return;
+    const decision = await gate.check({ tool, args, agentId, proof });
+    if (!decision.allowed) {
+      this.emit('policy:violation', agentId, target, decision.violation ?? 'proof required');
+      this.audit({ action: tool === 'shell_exec' ? 'shell_execute' : 'file_write', agentId, target, result: 'blocked', details: { asi: decision.violation } });
+      throw new AsiPolicyError(`ASI strict mode: ${decision.violation ?? 'proof required'}`, 'ASI_PROOF_REQUIRED');
+    }
   }
 
   /** Clear the internal audit log */

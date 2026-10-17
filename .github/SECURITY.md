@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 5.15.x  | ✅ Yes — full support (current) |
+| 5.16.x  | ✅ Yes — full support (current) |
+| 5.15.x  | ✅ Security fixes only |
 | 5.14.x  | ✅ Security fixes only |
 | 5.13.x  | ✅ Security fixes only |
 | 5.12.x  | ✅ Security fixes only |

@@ -34,6 +34,7 @@ npm run test:cli              # CLI layer tests
 - `lib/claude-hooks.ts` — ClaudeHookBridge: AuthGuardian-backed permission gating for coding-agent tool calls
 - `lib/mcp-elicitation.ts` — MCP elicitation channel: native in-client approval prompts
 - `lib/a2a-server.ts` — A2AServer: expose the orchestrator as a Google A2A agent
+- `lib/asi/` — ASI Strict Mode (opt-in `ASI_STRICT_MODE=audit|enforce`): proof-gated actions, BFT consensus, auditor receipts, kill switch
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Gemini, OpenAI Responses, Claude Agent SDK, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (stdio + SSE transports)

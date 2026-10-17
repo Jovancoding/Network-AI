@@ -41,6 +41,8 @@ import {
   McpBlackboardBridge,
 } from './mcp-bridge';
 import type { MCPToolDefinition, BlackboardToolResult } from './mcp-blackboard-tools';
+import type { ProofGate } from './asi/proof-gate';
+import type { FormalProof } from './asi/types';
 
 // Lazy-loaded network modules — deferred so that importing this file does not
 // pull in node:http / node:https unless the SSE transport is actually used.
@@ -97,9 +99,21 @@ export class McpCombinedBridge {
   readonly name: string;
   private readonly _providers: McpToolProvider[] = [];
   private readonly _toolIndex: Map<string, McpToolProvider> = new Map();
+  private _proofGate: ProofGate | undefined;
 
   constructor(name = 'network-ai') {
     this.name = name;
+  }
+
+  /**
+   * ASI strict mode: require formal proofs for tools marked
+   * `requires_formal_proof` (and any tools the gate already lists). The proof
+   * travels in `arguments.__proof` and binds to the remaining arguments and
+   * `arguments.agentId`.
+   */
+  useProofGate(gate: ProofGate): void {
+    this._proofGate = gate;
+    gate.gateTools(this.allDefinitions().filter((d) => d.requires_formal_proof).map((d) => d.name));
   }
 
   /**
@@ -111,6 +125,7 @@ export class McpCombinedBridge {
     this._providers.push(provider);
     for (const def of provider.getDefinitions()) {
       this._toolIndex.set(def.name, provider);
+      if (def.requires_formal_proof) this._proofGate?.gateTools([def.name]);
     }
   }
 
@@ -161,13 +176,23 @@ export class McpCombinedBridge {
             return this._error(id, McpErrorCode.InvalidParams, 'tools/call requires params object');
           }
           const toolName = params['name'];
-          const toolArgs = (params['arguments'] ?? {}) as Record<string, unknown>;
+          let toolArgs = (params['arguments'] ?? {}) as Record<string, unknown>;
           if (typeof toolName !== 'string' || !toolName) {
             return this._error(id, McpErrorCode.InvalidParams, 'tools/call: "name" must be a non-empty string');
           }
           const provider = this._toolIndex.get(toolName);
           if (!provider) {
             return this._error(id, McpErrorCode.MethodNotFound, `Unknown tool: "${toolName}"`);
+          }
+          let proof: FormalProof | undefined;
+          if (toolArgs && typeof toolArgs === 'object' && '__proof' in toolArgs) {
+            const { __proof, ...rest } = toolArgs;
+            toolArgs = rest;
+            proof = __proof as FormalProof;
+          }
+          if (this._proofGate?.requiresProof(toolName)) {
+            const denied = await this._checkProof(toolName, toolArgs, proof);
+            if (denied) return this._error(id, McpErrorCode.InvalidRequest, denied);
           }
           const result = await provider.call(toolName, toolArgs);
           return this._ok(id, {
@@ -190,6 +215,13 @@ export class McpCombinedBridge {
 
   private _ok(id: string | number | null, result: unknown): McpJsonRpcResponse {
     return { jsonrpc: '2.0', id, result };
+  }
+
+  /** Returns the denial message, or `null` when the call may proceed. */
+  private async _checkProof(tool: string, args: Record<string, unknown>, proof: FormalProof | undefined): Promise<string | null> {
+    const agentId = typeof args['agentId'] === 'string' ? args['agentId'] : 'mcp-client';
+    const decision = await this._proofGate!.check({ tool, args, agentId, proof });
+    return decision.allowed ? null : `ASI strict mode: ${decision.violation ?? 'formal proof required'}`;
   }
 
   private _error(

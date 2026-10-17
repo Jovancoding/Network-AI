@@ -41,6 +41,10 @@
  * @version 1.0.0
  */
 
+import { getAsiConfig } from './asi/config';
+import { applyContextPolicy, contextPolicyFor } from './asi/policies';
+import type { AgentTrustLevel, AsiStrictConfig } from './asi/types';
+
 // ============================================================================
 // TOKEN ESTIMATION
 // ============================================================================
@@ -96,7 +100,7 @@ export interface RankedContextItem extends ContextSource {
 }
 
 /** Why an item was left out of the composed pack. */
-export type ExclusionReason = 'budget' | 'score' | 'stale' | 'empty';
+export type ExclusionReason = 'budget' | 'score' | 'stale' | 'empty' | 'trust';
 
 /** An excluded item and the reason it was dropped. */
 export interface ExcludedItem {
@@ -145,6 +149,12 @@ export interface ComposeOptions {
    * AND end of the block, weakest in the middle.
    */
   positionAware?: boolean;
+  /**
+   * ASI strict mode: trust tier of the agent receiving the pack. The tier's
+   * `config.context` policy shrinks the budget and drops out-of-scope or
+   * excluded-producer items. Unset is treated as LOW while strict mode is on.
+   */
+  agentTrust?: AgentTrustLevel;
 }
 
 /** The assembled, budget-enforced context pack. */
@@ -171,6 +181,8 @@ export interface ContextComposerOptions {
   weights?: ScoreWeights;
   /** Default semantic ranker (BYOE) */
   ranker?: SemanticRanker;
+  /** ASI strict-mode config (default: the process-wide `ASI_STRICT_MODE` config) */
+  asi?: AsiStrictConfig;
 }
 
 /** Shape of a blackboard snapshot entry accepted by {@link ContextComposer.fromSnapshot}. */
@@ -295,6 +307,7 @@ export class ContextComposer {
   private readonly halfLifeMs: number;
   private readonly weights: Required<ScoreWeights>;
   private readonly ranker: SemanticRanker | undefined;
+  private readonly asiConfig: AsiStrictConfig;
 
   constructor(options: ContextComposerOptions = {}) {
     this.halfLifeMs = options.halfLifeMs ?? 1_800_000;
@@ -312,6 +325,7 @@ export class ContextComposer {
       affinity: w.affinity / sum,
     };
     this.ranker = options.ranker;
+    this.asiConfig = options.asi ?? getAsiConfig();
   }
 
   /**
@@ -367,6 +381,15 @@ export class ContextComposer {
       throw new Error('ContextComposer.compose: options.budgetTokens must be > 0');
     }
 
+    const excluded: ExcludedItem[] = [];
+    const tierPolicy = contextPolicyFor(options.agentTrust, this.asiConfig);
+    if (tierPolicy) {
+      const narrowed = applyContextPolicy(sources ?? [], options, tierPolicy);
+      sources = narrowed.sources;
+      options = narrowed.options;
+      for (const key of narrowed.removed) excluded.push({ key, reason: 'trust' });
+    }
+
     const now = Date.now();
     const halfLifeMs = options.halfLifeMs ?? this.halfLifeMs;
     const minScore = options.minScore ?? 0.05;
@@ -380,7 +403,6 @@ export class ContextComposer {
         : this.weights;
     })();
 
-    const excluded: ExcludedItem[] = [];
     const pinned: ContextSource[] = [];
     const candidates: ContextSource[] = [];
 
