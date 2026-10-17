@@ -28,6 +28,7 @@ All four reported by zx (@manus-pi).
 
 ### Fixed
 - CodeQL #183 (`py/mixed-returns`): `context_manager.py` `_parse_json_arg()` raises `SystemExit` instead of calling `sys.exit()`, so no path falls through. Behavior is unchanged.
+- **CLI broken on Node 18 and older Node 20**: Dependabot had moved the runtime dependency `commander` to 15.x, which is ESM-only and requires Node >= 22.12, while the compiled CLI loads it with `require()` and `engines.node` is `>=18`. `npx network-ai` could fail with `ERR_REQUIRE_ESM` on supported Node versions (commander 15 shipped from 5.10.0; commander 14, which already dropped Node 18, from 4.4.0). `commander` is pinned to `^13.1.0` (CommonJS, Node >= 18), Dependabot now ignores commander >= 14, and CI runs the CLI tests plus a compiled-CLI smoke test on Node 18, 20, and 22.
 
 ### Changed
 - ClawHub skill (5.15.4 scan follow-up): `inject` preamble reworded so it no longer matches the prompt-injection rule; the `autonomous_actions` capability key replaced by an `invocation` declaration; `blackboard.py` archive writes (`pending_changes/archive/*.json`) now declared in the frontmatter, inventory, and script header; the scan-findings history moved from `SKILL.md` to `SECURITY.md` (fewer script references in the scanned bundle).

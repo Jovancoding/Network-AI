@@ -16,6 +16,10 @@ updates:
       # Only auto-update patch versions for dev dependencies; minor/major need review
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
+      # Runtime dep: commander >=14 drops Node 18 and v15 is ESM-only (breaks the CommonJS CLI).
+      # Revisit together with an engines.node bump.
+      - dependency-name: "commander"
+        versions: [">=14.0.0"]
 
   # Python dependencies
   - package-ecosystem: "pip"

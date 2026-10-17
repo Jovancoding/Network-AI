@@ -53,6 +53,12 @@ jobs:
       - name: Test - Phase 4 Behavioral (147 tests)
         run: npx ts-node test-phase4.ts
 
+      - name: Test - CLI
+        run: npx ts-node test-cli.ts
+
+      - name: Smoke - compiled CLI loads on this Node version
+        run: node dist/bin/cli.js --help
+
   build:
     runs-on: ubuntu-latest
     needs: test
