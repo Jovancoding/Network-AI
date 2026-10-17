@@ -26,6 +26,7 @@ import { join } from 'path';
 import type { Socket } from 'net';
 import type { WorkTree, WorkTreeSnapshot } from './work-tree';
 import type { LockedBlackboard, BlackboardEntry, PendingChange } from './locked-blackboard';
+import { isAllowedHostHeader, isAllowedOriginHeader, type HostGuardConfig } from './http-guards';
 
 // ============================================================================
 // TYPES
@@ -83,6 +84,17 @@ export interface ControlPlaneOptions {
   port?: number;
   /** Hostname (default: '127.0.0.1') */
   host?: string;
+  /**
+   * Accepted `Host` header values in addition to loopback names on the
+   * server's port. Enforced always on a loopback bind; on a non-loopback bind
+   * only when set. Blocks DNS-rebinding reads of workspace and blackboard data.
+   */
+  allowedHosts?: string[];
+  /**
+   * Extra exact `Origin` values allowed to open the WebSocket. The server's
+   * own origin is always allowed; other browser origins are rejected.
+   */
+  allowedOrigins?: string[];
 }
 
 /** Connected WebSocket client */
@@ -177,8 +189,10 @@ function getControlPlaneHTML(wsPort: number): string {
  * Register named workspaces, then open the browser to see them all.
  */
 export class ControlPlane extends EventEmitter {
-  private readonly port: number;
+  private port: number;
   private readonly host: string;
+  private readonly allowedHosts: string[];
+  private readonly allowedOrigins: string[];
   private server: ReturnType<typeof createServer> | null = null;
   private clients: Map<string, WSClient> = new Map();
   private workspaces: Map<string, Workspace> = new Map();
@@ -191,6 +205,8 @@ export class ControlPlane extends EventEmitter {
     super();
     this.port = options?.port ?? 4800;
     this.host = options?.host ?? '127.0.0.1';
+    this.allowedHosts = (options?.allowedHosts ?? []).map(h => h.toLowerCase());
+    this.allowedOrigins = options?.allowedOrigins ?? [];
   }
 
   // --------------------------------------------------------------------------
@@ -317,6 +333,8 @@ export class ControlPlane extends EventEmitter {
       server.on('error', (err) => { this.emit('error', err); reject(err); });
       server.listen(this.port, this.host, () => {
         this.server = server;
+        const address = server.address();
+        if (address && typeof address === 'object') this.port = address.port;
         this.pingInterval = setInterval(() => this.pingClients(), 30000);
         // Poll blackboards every 500ms for changes
         this.bbPollInterval = setInterval(() => this.pollBlackboards(), 500);
@@ -358,8 +376,18 @@ export class ControlPlane extends EventEmitter {
   // HTTP
   // --------------------------------------------------------------------------
 
+  private guardConfig(): HostGuardConfig {
+    return { bindHost: this.host, port: this.port, allowedHosts: this.allowedHosts, allowedOrigins: this.allowedOrigins };
+  }
+
   private handleHTTP(req: IncomingMessage, res: ServerResponse): void {
     const url = req.url ?? '/';
+
+    if (!isAllowedHostHeader(req, this.guardConfig())) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Forbidden: unrecognized Host header');
+      return;
+    }
 
     if (url === '/' || url === '/index.html') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
@@ -390,6 +418,12 @@ export class ControlPlane extends EventEmitter {
   private handleUpgrade(req: IncomingMessage, socket: Socket): void {
     const key = req.headers['sec-websocket-key'];
     if (!key) { socket.destroy(); return; }
+
+    const guard = this.guardConfig();
+    if (!isAllowedHostHeader(req, guard) || !isAllowedOriginHeader(req, guard)) {
+      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      return;
+    }
 
     const headers = [
       'HTTP/1.1 101 Switching Protocols', 'Upgrade: websocket', 'Connection: Upgrade',

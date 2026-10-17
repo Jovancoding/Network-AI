@@ -355,6 +355,7 @@ async function testA2AServerCardAndTasks() {
     name: 'Network-AI Orchestrator',
     description: 'Test swarm',
     version: '5.14.0',
+    allowUnauthenticated: true,
     executor: async (text) => ({ text: `handled: ${text}` }),
   });
 
@@ -436,6 +437,7 @@ async function testA2AServerFailuresAndAuth() {
   // Failing executor → failed state, not an HTTP error
   const failing = await startA2A({
     name: 'Failer',
+    allowUnauthenticated: true,
     executor: async () => { throw new Error('downstream exploded'); },
   });
   try {
@@ -490,6 +492,7 @@ async function testA2AServerFailuresAndAuth() {
   const capped = await startA2A({
     name: 'Capped',
     maxBodyBytes: 256,
+    allowUnauthenticated: true,
     executor: async (text) => ({ text }),
   });
   try {
@@ -516,6 +519,7 @@ async function testA2AServerHistoryEviction() {
   const { server, a2a, base } = await startA2A({
     name: 'Evictor',
     maxHistory: 3,
+    allowUnauthenticated: true,
     executor: async (text) => ({ text }),
   });
   try {

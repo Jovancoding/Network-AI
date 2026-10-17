@@ -11,12 +11,13 @@
  * Communication format: JSON-RPC 2.0 over HTTP POST.
  *
  * Usage (server):
- *   const server = new SwarmTransportServer(orchestrator, { port: 4000 });
+ *   const server = new SwarmTransportServer({ port: 4000, sharedSecret: process.env.SWARM_SECRET });
+ *   server.register('delegateTask', async (params) => orchestrator.delegateTask(params));
  *   await server.start();
  *
  * Usage (client):
- *   const client = new SwarmTransportClient('http://node-2:4000');
- *   const result = await client.delegateTask(agentId, payload);
+ *   const client = new SwarmTransportClient({ url: 'http://node-2:4000', sharedSecret: process.env.SWARM_SECRET });
+ *   const result = await client.call('delegateTask', { agentId, payload });
  *
  * @module SwarmTransport
  * @version 1.0.0
@@ -24,7 +25,8 @@
 
 import { createServer, IncomingMessage, ServerResponse, Server } from 'http';
 import { EventEmitter } from 'events';
-import { randomBytes, createHmac } from 'crypto';
+import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
+import { isLoopbackHost } from './http-guards';
 
 // ============================================================================
 // TYPES
@@ -54,7 +56,7 @@ export interface TransportMeta {
   timestamp: number;
   /** Time-to-live in ms (0 = no expiry) */
   ttlMs: number;
-  /** HMAC signature if auth is configured */
+  /** HMAC-SHA256 (hex) over id, method, params, sourceNode, timestamp, and ttlMs */
   signature?: string;
 }
 
@@ -72,11 +74,26 @@ export interface TransportServerConfig {
   port?: number;
   /** Hostname to bind (default: '127.0.0.1') */
   hostname?: string;
-  /** Shared secret for HMAC authentication (optional) */
+  /**
+   * Shared secret for HMAC authentication. Required unless
+   * `allowUnauthenticated` is true; clients must use the same secret.
+   */
   sharedSecret?: string;
+  /**
+   * Explicitly accept unsigned requests (local development only). Ignored
+   * when `sharedSecret` is set. The server then refuses any non-loopback
+   * bind, and `sourceNode` values are unauthenticated. Default: false.
+   */
+  allowUnauthenticated?: boolean;
+  /**
+   * Maximum accepted clock difference for signed requests in ms; older or
+   * future-dated messages are rejected and replays inside the window are
+   * refused (default: 300000 = 5 min).
+   */
+  maxClockSkewMs?: number;
   /** Maximum request body size in bytes (default: 1MB) */
   maxBodyBytes?: number;
-  /** Allowed source nodes (empty = allow all) */
+  /** Allowed source nodes (empty = allow all). When set, requests must name a listed sourceNode. */
   allowedNodes?: string[];
   /** Node identifier for this server */
   nodeId?: string;
@@ -102,6 +119,13 @@ export interface TransportClientConfig {
  */
 export type TransportHandler = (params: Record<string, unknown>) => Promise<unknown>;
 
+/** Canonical bytes covered by the request signature (shared by client and server). */
+function signTransport(secret: string, envelope: Pick<TransportEnvelope, 'id' | 'method' | 'params'>, meta: TransportMeta): string {
+  const payload = JSON.stringify(['nai-transport-v2', envelope.id, envelope.method, envelope.params,
+    meta.sourceNode, meta.timestamp, meta.ttlMs]);
+  return createHmac('sha256', secret).update(payload).digest('hex');
+}
+
 // ============================================================================
 // SERVER
 // ============================================================================
@@ -110,20 +134,35 @@ export type TransportHandler = (params: Record<string, unknown>) => Promise<unkn
  * HTTP transport server for distributed swarm orchestration.
  *
  * Exposes registered methods over HTTP POST with JSON-RPC 2.0 protocol.
- * Supports HMAC authentication, node allowlisting, TTL enforcement,
- * and request size limits.
+ * Requests must carry an HMAC signature from a client sharing `sharedSecret`
+ * (unless `allowUnauthenticated` is set for loopback-only development), with
+ * freshness and replay checks, node allowlisting, TTL enforcement, and
+ * request size limits.
  */
 export class SwarmTransportServer extends EventEmitter {
   private server: Server | null = null;
   private handlers = new Map<string, TransportHandler>();
   private readonly config: Required<TransportServerConfig>;
+  private readonly seenSignatures = new Map<string, number>();
 
+  /**
+   * @throws Error if no `sharedSecret` is set and `allowUnauthenticated` is not true.
+   */
   constructor(config: TransportServerConfig = {}) {
     super();
+    const secret = typeof config.sharedSecret === 'string' ? config.sharedSecret : '';
+    if (secret.trim() === '' && config.allowUnauthenticated !== true) {
+      throw new Error(
+        'SwarmTransportServer: sharedSecret is required. Configure a shared HMAC secret, or set '
+        + 'allowUnauthenticated: true for loopback-only local development.'
+      );
+    }
     this.config = {
       port: config.port ?? 4000,
       hostname: config.hostname ?? '127.0.0.1',
-      sharedSecret: config.sharedSecret ?? '',
+      sharedSecret: secret.trim() === '' ? '' : secret,
+      allowUnauthenticated: config.allowUnauthenticated === true,
+      maxClockSkewMs: config.maxClockSkewMs ?? 300_000,
       maxBodyBytes: config.maxBodyBytes ?? 1_048_576,
       allowedNodes: config.allowedNodes ?? [],
       nodeId: config.nodeId ?? `node-${randomBytes(4).toString('hex')}`,
@@ -142,9 +181,18 @@ export class SwarmTransportServer extends EventEmitter {
     }
   }
 
-  /** Start the transport server */
+  /**
+   * Start the transport server.
+   * @throws Error when running without a shared secret on a non-loopback address.
+   */
   async start(): Promise<void> {
     if (this.server) return;
+    if (!this.config.sharedSecret && !isLoopbackHost(this.config.hostname)) {
+      throw new Error(
+        `SwarmTransportServer: refusing to bind ${this.config.hostname} without a sharedSecret. `
+        + 'Unauthenticated mode is loopback-only.'
+      );
+    }
 
     this.server = createServer((req, res) => this.handleRequest(req, res));
     await new Promise<void>((resolve) => {
@@ -212,9 +260,10 @@ export class SwarmTransportServer extends EventEmitter {
         return;
       }
 
-      // Check node allowlist
-      if (this.config.allowedNodes.length > 0 && envelope.meta?.sourceNode) {
-        if (!this.config.allowedNodes.includes(envelope.meta.sourceNode)) {
+      // Check node allowlist (a listed sourceNode is mandatory once an allowlist exists)
+      if (this.config.allowedNodes.length > 0) {
+        const source = envelope.meta?.sourceNode;
+        if (typeof source !== 'string' || !this.config.allowedNodes.includes(source)) {
           this.sendResponse(res, {
             jsonrpc: '2.0', id: envelope.id,
             error: { code: -32001, message: 'Source node not allowed' },
@@ -223,22 +272,13 @@ export class SwarmTransportServer extends EventEmitter {
         }
       }
 
-      // Verify HMAC
-      if (this.config.sharedSecret && envelope.meta?.signature) {
-        const expected = this.computeHmac(envelope.method, envelope.params, envelope.meta.timestamp);
-        if (envelope.meta.signature !== expected) {
-          this.sendResponse(res, {
-            jsonrpc: '2.0', id: envelope.id,
-            error: { code: -32002, message: 'Invalid signature' },
-          });
+      // Verify HMAC, freshness, and replay
+      if (this.config.sharedSecret) {
+        const authError = this.verifySigned(envelope);
+        if (authError) {
+          this.sendResponse(res, { jsonrpc: '2.0', id: envelope.id, error: authError });
           return;
         }
-      } else if (this.config.sharedSecret && !envelope.meta?.signature) {
-        this.sendResponse(res, {
-          jsonrpc: '2.0', id: envelope.id,
-          error: { code: -32003, message: 'Signature required' },
-        });
-        return;
       }
 
       // Check TTL
@@ -300,9 +340,33 @@ export class SwarmTransportServer extends EventEmitter {
     res.end(body);
   }
 
-  private computeHmac(method: string, params: Record<string, unknown>, timestamp: number): string {
-    const payload = `${method}:${JSON.stringify(params)}:${timestamp}`;
-    return createHmac('sha256', this.config.sharedSecret).update(payload).digest('hex');
+  private verifySigned(envelope: TransportEnvelope): TransportResponse['error'] | null {
+    const meta = envelope.meta;
+    if (!meta || typeof meta.signature !== 'string' || meta.signature === '') {
+      return { code: -32003, message: 'Signature required' };
+    }
+    if (typeof meta.timestamp !== 'number' || typeof meta.ttlMs !== 'number' || typeof meta.sourceNode !== 'string') {
+      return { code: -32002, message: 'Invalid signature' };
+    }
+    const expected = Buffer.from(signTransport(this.config.sharedSecret, envelope, meta), 'hex');
+    const provided = /^[0-9a-f]{64}$/i.test(meta.signature) ? Buffer.from(meta.signature, 'hex') : null;
+    if (!provided || !timingSafeEqual(provided, expected)) {
+      return { code: -32002, message: 'Invalid signature' };
+    }
+
+    const now = Date.now();
+    if (Math.abs(now - meta.timestamp) > this.config.maxClockSkewMs) {
+      return { code: -32004, message: 'Message expired' };
+    }
+    for (const [sig, expiry] of this.seenSignatures) {
+      if (expiry <= now) this.seenSignatures.delete(sig);
+    }
+    const key = meta.signature.toLowerCase();
+    if (this.seenSignatures.has(key)) {
+      return { code: -32005, message: 'Replay detected' };
+    }
+    this.seenSignatures.set(key, meta.timestamp + this.config.maxClockSkewMs);
+    return null;
   }
 }
 
@@ -349,8 +413,7 @@ export class SwarmTransportClient extends EventEmitter {
 
     // Sign if shared secret is configured
     if (this.config.sharedSecret) {
-      const payload = `${method}:${JSON.stringify(params)}:${timestamp}`;
-      meta.signature = createHmac('sha256', this.config.sharedSecret).update(payload).digest('hex');
+      meta.signature = signTransport(this.config.sharedSecret, { id, method, params }, meta);
     }
 
     const envelope: TransportEnvelope = {

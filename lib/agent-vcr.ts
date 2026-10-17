@@ -31,8 +31,8 @@
  */
 
 import { readFile, writeFile, mkdir, stat } from 'fs/promises';
-import { join } from 'path';
 import { createHash } from 'crypto';
+import { InputSanitizer } from '../security';
 
 // ============================================================================
 // TYPES
@@ -166,9 +166,12 @@ export class AgentVCR {
 
   /**
    * Load a cassette from disk.
+   *
+   * @param name Cassette name: 1-128 characters of `[A-Za-z0-9_.-]`, no `..`.
+   * @throws SecurityError if `name` could address a file outside `cassettePath`.
    */
   async load(name: string): Promise<VCRCassette> {
-    const filePath = join(this.config.cassettePath, `${name}.json`);
+    const filePath = InputSanitizer.safeChildPath(this.config.cassettePath, name, '.json');
     const raw = await readFile(filePath, 'utf-8');
     this.cassette = JSON.parse(raw) as VCRCassette;
     this.replayIndex = 0;
@@ -177,8 +180,12 @@ export class AgentVCR {
 
   /**
    * Save the current recording as a named cassette.
+   *
+   * @param name Cassette name: 1-128 characters of `[A-Za-z0-9_.-]`, no `..`.
+   * @throws SecurityError if `name` could address a file outside `cassettePath`.
    */
   async save(name: string): Promise<void> {
+    const filePath = InputSanitizer.safeChildPath(this.config.cassettePath, name, '.json');
     if (!this.cassette) {
       this.cassette = { name, createdAt: Date.now(), interactions: [] };
     }
@@ -190,7 +197,6 @@ export class AgentVCR {
       await mkdir(this.config.cassettePath, { recursive: true });
     }
 
-    const filePath = join(this.config.cassettePath, `${name}.json`);
     await writeFile(filePath, JSON.stringify(this.cassette, null, 2), 'utf-8');
   }
 

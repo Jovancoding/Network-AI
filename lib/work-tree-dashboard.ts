@@ -20,6 +20,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { Socket } from 'net';
 import type { WorkTree, WorkNode, WorkTreeStats, WorkTreeSnapshot } from './work-tree';
+import { isAllowedHostHeader, isAllowedOriginHeader, type HostGuardConfig } from './http-guards';
 
 // ============================================================================
 // TYPES
@@ -31,6 +32,17 @@ export interface WorkTreeDashboardOptions {
   port?: number;
   /** Hostname to bind to (default: '127.0.0.1') */
   host?: string;
+  /**
+   * Accepted `Host` header values in addition to loopback names on the
+   * server's port. Enforced always on a loopback bind; on a non-loopback bind
+   * only when set. Blocks DNS-rebinding reads of the task tree.
+   */
+  allowedHosts?: string[];
+  /**
+   * Extra exact `Origin` values allowed to open the WebSocket. The dashboard's
+   * own origin is always allowed; other browser origins are rejected.
+   */
+  allowedOrigins?: string[];
 }
 
 /** Connected WebSocket client */
@@ -168,8 +180,10 @@ function getDashboardHTML(wsPort: number): string {
  */
 export class WorkTreeDashboard extends EventEmitter {
   private readonly tree: WorkTree;
-  private readonly port: number;
+  private port: number;
   private readonly host: string;
+  private readonly allowedHosts: string[];
+  private readonly allowedOrigins: string[];
   private server: ReturnType<typeof createServer> | null = null;
   private clients: Map<string, WSClient> = new Map();
   private pingInterval: ReturnType<typeof setInterval> | null = null;
@@ -185,6 +199,8 @@ export class WorkTreeDashboard extends EventEmitter {
     this.tree = tree;
     this.port = options?.port ?? 4821;
     this.host = options?.host ?? '127.0.0.1';
+    this.allowedHosts = (options?.allowedHosts ?? []).map(h => h.toLowerCase());
+    this.allowedOrigins = options?.allowedOrigins ?? [];
   }
 
   /**
@@ -205,6 +221,8 @@ export class WorkTreeDashboard extends EventEmitter {
 
       server.listen(this.port, this.host, () => {
         this.server = server;
+        const address = server.address();
+        if (address && typeof address === 'object') this.port = address.port;
         this.subscribeToTree();
 
         // Ping clients every 30s
@@ -337,8 +355,18 @@ export class WorkTreeDashboard extends EventEmitter {
   // HTTP
   // --------------------------------------------------------------------------
 
+  private guardConfig(): HostGuardConfig {
+    return { bindHost: this.host, port: this.port, allowedHosts: this.allowedHosts, allowedOrigins: this.allowedOrigins };
+  }
+
   private handleHTTP(req: IncomingMessage, res: ServerResponse): void {
     const url = req.url ?? '/';
+
+    if (!isAllowedHostHeader(req, this.guardConfig())) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Forbidden: unrecognized Host header');
+      return;
+    }
 
     if (url === '/' || url === '/index.html') {
       res.writeHead(200, {
@@ -387,6 +415,12 @@ export class WorkTreeDashboard extends EventEmitter {
   private handleUpgrade(req: IncomingMessage, socket: Socket): void {
     const key = req.headers['sec-websocket-key'];
     if (!key) { socket.destroy(); return; }
+
+    const guard = this.guardConfig();
+    if (!isAllowedHostHeader(req, guard) || !isAllowedOriginHeader(req, guard)) {
+      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      return;
+    }
 
     const acceptKey = computeAcceptKey(key);
     const headers = [

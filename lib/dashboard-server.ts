@@ -15,6 +15,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { Socket } from 'net';
 import type { TopologyTracker, TopologyEvent, TopologySnapshot, TopologyDelta } from './topology';
+import { isAllowedHostHeader, isAllowedOriginHeader, type HostGuardConfig } from './http-guards';
 
 // ============================================================================
 // TYPES
@@ -256,36 +257,16 @@ export class DashboardServer extends EventEmitter {
   // REQUEST VALIDATION (GHSA-hr6v-mfxm-4438)
   // --------------------------------------------------------------------------
 
-  private isLoopbackBind(): boolean {
-    return this.host === 'localhost' || this.host === '::1' || this.host.startsWith('127.');
+  private guardConfig(): HostGuardConfig {
+    return { bindHost: this.host, port: this.port, allowedHosts: this.allowedHosts, allowedOrigins: this.allowedOrigins };
   }
 
-  /**
-   * Reject requests whose Host header is not this server. A DNS-rebound
-   * attacker page is same-origin with its own hostname, so only the Host
-   * header reveals that the request was not meant for the dashboard.
-   */
   private isAllowedHost(req: IncomingMessage): boolean {
-    const host = req.headers.host?.toLowerCase();
-    if (!host) return false;
-    if (this.allowedHosts.includes(host)) return true;
-    // A wildcard/external bind has no knowable public name; operators must set allowedHosts to enforce.
-    if (!this.isLoopbackBind() && this.allowedHosts.length === 0) return true;
-    const suffix = this.port === 80 ? ['', ':80'] : [`:${this.port}`];
-    return ['127.0.0.1', 'localhost', '[::1]']
-      .some(name => suffix.some(s => host === name + s));
+    return isAllowedHostHeader(req, this.guardConfig());
   }
 
-  /**
-   * Browsers always send Origin on a WebSocket handshake and do not apply
-   * same-origin policy to it, so only the dashboard's own origin (or an
-   * explicit allowlist entry) may connect. Non-browser clients omit Origin.
-   */
   private isAllowedOrigin(req: IncomingMessage): boolean {
-    const origin = req.headers.origin;
-    if (origin === undefined) return true;
-    if (this.allowedOrigins.includes(origin)) return true;
-    return origin.toLowerCase() === `http://${req.headers.host?.toLowerCase()}`;
+    return isAllowedOriginHeader(req, this.guardConfig());
   }
 
   // --------------------------------------------------------------------------

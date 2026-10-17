@@ -14,8 +14,11 @@
  *
  * Security posture mirrors `ApprovalInbox`:
  * - binds to 127.0.0.1 by default;
- * - optional Bearer `secret` gates the task routes (the Agent Card remains
- *   public — it is the A2A discovery document);
+ * - Bearer `secret` gates the task routes (the Agent Card remains public —
+ *   it is the A2A discovery document). Without a secret the constructor
+ *   throws unless `allowUnauthenticated: true` is set, and an
+ *   unauthenticated server refuses to bind a non-loopback address
+ *   (GHSA-qvf5-9prv-7r9c);
  * - request bodies are size-capped; unknown methods are rejected.
  *
  * @example
@@ -39,7 +42,7 @@
  */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 
 // ============================================================================
 // TYPES
@@ -83,10 +86,17 @@ export interface A2AServerOptions {
   /** Public URL of this agent (advertised on the card) */
   url?: string;
   /**
-   * Bearer token required on the task routes when set. The Agent Card at
+   * Bearer token required on the task routes. The Agent Card at
    * /.well-known/agent.json stays public — it is the discovery document.
+   * Required unless `allowUnauthenticated` is true.
    */
   secret?: string;
+  /**
+   * Explicitly run the task routes without authentication (local development
+   * only). Ignored when `secret` is set. An unauthenticated server can only
+   * bind a loopback address. Default: false.
+   */
+  allowUnauthenticated?: boolean;
   /** Executor that fulfils incoming tasks (required) */
   executor: A2ATaskExecutor;
   /** Maximum stored task records (default: 1000, oldest evicted first) */
@@ -111,6 +121,13 @@ interface A2AJsonRpcRequest {
 // A2A SERVER
 // ============================================================================
 
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+
+// Fixed-length digests let timingSafeEqual compare tokens of any length.
+function digest(value: string): Buffer {
+  return createHash('sha256').update(value, 'utf8').digest();
+}
+
 /**
  * Minimal, dependency-free A2A protocol server: Agent Card discovery plus
  * `tasks/send`, `tasks/get`, and `tasks/cancel` over JSON-RPC 2.0.
@@ -119,6 +136,7 @@ export class A2AServer {
   private readonly options: Required<Pick<A2AServerOptions, 'name' | 'version' | 'maxHistory' | 'maxBodyBytes'>> &
     Omit<A2AServerOptions, 'name' | 'version' | 'maxHistory' | 'maxBodyBytes'>;
   private readonly tasks = new Map<string, A2AServerTask>();
+  private readonly secretDigest: Buffer | null;
 
   constructor(options: A2AServerOptions) {
     if (!options || typeof options.name !== 'string' || options.name.trim() === '') {
@@ -127,8 +145,17 @@ export class A2AServer {
     if (typeof options.executor !== 'function') {
       throw new Error('A2AServer: options.executor is required');
     }
+    const hasSecret = typeof options.secret === 'string' && options.secret.trim() !== '';
+    if (!hasSecret && options.allowUnauthenticated !== true) {
+      throw new Error(
+        'A2AServer: options.secret is required. Pass a non-empty Bearer secret, or set '
+        + 'allowUnauthenticated: true for loopback-only local development.'
+      );
+    }
+    this.secretDigest = hasSecret ? digest(options.secret as string) : null;
     this.options = {
       ...options,
+      secret: hasSecret ? options.secret : undefined,
       version: options.version ?? '1.0.0',
       maxHistory: options.maxHistory ?? 1000,
       maxBodyBytes: options.maxBodyBytes ?? 1024 * 1024,
@@ -174,8 +201,16 @@ export class A2AServer {
   /**
    * Convenience: create and start an http.Server with the handler mounted.
    * Binds to 127.0.0.1 by default — expose deliberately, not accidentally.
+   *
+   * @throws Error if the server has no secret and `hostname` is not loopback.
    */
   startServer(port: number, hostname = '127.0.0.1'): Server {
+    if (!this.secretDigest && !LOOPBACK_HOSTS.has(hostname.toLowerCase())) {
+      throw new Error(
+        `A2AServer: refusing to bind ${hostname} without a secret. `
+        + 'Unauthenticated mode is loopback-only; configure options.secret to expose the server.'
+      );
+    }
     const server = createServer(this.httpHandler());
     server.listen(port, hostname);
     return server;
@@ -195,11 +230,12 @@ export class A2AServer {
     }
 
     if (req.method === 'POST' && (url === '/tasks' || url === '/')) {
-      // Auth gate (fail closed when a secret is configured)
-      if (this.options.secret) {
-        const header = req.headers['authorization'] ?? '';
-        const ok = typeof header === 'string' && header === `Bearer ${this.options.secret}`;
-        if (!ok) {
+      // Auth gate: always enforced when a secret exists; the constructor only
+      // permits a missing secret under explicit allowUnauthenticated.
+      if (this.secretDigest) {
+        const header = req.headers['authorization'];
+        const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : null;
+        if (token === null || !timingSafeEqual(digest(token), this.secretDigest)) {
           this.json(res, 401, { error: 'unauthorized' });
           return;
         }

@@ -17,7 +17,7 @@
 
 import { createHmac, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 import { readFileSync, appendFileSync } from 'fs';
-import { join, normalize, isAbsolute } from 'path';
+import { normalize, isAbsolute, resolve, relative, dirname, sep } from 'path';
 
 // ============================================================================
 // SECURITY CONFIGURATION
@@ -369,28 +369,62 @@ export class InputSanitizer {
   }
   
   /**
-   * Validate and sanitize a file path
+   * Validate that `inputPath` resolves inside `basePath` and return the
+   * resolved absolute path.
+   *
+   * Containment is checked on path boundaries, so a sibling directory that
+   * shares a name prefix (`/data/project-evil` vs `/data/project`) is
+   * rejected (GHSA-5mm5-4mh4-6gm6). The check is lexical: it does not follow
+   * symlinks, so callers must not let untrusted parties create links under
+   * `basePath`.
+   *
+   * @throws SecurityError `PATH_TRAVERSAL` when the path escapes `basePath`
+   *   or either argument is not a string or contains a NUL byte.
    */
   static sanitizePath(inputPath: string, basePath: string): string {
-    // Normalize the path
-    const normalized = normalize(inputPath);
-    
-    // Resolve to absolute
-    const absolute = isAbsolute(normalized) 
-      ? normalized 
-      : join(basePath, normalized);
-    
-    // Ensure it's within the allowed base path
-    const resolvedBase = normalize(basePath);
-    const resolvedPath = normalize(absolute);
-    
-    if (!resolvedPath.startsWith(resolvedBase)) {
+    if (typeof inputPath !== 'string' || typeof basePath !== 'string'
+        || inputPath.includes('\0') || basePath.includes('\0')) {
+      throw new SecurityError('Invalid path', 'PATH_TRAVERSAL');
+    }
+
+    const resolvedBase = resolve(basePath);
+    const resolvedPath = resolve(resolvedBase, normalize(inputPath));
+    const rel = relative(resolvedBase, resolvedPath);
+
+    // `relative` returns an absolute path when the target is on another drive (Windows).
+    if (rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) {
       throw new SecurityError('Path traversal attempt detected', 'PATH_TRAVERSAL');
     }
-    
+
     return resolvedPath;
   }
+
+  /**
+   * Resolve `name + extension` as a direct child of `baseDir` for stores that
+   * key files by a caller-supplied identifier (job IDs, cassette names).
+   *
+   * `name` must be 1-128 characters of `[A-Za-z0-9_.-]`, start with a letter,
+   * digit, or underscore, and contain no `..`; the resolved file must sit
+   * directly in `baseDir` (GHSA-v64j-mc7x-c7x7, GHSA-mfxv-jg44-xj48).
+   *
+   * @throws SecurityError `INVALID_NAME` for a disallowed name, or
+   *   `PATH_TRAVERSAL` if the result would leave `baseDir`.
+   */
+  static safeChildPath(baseDir: string, name: string, extension = ''): string {
+    if (typeof name !== 'string' || !SAFE_CHILD_NAME.test(name) || name.includes('..')) {
+      const shown = typeof name === 'string' ? JSON.stringify(name.slice(0, 64)) : typeof name;
+      throw new SecurityError(`Invalid name: ${shown}`, 'INVALID_NAME');
+    }
+    const base = resolve(baseDir);
+    const target = resolve(base, name + extension);
+    if (dirname(target) !== base) {
+      throw new SecurityError('Path traversal attempt detected', 'PATH_TRAVERSAL');
+    }
+    return target;
+  }
 }
+
+const SAFE_CHILD_NAME = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
 
 // ============================================================================
 // 2b. PROMPT INJECTION SHIELD

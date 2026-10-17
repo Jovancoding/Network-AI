@@ -36,6 +36,17 @@ import type { IdentityRegisteringBlackboard } from './lib/mcp-bridge';
 import type { ClaudeHookInput } from './lib/claude-hooks';
 import { SandboxPolicy } from './lib/agent-runtime';
 import { randomBytes } from 'crypto';
+import type { AddressInfo } from 'net';
+import { InputSanitizer, SecurityError } from './security';
+import { FileJobStore, JobQueue } from './lib/job-queue';
+import type { JobRecord } from './lib/job-queue';
+import { AgentVCR } from './lib/agent-vcr';
+import { A2AServer } from './lib/a2a-server';
+import { ApprovalInbox } from './lib/approval-inbox';
+import { SwarmTransportServer, SwarmTransportClient } from './lib/swarm-transport';
+import { ControlPlane } from './lib/control-plane';
+import { WorkTreeDashboard } from './lib/work-tree-dashboard';
+import { WorkTree } from './lib/work-tree';
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -474,6 +485,267 @@ async function testNoPublicOrchestratorToken() {
 }
 
 // ---------------------------------------------------------------------------
+// v5.15.5 — GHSA-5mm5 / GHSA-v64j / GHSA-mfxv path traversal, GHSA-qvf5 A2A auth
+// ---------------------------------------------------------------------------
+
+function securityCode(fn: () => unknown): string | null {
+  try { fn(); return null; } catch (e) { return e instanceof SecurityError ? e.code : `other:${String(e)}`; }
+}
+
+async function securityCodeAsync(fn: () => Promise<unknown>): Promise<string | null> {
+  try { await fn(); return null; } catch (e) { return e instanceof SecurityError ? e.code : `other:${String(e)}`; }
+}
+
+function testGhsa5mm5SanitizePathSiblingPrefix() {
+  header('GHSA-5mm5-4mh4-6gm6 — sanitizePath rejects sibling-prefix escapes');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-5mm5-'));
+  const base = path.join(root, 'project');
+  try {
+    for (const input of [
+      path.join(root, 'project-evil', 'secret.txt'),
+      path.join('..', 'project-evil', 'secret.txt'),
+      path.join(root, 'project2', 'key.pem'),
+      path.join('..', 'project2', 'key.pem'),
+    ]) {
+      assert(securityCode(() => InputSanitizer.sanitizePath(input, base)) === 'PATH_TRAVERSAL',
+        `advisory PoC input rejected: ${input}`);
+    }
+    assert(securityCode(() => InputSanitizer.sanitizePath('../../../etc/passwd', base)) === 'PATH_TRAVERSAL',
+      'classic ../ traversal still rejected');
+    assert(securityCode(() => InputSanitizer.sanitizePath('a\0b', base)) === 'PATH_TRAVERSAL', 'NUL byte rejected');
+    assert(InputSanitizer.sanitizePath('sub/file.txt', base) === path.join(base, 'sub', 'file.txt'),
+      'relative child resolves inside base');
+    assert(InputSanitizer.sanitizePath(path.join(base, 'x.json'), base) === path.join(base, 'x.json'),
+      'absolute child inside base accepted');
+    assert(InputSanitizer.sanitizePath('..foo', base) === path.join(base, '..foo'),
+      'child whose name merely starts with ".." is not mistaken for traversal');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testGhsaV64jFileJobStoreTraversal() {
+  header('GHSA-v64j-mc7x-c7x7 — FileJobStore confines job IDs to its directory');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-v64j-'));
+  const jobs = path.join(root, 'jobs');
+  const outside = path.join(root, 'outside');
+  fs.mkdirSync(outside, { recursive: true });
+  const secret = path.join(outside, 'secret.json');
+  fs.writeFileSync(secret, '{"leaked":true}');
+  try {
+    const store = new FileJobStore(jobs);
+    await store.init();
+    const traversal = path.relative(jobs, path.join(outside, 'secret'));
+
+    assert(await securityCodeAsync(() => store.get(traversal)) === 'INVALID_NAME', 'advisory PoC: get() of ../outside/secret rejected');
+    assert(await securityCodeAsync(() => store.delete(traversal)) === 'INVALID_NAME', 'delete() of traversal ID rejected');
+    assert(fs.existsSync(secret), 'file outside the job directory was not deleted');
+    const forged = { id: traversal } as JobRecord;
+    assert(await securityCodeAsync(() => store.save(forged)) === 'INVALID_NAME', 'save() with traversal ID rejected');
+    assert(await securityCodeAsync(() => store.get(secret.replace(/\.json$/, ''))) === 'INVALID_NAME', 'absolute-path ID rejected');
+
+    const queue = new JobQueue({ store });
+    assert(await securityCodeAsync(() => queue.getJob(traversal)) === 'INVALID_NAME', 'JobQueue.getJob forwards the rejection');
+    assert(await securityCodeAsync(() => queue.cancel(traversal)) === 'INVALID_NAME', 'JobQueue.cancel forwards the rejection');
+
+    const job = await queue.enqueue({ type: 't', payload: {} });
+    assert((await store.get(job.id))?.id === job.id, 'generated job IDs still round-trip');
+    assert(await store.get('missing-job') === null, 'unknown valid ID still returns null');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testGhsaMfxvAgentVcrTraversal() {
+  header('GHSA-mfxv-jg44-xj48 — AgentVCR confines cassette names to cassettePath');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nai-mfxv-'));
+  const cassettes = path.join(root, 'cassettes');
+  const outside = path.join(root, 'outside');
+  fs.mkdirSync(cassettes, { recursive: true });
+  fs.mkdirSync(outside, { recursive: true });
+  fs.writeFileSync(path.join(outside, 'secret.json'), '{"leaked":true}');
+  try {
+    const vcr = new AgentVCR({ mode: 'record', cassettePath: cassettes });
+    const traversal = path.relative(cassettes, path.join(outside, 'secret'));
+
+    assert(await securityCodeAsync(() => vcr.load(traversal)) === 'INVALID_NAME', 'advisory PoC: load() of ../outside/secret rejected');
+    assert(await securityCodeAsync(() => vcr.save(path.relative(cassettes, path.join(outside, 'planted')))) === 'INVALID_NAME',
+      'save() to a path outside cassettePath rejected');
+    assert(!fs.existsSync(path.join(outside, 'planted.json')), 'no file written outside cassettePath');
+
+    await vcr.save('suite.case-1');
+    assert(fs.existsSync(path.join(cassettes, 'suite.case-1.json')), 'valid cassette name still saves');
+    const loaded = await new AgentVCR({ mode: 'replay', cassettePath: cassettes }).load('suite.case-1');
+    assert(loaded.name === 'suite.case-1', 'valid cassette name still loads');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function listen(server: http.Server): Promise<string> {
+  return new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)));
+}
+
+async function testGhsaQvf5A2AFailsClosed() {
+  header('GHSA-qvf5-9prv-7r9c — A2AServer requires a secret unless explicitly opted out');
+  const executor = async (text: string) => ({ text });
+
+  let msg = '';
+  try { new A2AServer({ name: 'demo', executor }); } catch (e) { msg = String(e); }
+  assert(/secret is required/.test(msg), 'advisory PoC config (no secret) now throws at construction');
+  msg = '';
+  try { new A2AServer({ name: 'demo', secret: '   ', executor }); } catch (e) { msg = String(e); }
+  assert(/secret is required/.test(msg), 'whitespace-only secret treated as missing');
+
+  const dev = new A2AServer({ name: 'dev', allowUnauthenticated: true, executor });
+  msg = '';
+  try { dev.startServer(0, '0.0.0.0'); } catch (e) { msg = String(e); }
+  assert(/refusing to bind/.test(msg), 'unauthenticated server refuses a non-loopback bind');
+
+  const secret = randomBytes(16).toString('hex');
+  const secured = new A2AServer({ name: 'sec', secret, executor });
+  const server = secured.startServer(0);
+  const base = await listen(server);
+  const send = (auth?: string) => fetch(`${base}/tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: auth } : {}) },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tasks/send', params: { message: { parts: [{ type: 'text', text: 'attacker task' }] } } }),
+  }).then((r) => r.status);
+  try {
+    assert(await send() === 401, 'no Authorization header → 401');
+    assert(await send(`Bearer ${secret}x`) === 401, 'longer wrong token → 401 (length-independent compare)');
+    assert(await send(`bearer ${secret}`) === 401, 'wrong scheme casing → 401');
+    assert(await send(`Bearer ${secret}`) === 200, 'correct token → 200');
+  } finally {
+    await new Promise<void>((res) => server.close(() => res()));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Runner
+// ---------------------------------------------------------------------------
+
+async function testApprovalInboxFailsClosed() {
+  header('ApprovalInbox — HTTP API requires a secret (same class as GHSA-qvf5)');
+  let msg = '';
+  try { new ApprovalInbox().httpHandler(); } catch (e) { msg = String(e); }
+  assert(/secret is required/.test(msg), 'no secret: httpHandler() throws');
+  msg = '';
+  try { new ApprovalInbox({ secret: '  ' }).startServer(0); } catch (e) { msg = String(e); }
+  assert(/secret is required/.test(msg), 'whitespace-only secret treated as missing');
+  msg = '';
+  try { new ApprovalInbox({ allowUnauthenticated: true }).startServer(0, '0.0.0.0'); } catch (e) { msg = String(e); }
+  assert(/refusing to bind/.test(msg), 'unauthenticated inbox refuses a non-loopback bind');
+
+  const local = new ApprovalInbox();
+  const pending = local.callback()({ type: 'shell', target: 'ls', agentId: 'a', risk: 'high', timestamp: Date.now() });
+  const id = local.list('pending')[0]?.id;
+  local.approve(id, 'tester');
+  assert((await pending).approved === true, 'in-process use (callback/approve) still works without a secret');
+
+  const secret = randomBytes(16).toString('hex');
+  const inbox = new ApprovalInbox({ secret });
+  const server = inbox.startServer(0);
+  const base = `${await listen(server)}/approvals`;
+  try {
+    assert((await fetch(`${base}/stats`, { headers: { Authorization: `Bearer ${secret}extra` } })).status === 403, 'longer wrong token -> 403');
+    assert((await fetch(`${base}/stats`, { headers: { Authorization: `Bearer ${secret}` } })).status === 200, 'correct token -> 200');
+  } finally {
+    await new Promise<void>((res) => server.close(() => res()));
+  }
+}
+
+async function testSwarmTransportAuth() {
+  header('SwarmTransportServer — required HMAC, bound metadata, freshness, replay');
+  let msg = '';
+  try { new SwarmTransportServer({ port: 0 }); } catch (e) { msg = String(e); }
+  assert(/sharedSecret is required/.test(msg), 'no sharedSecret: constructor throws');
+  msg = '';
+  try { await new SwarmTransportServer({ port: 0, hostname: '0.0.0.0', allowUnauthenticated: true }).start(); } catch (e) { msg = String(e); }
+  assert(/refusing to bind/.test(msg), 'unauthenticated transport refuses a non-loopback bind');
+
+  const secret = randomBytes(16).toString('hex');
+  const server = new SwarmTransportServer({ port: 0, sharedSecret: secret, allowedNodes: ['node-a'] });
+  let calls = 0;
+  server.register('run', async (p) => { calls++; return { echoed: p.x }; });
+  await server.start();
+  const port = ((server as unknown as { server: http.Server }).server.address() as AddressInfo).port;
+  const url = `http://127.0.0.1:${port}`;
+
+  const captured: string[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    if (typeof init?.body === 'string') captured.push(init.body);
+    return realFetch(input, init);
+  }) as typeof fetch;
+  const post = async (body: unknown) => (await realFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json() as Promise<{ error?: { code: number } }>;
+
+  try {
+    const client = new SwarmTransportClient({ url, sharedSecret: secret, nodeId: 'node-a' });
+    const result = await client.call('run', { x: 1 }) as { echoed: number };
+    assert(result.echoed === 1, 'signed client call from an allowlisted node succeeds');
+    globalThis.fetch = realFetch;
+
+    const sent = JSON.parse(captured[0]) as { id: string; meta: Record<string, unknown> };
+    assert((await post(sent)).error?.code === -32005, 'replaying a captured request is rejected');
+    assert((await post({ ...sent, id: 'other-id' })).error?.code === -32002, 'changing the request id breaks the signature');
+    assert((await post({ ...sent, meta: { ...sent.meta, ttlMs: 0 } })).error?.code === -32002, 'changing ttlMs breaks the signature');
+    assert((await post({ ...sent, meta: { ...sent.meta, signature: undefined } })).error?.code === -32003, 'unsigned request rejected');
+    const { sourceNode: _drop, ...noSource } = sent.meta;
+    assert((await post({ ...sent, meta: noSource })).error?.code === -32001, 'omitting sourceNode no longer bypasses the allowlist');
+
+    const stale = new SwarmTransportClient({ url, sharedSecret: secret, nodeId: 'node-a' });
+    const realNow = Date.now;
+    Date.now = () => realNow() - 3_600_000;
+    // call() signs synchronously before its first await; restore the clock so only the client is skewed.
+    const staleCall = stale.call('run', { x: 2 });
+    Date.now = realNow;
+    let staleCode: unknown;
+    try { await staleCall; } catch (e) { staleCode = (e as Record<string, unknown>).code; }
+    assert(staleCode === -32004, 'request signed an hour ago is rejected as expired');
+
+    let wrongCode: unknown;
+    try { await new SwarmTransportClient({ url, sharedSecret: randomBytes(16).toString('hex'), nodeId: 'node-a' }).call('run', {}); } catch (e) { wrongCode = (e as Record<string, unknown>).code; }
+    assert(wrongCode === -32002, 'wrong shared secret rejected');
+    assert(calls === 1, 'handler ran exactly once across all attempts', String(calls));
+  } finally {
+    globalThis.fetch = realFetch;
+    await server.stop();
+  }
+}
+
+async function testDashboardsRejectRebindingAndCrossSiteWs() {
+  header('ControlPlane / WorkTreeDashboard — Host and Origin validation (GHSA-hr6v class)');
+  const tree = new WorkTree('root', 'secret-project');
+  const cp = new ControlPlane({ port: 0 });
+  cp.addWorkspace('secret-ws', { tree });
+  await cp.start();
+  const wtd = new WorkTreeDashboard(tree, { port: 0 });
+  await wtd.start();
+
+  try {
+    for (const [label, url, api, marker] of [
+      ['ControlPlane', cp.url, '/api/workspaces', 'secret-ws'],
+      ['WorkTreeDashboard', wtd.url, '/api/snapshot', 'secret-project'],
+    ] as const) {
+      const port = Number(new URL(url).port);
+      assert(port > 0, `${label} reports the real port after binding port 0`);
+      const rebind = await rawRequest(port, api, { Host: `evil.example:${port}` });
+      assert(rebind.status === 403 && !rebind.body.includes(marker), `${label}: DNS-rebound API read returns 403`);
+      const local = await rawRequest(port, api, { Host: `127.0.0.1:${port}` });
+      assert(local.status === 200 && local.body.includes(marker), `${label}: loopback Host still reads the API`);
+      const evilWs = await rawRequest(port, '/', wsHeaders(port, { Origin: 'https://evil.example' }));
+      assert(!evilWs.upgraded, `${label}: cross-site WebSocket handshake refused`);
+      const ownWs = await rawRequest(port, '/', wsHeaders(port, { Origin: `http://127.0.0.1:${port}` }));
+      assert(ownWs.upgraded, `${label}: own-origin WebSocket still connects`);
+    }
+  } finally {
+    await wtd.stop();
+    await cp.stop();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
@@ -501,6 +773,14 @@ async function main() {
   await testGhsaHr6vDashboardOriginAndHost();
   testGhsa4pvgSseCorsLoopbackOnly();
   await testNoPublicOrchestratorToken();
+
+  testGhsa5mm5SanitizePathSiblingPrefix();
+  await testGhsaV64jFileJobStoreTraversal();
+  await testGhsaMfxvAgentVcrTraversal();
+  await testGhsaQvf5A2AFailsClosed();
+  await testApprovalInboxFailsClosed();
+  await testSwarmTransportAuth();
+  await testDashboardsRejectRebindingAndCrossSiteWs();
 
   process.stdout.write(`\n${passed + failed} checks — ${passed} passed, ${failed} failed\n`);
   if (failed > 0) {

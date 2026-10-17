@@ -18,8 +18,9 @@
 
 import { EventEmitter } from 'events';
 import { createServer, IncomingMessage, ServerResponse, Server } from 'http';
-import { randomBytes, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import type { ApprovalRequest, ApprovalDecision, ApprovalCallback } from './agent-runtime';
+import { isLoopbackHost } from './http-guards';
 
 // ============================================================================
 // TYPES
@@ -49,14 +50,20 @@ export interface ApprovalEntry {
 /** Options for the ApprovalInbox */
 export interface ApprovalInboxOptions {
   /**
-   * Bearer token required for every route (GET list/stats/sse/:id and
-   * POST approve/deny) once configured. Strongly recommended in
-   * production — without a secret, any process that can reach the HTTP
-   * server can read queued action details (command strings, file paths,
-   * justifications) and approve/deny agent actions (GHSA-mxjx-28vx-xjjj,
+   * Bearer token required for every HTTP route (GET list/stats/sse/:id and
+   * POST approve/deny). Required to serve HTTP unless `allowUnauthenticated`
+   * is set — without it any process that can reach the server could read
+   * queued action details and approve/deny agent actions (GHSA-mxjx-28vx-xjjj,
    * GHSA-m4jg-6w3q-gm86). Clients must send: `Authorization: Bearer <secret>`.
+   * In-process use (`callback()`, `approve()`, `deny()`) never needs it.
    */
   secret?: string;
+  /**
+   * Explicitly serve the HTTP API without authentication (local development
+   * only). Ignored when `secret` is set. `startServer()` then refuses any
+   * non-loopback bind. Default: false.
+   */
+  allowUnauthenticated?: boolean;
   /** Default timeout for approval requests in ms (default: 300000 = 5 min) */
   defaultTimeoutMs?: number;
   /** Maximum number of pending approvals (default: 100) */
@@ -107,9 +114,9 @@ export interface InboxStats {
  *
  * @example
  * ```ts
- * const inbox = new ApprovalInbox();
+ * const inbox = new ApprovalInbox({ secret: process.env.INBOX_SECRET });
  * const gate = new ApprovalGate(inbox.callback());
- * const server = inbox.createServer(3002);
+ * const server = inbox.startServer(3002);
  * ```
  */
 export class ApprovalInbox extends EventEmitter {
@@ -126,6 +133,8 @@ export class ApprovalInbox extends EventEmitter {
   private readonly maxHistory: number;
   private readonly pathPrefix: string;
   private readonly secret: string | null;
+  private readonly secretDigest: Buffer | null;
+  private readonly allowUnauthenticated: boolean;
   private readonly allowedOrigins: string[] | null;
 
   // Counters for stats (history may be truncated)
@@ -139,7 +148,9 @@ export class ApprovalInbox extends EventEmitter {
     this.maxPending = options.maxPending ?? 100;
     this.maxHistory = options.maxHistory ?? 1000;
     this.pathPrefix = (options.pathPrefix ?? '/approvals').replace(/\/$/, '');
-    this.secret = options.secret ?? null;
+    this.secret = typeof options.secret === 'string' && options.secret.trim() !== '' ? options.secret : null;
+    this.secretDigest = this.secret === null ? null : createHash('sha256').update(this.secret, 'utf8').digest();
+    this.allowUnauthenticated = options.allowUnauthenticated === true;
     this.allowedOrigins = options.allowedOrigins && options.allowedOrigins.length > 0
       ? options.allowedOrigins
       : null;
@@ -271,8 +282,16 @@ export class ApprovalInbox extends EventEmitter {
    *   GET  /:id        — Get single entry
    *   POST /:id/approve — Approve (body: { approvedBy, reason? })
    *   POST /:id/deny    — Deny (body: { deniedBy?, reason? })
+   *
+   * @throws Error if no `secret` is configured and `allowUnauthenticated` is not set.
    */
   httpHandler(): (req: IncomingMessage, res: ServerResponse) => void {
+    if (this.secret === null && !this.allowUnauthenticated) {
+      throw new Error(
+        'ApprovalInbox: options.secret is required to serve the HTTP API. Pass a non-empty Bearer '
+        + 'secret, or set allowUnauthenticated: true for loopback-only local development.'
+      );
+    }
     return (req: IncomingMessage, res: ServerResponse) => {
       const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
       const path = url.pathname;
@@ -321,9 +340,17 @@ export class ApprovalInbox extends EventEmitter {
   /**
    * Create a standalone HTTP server for the inbox.
    * @returns The HTTP server instance (already listening).
+   * @throws Error without a secret (unless `allowUnauthenticated`), or when an
+   *   unauthenticated inbox is asked to bind a non-loopback address.
    */
   startServer(port: number, hostname = '127.0.0.1'): Server {
     const handler = this.httpHandler();
+    if (this.secret === null && !isLoopbackHost(hostname)) {
+      throw new Error(
+        `ApprovalInbox: refusing to bind ${hostname} without a secret. `
+        + 'Unauthenticated mode is loopback-only; configure options.secret to expose the inbox.'
+      );
+    }
     const server = createServer(handler);
     server.listen(port, hostname);
     return server;
@@ -412,11 +439,8 @@ export class ApprovalInbox extends EventEmitter {
   }
 
   private routeRequest(req: IncomingMessage, res: ServerResponse, subPath: string, url: URL, corsOrigin: string | null): void {
-    // Gate the entire pipeline behind the same auth check used for the
-    // mutating routes. When no `secret` is configured this is a no-op
-    // (backward compatible); when a secret IS configured it now also
-    // covers the read routes (GHSA-m4jg-6w3q-gm86 — incomplete fix for
-    // GHSA-mxjx-28vx-xjjj, which only gated /approve and /deny).
+    // Every route is gated (GHSA-m4jg-6w3q-gm86). A missing secret only gets
+    // here under explicit allowUnauthenticated (loopback-only).
     if (!this.checkAuth(req, res)) return;
 
     // GET / — list
@@ -500,15 +524,14 @@ export class ApprovalInbox extends EventEmitter {
    * Uses constant-time comparison to prevent timing attacks (GHSA-mxjx-28vx-xjjj).
    */
   private checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
-    if (this.secret === null) return true; // no secret configured — allow (backward-compatible)
+    if (this.secretDigest === null) return true; // only reachable under explicit allowUnauthenticated
     const authHeader = req.headers['authorization'];
     if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
       this.sendJson(res, 401, { error: 'Authorization: Bearer <token> required' });
       return false;
     }
-    const provided = Buffer.from(authHeader.slice(7));
-    const expected = Buffer.from(this.secret);
-    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+    const provided = createHash('sha256').update(authHeader.slice(7), 'utf8').digest();
+    if (!timingSafeEqual(provided, this.secretDigest)) {
       this.sendJson(res, 403, { error: 'Forbidden' });
       return false;
     }

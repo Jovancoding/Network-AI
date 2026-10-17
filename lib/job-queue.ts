@@ -30,6 +30,7 @@ import { EventEmitter } from 'events';
 import { readFile, writeFile, readdir, unlink, mkdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
+import { InputSanitizer } from '../security';
 
 // ============================================================================
 // TYPES
@@ -155,9 +156,16 @@ export interface IJobStore {
 /**
  * File-system job store — persists jobs as individual JSON files.
  * Simple and dependency-free. Suitable for single-node deployments.
+ *
+ * Job IDs must be 1-128 characters of `[A-Za-z0-9_.-]` (no `..`); any other
+ * ID throws a `SecurityError` so it can never address a file outside `dir`.
  */
 export class FileJobStore implements IJobStore {
   constructor(private readonly dir: string) {}
+
+  private jobPath(id: string): string {
+    return InputSanitizer.safeChildPath(this.dir, id, '.json');
+  }
 
   async init(): Promise<void> {
     try {
@@ -168,13 +176,13 @@ export class FileJobStore implements IJobStore {
   }
 
   async save(job: JobRecord): Promise<void> {
-    const filePath = join(this.dir, `${job.id}.json`);
+    const filePath = this.jobPath(job.id);
     await writeFile(filePath, JSON.stringify(job, null, 2), 'utf-8');
   }
 
   async get(id: string): Promise<JobRecord | null> {
+    const filePath = this.jobPath(id);
     try {
-      const filePath = join(this.dir, `${id}.json`);
       const raw = await readFile(filePath, 'utf-8');
       return JSON.parse(raw) as JobRecord;
     } catch {
@@ -183,8 +191,9 @@ export class FileJobStore implements IJobStore {
   }
 
   async delete(id: string): Promise<void> {
+    const filePath = this.jobPath(id);
     try {
-      await unlink(join(this.dir, `${id}.json`));
+      await unlink(filePath);
     } catch {
       // Ignore if already deleted
     }

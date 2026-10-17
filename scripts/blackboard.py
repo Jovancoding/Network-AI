@@ -4,6 +4,7 @@
 #   READS:  <data_dir>/swarm-blackboard.md, <data_dir>/pending_changes/<id>.json,
 #           <data_dir>/.blackboard.lock
 #   WRITES: <data_dir>/swarm-blackboard.md, <data_dir>/pending_changes/<id>.json,
+#           <data_dir>/pending_changes/archive/<id>.<committed|aborted>.json,
 #           <data_dir>/.blackboard.lock
 #   where <data_dir> is "data/" by default, or "data/<env>/" when NETWORK_AI_ENV
 #   is set or --env is passed (env in: dev|st|sit|qa|sandbox|preprod|prod). This

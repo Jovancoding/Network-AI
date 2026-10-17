@@ -5,6 +5,37 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.15.5] - 2026-10-17
+
+### Security
+- **`InputSanitizer.sanitizePath()` sibling-directory escape** ([GHSA-5mm5-4mh4-6gm6](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-5mm5-4mh4-6gm6), CWE-22) — containment used a bare `startsWith(base)` string check, so `/data/project-evil/...` passed for base `/data/project`.
+  - **Fixed**: both paths are resolved to absolute form and containment is checked with `path.relative()` on path-segment boundaries (also correct across Windows drives and case). NUL bytes and non-string arguments are rejected. The return value is now always the resolved absolute path.
+- **`FileJobStore` job-ID path traversal** ([GHSA-v64j-mc7x-c7x7](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-v64j-mc7x-c7x7), CWE-23) — `get()`, `delete()`, and `save()` joined the caller-supplied ID into the path, so `JobQueue.getJob()` / `cancel()` with `../x` could read or delete any `.json` file.
+- **`AgentVCR` cassette-name path traversal** ([GHSA-mfxv-jg44-xj48](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-mfxv-jg44-xj48), CWE-23) — `load()` and `save()` did the same with the cassette name, allowing reads and writes of any `.json` file.
+  - **Fixed (both)**: new `InputSanitizer.safeChildPath()` accepts only names of 1-128 characters from `[A-Za-z0-9_.-]` (no `..`) and asserts the resolved file sits directly in the configured directory. Invalid names throw `SecurityError` (`INVALID_NAME`). Generated job IDs and ordinary cassette names are unaffected.
+- **`A2AServer` ran unauthenticated by default** ([GHSA-qvf5-9prv-7r9c](https://github.com/Jovancoding/Network-AI/security/advisories/GHSA-qvf5-9prv-7r9c), CWE-306) — the Bearer check ran only when `secret` was set, and `startServer()` never required one.
+  - **Fixed**: the constructor throws without a non-empty `secret` unless `allowUnauthenticated: true` is passed, and an unauthenticated server refuses to bind a non-loopback address. Tokens are compared in constant time over SHA-256 digests.
+  - **Breaking for secret-less A2A servers**: pass a `secret` (recommended) or `allowUnauthenticated: true` for loopback-only local development.
+
+All four reported by zx (@manus-pi).
+
+### Security — same-class hardening (found in a follow-up audit, no advisory)
+- **`ApprovalInbox` HTTP API required no auth by default** — without a `secret`, every route (list, SSE, approve, deny) was open. `httpHandler()` / `startServer()` now throw without a non-empty `secret` unless `allowUnauthenticated: true` is set, and an unauthenticated inbox only binds loopback. Token comparison is length-independent. In-process use (`callback()`, `approve()`, `deny()`) is unchanged.
+- **`SwarmTransportServer` ran remote handlers unauthenticated by default** — HMAC was checked only when `sharedSecret` was set, compared with `!==`, and covered only method, params, and timestamp, so captured requests could be replayed (or re-tagged with a new id, TTL, or source node), and omitting `sourceNode` skipped the node allowlist.
+  - **Fixed**: `sharedSecret` required unless `allowUnauthenticated: true` (loopback-only). The signature now covers id, method, params, sourceNode, timestamp, and ttlMs; it is verified in constant time; requests outside `maxClockSkewMs` (default 5 min) are rejected, as are replays inside the window; a listed `sourceNode` is mandatory when `allowedNodes` is set.
+  - **Breaking**: client and server must both run 5.15.5 (the signed payload changed), and secret-less servers must opt in explicitly.
+- **`ControlPlane` and `WorkTreeDashboard` lacked the GHSA-hr6v-mfxm-4438 protections** — they now apply the same Host-header (DNS rebinding) and WebSocket Origin (cross-site hijacking) checks as `DashboardServer`, with `allowedHosts` / `allowedOrigins` options. The checks live in a shared `lib/http-guards.ts`.
+
+### Fixed
+- CodeQL #183 (`py/mixed-returns`): `context_manager.py` `_parse_json_arg()` raises `SystemExit` instead of calling `sys.exit()`, so no path falls through. Behavior is unchanged.
+
+### Changed
+- ClawHub skill (5.15.4 scan follow-up): `inject` preamble reworded so it no longer matches the prompt-injection rule; the `autonomous_actions` capability key replaced by an `invocation` declaration; `blackboard.py` archive writes (`pending_changes/archive/*.json`) now declared in the frontmatter, inventory, and script header; the scan-findings history moved from `SKILL.md` to `SECURITY.md` (fewer script references in the scanned bundle).
+- `.clawhubignore` excludes local editor folders (`.vscode/`, `.idea/`).
+
+### Tests
+- Full suite: **3,738 tests across 41 suites**; `tsc --noEmit` clean. `test-phase20.ts` reproduces all four advisory PoCs and covers the follow-up hardening.
+
 ## [5.15.4] - 2026-09-29
 
 ### Security

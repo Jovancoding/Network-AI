@@ -92,11 +92,18 @@ async function testReadRoutesRejectWrongToken() {
 }
 
 async function testBackwardCompatNoSecretConfigured() {
-  header('Backward compatibility — no secret configured leaves read routes open');
-  const { server, base } = await startInbox();
+  header('No secret — HTTP refused unless allowUnauthenticated is set explicitly');
+  let msg = '';
+  try { new ApprovalInbox().startServer(0); } catch (e) { msg = String(e); }
+  assert(/secret is required/.test(msg), 'startServer() without a secret throws (fail closed)', msg);
+  msg = '';
+  try { new ApprovalInbox().httpHandler(); } catch (e) { msg = String(e); }
+  assert(/secret is required/.test(msg), 'httpHandler() without a secret throws (fail closed)', msg);
+
+  const { server, base } = await startInbox({ allowUnauthenticated: true });
   try {
     const rList = await fetch(`${base}/?status=all`);
-    assert(rList.status === 200, 'GET / with no secret configured -> 200 (unchanged default)', String(rList.status));
+    assert(rList.status === 200, 'explicit allowUnauthenticated on loopback -> 200', String(rList.status));
   } finally {
     await closeServer(server);
   }
@@ -108,7 +115,7 @@ async function testBackwardCompatNoSecretConfigured() {
 
 async function testNoWildcardCorsByDefault() {
   header('CORS — no Access-Control-Allow-Origin header by default');
-  const { server, base } = await startInbox();
+  const { server, base } = await startInbox({ allowUnauthenticated: true });
   try {
     const r = await fetch(`${base}/?status=all`, { headers: { Origin: 'https://evil.example' } });
     assert(r.headers.get('access-control-allow-origin') === null, 'no CORS header when allowedOrigins is not configured', String(r.headers.get('access-control-allow-origin')));
@@ -119,7 +126,7 @@ async function testNoWildcardCorsByDefault() {
 
 async function testAllowlistedOriginEchoed() {
   header('CORS — allowlisted origin is echoed back (never wildcard)');
-  const { server, base } = await startInbox({ allowedOrigins: ['https://good.example'] });
+  const { server, base } = await startInbox({ allowedOrigins: ['https://good.example'], allowUnauthenticated: true });
   try {
     const rGood = await fetch(`${base}/?status=all`, { headers: { Origin: 'https://good.example' } });
     assert(rGood.headers.get('access-control-allow-origin') === 'https://good.example', 'allowlisted origin echoed exactly', String(rGood.headers.get('access-control-allow-origin')));
