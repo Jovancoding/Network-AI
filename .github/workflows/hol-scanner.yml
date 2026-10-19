@@ -21,7 +21,7 @@ jobs:
 
       # Same gate as the awesome-ai-plugins central scan (repo policy not trusted).
       - name: Run HOL plugin-scanner
-        uses: hashgraph-online/ai-plugin-scanner-action@a4705d710505d3e8f6d639b683a0c87dd31ce598  # v1.2.748
+        uses: hashgraph-online/ai-plugin-scanner-action@1fb7eef6f7387abd0512e91ee8f336ac8bf07c95  # v1.2.789
         with:
           plugin_dir: "."
           min_score: 80
