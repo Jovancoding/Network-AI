@@ -5,6 +5,14 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.17.1] - 2026-10-27
+
+### Security
+- **Low-confidence results no longer pass review** (ClawScan, ClawHub skill) — `swarm_guard.py validate-result` marked a result with 10% confidence `usable: true` and "APPROVED", stored no warning, and supervisor review then approved the task. Results below the 0.7 threshold are now `usable: false` with a `REVIEW REQUIRED` recommendation (exit code 1); the warning is stored with the validation; `supervisor-review` returns `BLOCKED` until the agent's latest result meets the threshold. Non-numeric or out-of-range `confidence` values are invalid.
+- **Blackboard commits re-check for conflicts** (ClawScan, ClawHub skill) — `blackboard.py commit` applied a validated change without re-checking the key, so a change validated against an older value could overwrite a newer one, and archiving ran outside the lock. Propose, validate, commit, and abort now each run as one locked critical section; commit re-checks the base hash and refuses stale changes (nothing written, change stays pending); a change cannot be committed twice; two proposals on one key cannot both validate.
+- **No stale-cache writes** — `blackboard.py` reloads replace the in-memory cache (a key deleted by another process is no longer resurrected by a later write), a failed reload under the lock aborts instead of writing old state, reads never rewrite the file, and the blackboard file is replaced atomically (temp file + rename).
+- Docs: `SKILL.md` describes the review gate; `blackboard.py` no longer claims "all-or-nothing" commits.
+
 ## [5.17.0] - 2026-10-27
 
 ### Added — Perpetual Runtime (opt-in, `lib/perpetual/`)

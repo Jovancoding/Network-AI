@@ -382,13 +382,18 @@ class SwarmGuard:
         if result.get("status") == "error":
             issues.append(f"ERROR_STATUS: Agent reported error: {result.get('error', 'unknown')}")
         
-        # Check confidence
-        confidence = result.get("confidence", 0)
-        if confidence < MIN_CONFIDENCE_THRESHOLD:
+        # Check confidence: a number in [0, 1]; below the threshold needs a human review
+        confidence = result.get("confidence")
+        needs_review = False
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+            if "confidence" in result:
+                issues.append("INVALID_CONFIDENCE: 'confidence' must be a number between 0 and 1")
+        elif confidence < MIN_CONFIDENCE_THRESHOLD:
+            needs_review = True
             warnings.append(
                 f"LOW_CONFIDENCE: Agent confidence is {confidence:.0%}, "
                 f"threshold is {MIN_CONFIDENCE_THRESHOLD:.0%}. "
-                "Consider supervisor review."
+                "A supervisor must review this result before other agents use it."
             )
         
         # Check for empty output
@@ -397,6 +402,7 @@ class SwarmGuard:
             issues.append("EMPTY_OUTPUT: Result contains no meaningful output")
         
         valid = len(issues) == 0
+        usable = valid and not needs_review
         
         # Record validation
         if task_id in self.task_tracking:
@@ -407,19 +413,28 @@ class SwarmGuard:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "agent_id": agent_id,
                 "valid": valid,
-                "issues": issues
+                "needs_review": needs_review,
+                "issues": issues,
+                "warnings": warnings
             })
             self._save_state()
+        
+        if not valid:
+            recommendation = "BLOCKED - Do NOT propagate this result. Fix issues or restart task."
+        elif needs_review:
+            recommendation = "REVIEW REQUIRED - Low confidence. Do NOT propagate until a supervisor approves or the agent re-runs with higher confidence."
+        else:
+            recommendation = "APPROVED - Result can be used by other agents"
         
         return {
             "task_id": task_id,
             "agent_id": agent_id,
             "valid": valid,
-            "usable": valid,  # Other agents can use this result
+            "usable": usable,  # Other agents may use this result only when true
+            "needs_review": needs_review,
             "issues": issues,
             "warnings": warnings,
-            "recommendation": "APPROVED - Result can be used by other agents" if valid 
-                            else "BLOCKED - Do NOT propagate this result. Fix issues or restart task."
+            "recommendation": recommendation
         }
     
     def supervisor_review(self, task_id: str) -> dict[str, Any]:
@@ -465,6 +480,15 @@ class SwarmGuard:
             for v in failed_validations:
                 recommendations.append(f"Re-run or fix agent '{v['agent_id']}': {v['issues']}")
         
+        # Low-confidence results: an agent's latest validation decides whether it still needs review
+        latest_by_agent: dict[str, dict[str, Any]] = {}
+        for v in validations:
+            latest_by_agent[str(v.get("agent_id"))] = v
+        needs_review = [a for a, v in latest_by_agent.items() if v.get("needs_review") and v.get("valid")]
+        if needs_review:
+            issues.append(f"REVIEW_REQUIRED: low-confidence results from {sorted(needs_review)}")
+            recommendations.append("A human must review these results, or the agents must re-run with confidence at or above the threshold, before anything is committed")
+        
         # Check for participating agents' health
         participating_agents: set[str] = set()
         for h in handoffs:
@@ -500,7 +524,7 @@ class SwarmGuard:
         if len(issues) == 0:
             verdict = "APPROVED"
             status = "healthy"
-        elif any("VALIDATION_FAILURES" in i or "UNHEALTHY_AGENTS" in i or "BUDGET_EXCEEDED" in i for i in issues):
+        elif any("VALIDATION_FAILURES" in i or "UNHEALTHY_AGENTS" in i or "BUDGET_EXCEEDED" in i or "REVIEW_REQUIRED" in i for i in issues):
             verdict = "BLOCKED"
             status = "critical"
         else:
@@ -1000,7 +1024,7 @@ Examples:
     # Exit code based on result
     if result.get("blocked") or result.get("verdict") == "BLOCKED":
         sys.exit(2)
-    elif not result.get("healthy", True) or not result.get("valid", True):
+    elif not result.get("healthy", True) or not result.get("valid", True) or result.get("usable") is False:
         sys.exit(1)
     sys.exit(0)
 
@@ -1049,8 +1073,13 @@ def _pretty_print(command: str, result: dict[str, Any]) -> None:
             print("   → Do NOT call sessions_send")
     
     elif command == "validate-result":
-        if result.get("valid"):
+        if result.get("usable"):
             print("✅ RESULT VALID")
+            print(f"   Task: {result['task_id']}")
+            print(f"   Agent: {result['agent_id']}")
+            print(f"   → {result['recommendation']}")
+        elif result.get("valid"):
+            print("⚠️  RESULT NEEDS REVIEW")
             print(f"   Task: {result['task_id']}")
             print(f"   Agent: {result['agent_id']}")
             print(f"   → {result['recommendation']}")

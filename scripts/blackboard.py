@@ -29,7 +29,9 @@ Stores key-value pairs with optional TTL (time-to-live) expiration.
 FEATURES:
   - File Locking: Prevents race conditions in multi-agent environments
   - Staging Area: propose → validate → commit workflow
-  - Atomic Commits: Changes are all-or-nothing
+  - Checked Commits: each commit re-checks, under the lock, that the key has not
+    changed since the proposal, then applies that one change; the blackboard
+    file is replaced atomically (write to a temp file, then rename)
 
 Usage:
     python blackboard.py write KEY VALUE [--ttl SECONDS]
@@ -54,7 +56,7 @@ Examples:
     # Safe multi-agent update:
     python blackboard.py propose "chg_001" "order:123" '{"status": "approved"}'
     python blackboard.py validate "chg_001"  # Orchestrator checks for conflicts
-    python blackboard.py commit "chg_001"    # Apply atomically
+    python blackboard.py commit "chg_001"    # Re-check for conflicts, then apply
 """
 
 import argparse
@@ -220,10 +222,15 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
 """
             self.path.write_text(initial_content, encoding="utf-8")
     
-    def _load_from_disk(self):
-        """Load entries from the markdown blackboard."""
+    def _load_from_disk(self, strict: bool = False):
+        """Replace the in-memory cache with the entries on disk.
+
+        With strict=True a read failure raises instead of keeping the old cache,
+        so a locked write never persists stale state.
+        """
         try:
             content = self.path.read_text(encoding="utf-8")
+            fresh: dict[str, dict[str, Any]] = {}
             
             # Parse Knowledge Cache section
             cache_match = re.search(
@@ -242,11 +249,14 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
                 for key, value_str in entries:
                     try:
                         entry = json.loads(value_str.strip())
-                        self.cache[key] = entry
+                        fresh[key] = entry
                     except json.JSONDecodeError:
                         # Skip malformed entries
                         pass
+            self.cache = fresh
         except Exception as e:
+            if strict:
+                raise RuntimeError(f"Failed to load blackboard: {e}") from e
             print(f"Warning: Failed to load blackboard: {e}", file=sys.stderr)
     
     def _persist_to_disk(self):
@@ -278,7 +288,10 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
             "## Execution History",
         ])
         
-        self.path.write_text("\n".join(sections), encoding="utf-8")
+        # Readers never see a half-written file: write a temp file, then rename over.
+        tmp = self.path.with_name(f"{self.path.name}.{os.getpid()}.tmp")
+        tmp.write_text("\n".join(sections), encoding="utf-8")
+        os.replace(tmp, self.path)
     
     def _is_expired(self, entry: dict[str, Any]) -> bool:
         """Check if an entry has expired based on TTL."""
@@ -299,16 +312,10 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
             return False
     
     def read(self, key: str) -> Optional[dict[str, Any]]:
-        """Read an entry from the blackboard."""
+        """Read an entry from the blackboard (expired entries read as missing)."""
         entry = self.cache.get(key)
-        if entry is None:
+        if entry is None or self._is_expired(entry):
             return None
-        
-        if self._is_expired(entry):
-            del self.cache[key]
-            self._persist_to_disk()
-            return None
-        
         return entry
     
     def write(self, key: str, value: Any, source_agent: str = "unknown", 
@@ -324,7 +331,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         
         with blackboard_lock(self.lock_path):
             # Reload to get latest state
-            self._load_from_disk()
+            self._load_from_disk(strict=True)
             self.cache[key] = entry
             self._persist_to_disk()
         
@@ -333,7 +340,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
     def delete(self, key: str) -> bool:
         """Delete an entry from the blackboard (with file locking)."""
         with blackboard_lock(self.lock_path):
-            self._load_from_disk()
+            self._load_from_disk(strict=True)
             if key in self.cache:
                 del self.cache[key]
                 self._persist_to_disk()
@@ -375,6 +382,21 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
             raise ValueError(f"Path traversal blocked for change_id '{change_id}'")
         return target
 
+    @staticmethod
+    def _entry_hash(entry: Optional[dict[str, Any]]) -> Optional[str]:
+        """Hash of a stored entry, used to detect changes since a proposal."""
+        if not entry:
+            return None
+        return hashlib.sha256(json.dumps(entry, sort_keys=True).encode()).hexdigest()[:16]
+
+    def _archive(self, change_set: dict[str, Any], pending_file: Path, outcome: str) -> None:
+        """Move a finished change into pending_changes/archive/. Call with the lock held."""
+        safe_id = self._sanitize_change_id(change_set["change_id"])
+        archive_dir = self.pending_dir / "archive"
+        archive_dir.mkdir(exist_ok=True)
+        (archive_dir / f"{safe_id}.{outcome}.json").write_text(json.dumps(change_set, indent=2))
+        pending_file.unlink()
+
     def propose_change(self, change_id: str, key: str, value: Any, 
                        source_agent: str = "unknown", ttl: Optional[int] = None,
                        operation: str = "write") -> dict[str, Any]:
@@ -386,34 +408,31 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         """
         pending_file = self._safe_pending_path(change_id)
         
-        # Check for duplicate change_id
-        if pending_file.exists():
-            return {
-                "success": False,
-                "error": f"Change ID '{change_id}' already exists. Use a unique ID."
+        with blackboard_lock(self.lock_path):
+            # Check for duplicate change_id
+            if pending_file.exists():
+                return {
+                    "success": False,
+                    "error": f"Change ID '{change_id}' already exists. Use a unique ID."
+                }
+            
+            # Base hash from the current on-disk state, for conflict detection
+            self._load_from_disk(strict=True)
+            current_hash = self._entry_hash(self.cache.get(key))
+            
+            change_set: dict[str, Any] = {
+                "change_id": change_id,
+                "operation": operation,  # "write" or "delete"
+                "key": key,
+                "value": value,
+                "source_agent": source_agent,
+                "ttl": ttl,
+                "proposed_at": datetime.now(timezone.utc).isoformat(),
+                "status": "pending",
+                "base_hash": current_hash,  # For conflict detection
             }
-        
-        # Get current value for conflict detection
-        current_entry = self.cache.get(key)
-        current_hash = None
-        if current_entry:
-            current_hash = hashlib.sha256(
-                json.dumps(current_entry, sort_keys=True).encode()
-            ).hexdigest()[:16]
-        
-        change_set: dict[str, Any] = {
-            "change_id": change_id,
-            "operation": operation,  # "write" or "delete"
-            "key": key,
-            "value": value,
-            "source_agent": source_agent,
-            "ttl": ttl,
-            "proposed_at": datetime.now(timezone.utc).isoformat(),
-            "status": "pending",
-            "base_hash": current_hash,  # For conflict detection
-        }
-        
-        pending_file.write_text(json.dumps(change_set, indent=2))
+            
+            pending_file.write_text(json.dumps(change_set, indent=2))
         
         return {
             "success": True,
@@ -434,65 +453,60 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         """
         pending_file = self._safe_pending_path(change_id)
         
-        if not pending_file.exists():
-            return {
-                "valid": False,
-                "error": f"Change '{change_id}' not found. Was it proposed?"
-            }
-        
-        change_set = json.loads(pending_file.read_text())
-        
-        if change_set["status"] != "pending":
-            return {
-                "valid": False,
-                "error": f"Change is in '{change_set['status']}' state, not 'pending'"
-            }
-        
-        key = change_set["key"]
-        base_hash = change_set["base_hash"]
-        
-        # Check for conflicts: has the key changed since we proposed?
         with blackboard_lock(self.lock_path):
-            self._load_from_disk()
+            if not pending_file.exists():
+                return {
+                    "valid": False,
+                    "error": f"Change '{change_id}' not found. Was it proposed?"
+                }
+            
+            change_set = json.loads(pending_file.read_text())
+            
+            if change_set["status"] != "pending":
+                return {
+                    "valid": False,
+                    "error": f"Change is in '{change_set['status']}' state, not 'pending'"
+                }
+            
+            key = change_set["key"]
+            base_hash = change_set["base_hash"]
+            
+            # Check for conflicts: has the key changed since we proposed?
+            self._load_from_disk(strict=True)
             current_entry = self.cache.get(key)
-        
-        current_hash = None
-        if current_entry:
-            current_hash = hashlib.sha256(
-                json.dumps(current_entry, sort_keys=True).encode()
-            ).hexdigest()[:16]
-        
-        if base_hash != current_hash:
-            return {
-                "valid": False,
-                "conflict": True,
-                "error": f"CONFLICT: Key '{key}' was modified since proposal. "
-                         f"Expected hash {base_hash}, got {current_hash}. "
-                         "Abort and re-propose with fresh data.",
-                "current_value": current_entry
-            }
-        
-        # Check for other pending changes to the same key
-        conflicts: list[str] = []
-        for other_file in self.pending_dir.glob("*.pending.json"):
-            if other_file.name == pending_file.name:
-                continue
-            other_change = json.loads(other_file.read_text())
-            if other_change["key"] == key and other_change["status"] == "pending":
-                conflicts.append(other_change["change_id"])
-        
-        if conflicts:
-            return {
-                "valid": False,
-                "conflict": True,
-                "error": f"CONFLICT: Other pending changes affect key '{key}': {conflicts}. "
-                         "Resolve conflicts before committing."
-            }
-        
-        # Mark as validated
-        change_set["status"] = "validated"
-        change_set["validated_at"] = datetime.now(timezone.utc).isoformat()
-        pending_file.write_text(json.dumps(change_set, indent=2))
+            current_hash = self._entry_hash(current_entry)
+            
+            if base_hash != current_hash:
+                return {
+                    "valid": False,
+                    "conflict": True,
+                    "error": f"CONFLICT: Key '{key}' was modified since proposal. "
+                             f"Expected hash {base_hash}, got {current_hash}. "
+                             "Abort and re-propose with fresh data.",
+                    "current_value": current_entry
+                }
+            
+            # Check for other pending changes to the same key
+            conflicts: list[str] = []
+            for other_file in self.pending_dir.glob("*.pending.json"):
+                if other_file.name == pending_file.name:
+                    continue
+                other_change = json.loads(other_file.read_text())
+                if other_change["key"] == key and other_change["status"] in ("pending", "validated"):
+                    conflicts.append(other_change["change_id"])
+            
+            if conflicts:
+                return {
+                    "valid": False,
+                    "conflict": True,
+                    "error": f"CONFLICT: Other pending changes affect key '{key}': {conflicts}. "
+                             "Resolve conflicts before committing."
+                }
+            
+            # Mark as validated
+            change_set["status"] = "validated"
+            change_set["validated_at"] = datetime.now(timezone.utc).isoformat()
+            pending_file.write_text(json.dumps(change_set, indent=2))
         
         return {
             "valid": True,
@@ -504,87 +518,83 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
     
     def commit_change(self, change_id: str) -> dict[str, Any]:
         """
-        Apply a validated change atomically (Step 3 of atomic commit).
+        Apply a validated change (Step 3 of atomic commit).
+
+        Status check, conflict re-check, the write, and archiving all happen
+        under one lock, so a change validated against an older value can never
+        overwrite a newer one and a change is never applied twice.
         """
         pending_file = self._safe_pending_path(change_id)
         
-        if not pending_file.exists():
-            return {
-                "committed": False,
-                "error": f"Change '{change_id}' not found."
-            }
-        
-        change_set = json.loads(pending_file.read_text())
-        
-        if change_set["status"] != "validated":
-            return {
-                "committed": False,
-                "error": f"Change must be validated first. Current status: {change_set['status']}"
-            }
-        
-        # Apply the change atomically
         with blackboard_lock(self.lock_path):
-            self._load_from_disk()
+            if not pending_file.exists():
+                return {
+                    "committed": False,
+                    "error": f"Change '{change_id}' not found."
+                }
+            
+            change_set = json.loads(pending_file.read_text())
+            
+            if change_set["status"] != "validated":
+                return {
+                    "committed": False,
+                    "error": f"Change must be validated first. Current status: {change_set['status']}"
+                }
+            
+            self._load_from_disk(strict=True)
+            key = change_set["key"]
+            current_hash = self._entry_hash(self.cache.get(key))
+            if current_hash != change_set["base_hash"]:
+                return {
+                    "committed": False,
+                    "conflict": True,
+                    "error": f"CONFLICT: Key '{key}' changed after validation "
+                             f"(expected {change_set['base_hash']}, got {current_hash}). "
+                             "Nothing was written; abort and re-propose with fresh data."
+                }
             
             if change_set["operation"] == "delete":
-                if change_set["key"] in self.cache:
-                    del self.cache[change_set["key"]]
+                self.cache.pop(key, None)
             else:
                 entry: dict[str, Any] = {
-                    "key": change_set["key"],
+                    "key": key,
                     "value": change_set["value"],
                     "source_agent": change_set["source_agent"],
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "ttl": change_set["ttl"],
                     "committed_from": change_id
                 }
-                self.cache[change_set["key"]] = entry
+                self.cache[key] = entry
             
             self._persist_to_disk()
-        
-        # Archive the committed change
-        change_set["status"] = "committed"
-        change_set["committed_at"] = datetime.now(timezone.utc).isoformat()
-        
-        safe_id = self._sanitize_change_id(change_id)
-        archive_dir = self.pending_dir / "archive"
-        archive_dir.mkdir(exist_ok=True)
-        archive_file = archive_dir / f"{safe_id}.committed.json"
-        archive_file.write_text(json.dumps(change_set, indent=2))
-        
-        # Remove pending file
-        pending_file.unlink()
+            
+            change_set["status"] = "committed"
+            change_set["committed_at"] = datetime.now(timezone.utc).isoformat()
+            self._archive(change_set, pending_file, "committed")
         
         return {
             "committed": True,
             "change_id": change_id,
-            "key": change_set["key"],
+            "key": key,
             "operation": change_set["operation"],
-            "message": "Change committed atomically."
+            "message": "Change committed after a conflict re-check."
         }
     
     def abort_change(self, change_id: str) -> dict[str, Any]:
         """Abort a pending change without applying it."""
         pending_file = self._safe_pending_path(change_id)
         
-        if not pending_file.exists():
-            return {
-                "aborted": False,
-                "error": f"Change '{change_id}' not found."
-            }
-        
-        change_set = json.loads(pending_file.read_text())
-        change_set["status"] = "aborted"
-        change_set["aborted_at"] = datetime.now(timezone.utc).isoformat()
-        
-        # Archive the aborted change
-        safe_id = self._sanitize_change_id(change_id)
-        archive_dir = self.pending_dir / "archive"
-        archive_dir.mkdir(exist_ok=True)
-        archive_file = archive_dir / f"{safe_id}.aborted.json"
-        archive_file.write_text(json.dumps(change_set, indent=2))
-        
-        pending_file.unlink()
+        with blackboard_lock(self.lock_path):
+            if not pending_file.exists():
+                return {
+                    "aborted": False,
+                    "error": f"Change '{change_id}' not found."
+                }
+            
+            change_set = json.loads(pending_file.read_text())
+            change_set["status"] = "aborted"
+            change_set["aborted_at"] = datetime.now(timezone.utc).isoformat()
+            self._archive(change_set, pending_file, "aborted")
         
         return {
             "aborted": True,
@@ -644,7 +654,7 @@ Commands:
 Atomic Commit Workflow (for multi-agent safety):
   propose CHANGE_ID KEY VALUE         Stage a change (Step 1)
   validate CHANGE_ID                  Check for conflicts (Step 2)
-  commit CHANGE_ID                    Apply atomically (Step 3)
+  commit CHANGE_ID                    Re-check for conflicts, then apply (Step 3)
   abort CHANGE_ID                     Cancel a pending change
   list-pending                        Show all pending changes
 

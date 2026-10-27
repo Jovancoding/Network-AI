@@ -696,7 +696,9 @@ python {baseDir}/scripts/swarm_guard.py validate-result \
 #    → APPROVED - Result can be used by other agents
 ```
 
-**Required result fields**: `status`, `output`, `confidence`
+**Required result fields**: `status`, `output`, `confidence` (a number from 0 to 1)
+
+A result with confidence below 0.7 is reported as `⚠️ RESULT NEEDS REVIEW` with `usable: false` (exit code 1). Do not pass it to other agents until a human has reviewed it or the agent re-runs with higher confidence; until then, supervisor review returns `BLOCKED`.
 
 ### Supervisor Review
 
@@ -715,7 +717,7 @@ python {baseDir}/scripts/swarm_guard.py supervisor-review --task-id "task_001"
 **Verdicts**:
 - `APPROVED` - Task healthy, results usable
 - `WARNING` - Issues detected, review recommended
-- `BLOCKED` - Critical failures, do NOT use results
+- `BLOCKED` - Critical failures or results awaiting review (failed validation, low confidence, unhealthy agent, budget exceeded), do NOT use results
 
 ## Troubleshooting
 
@@ -770,7 +772,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.17.0"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.17.1"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |
