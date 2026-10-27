@@ -88,6 +88,17 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _is_iso_timestamp(value: Any) -> bool:
+    """True only for a short string that parses as an ISO-8601 datetime."""
+    if not isinstance(value, str) or len(value) > 40:
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
 # Memory-poisoning guards (ASI06 / T02). Every string that can reach an agent
 # prompt via `inject` is checked — on write (init/update reject) and on read
 # (show warns, inject blocks).
@@ -181,8 +192,11 @@ def _validate_context(ctx: Any) -> list[str]:
                 warnings.append(f"project.{field} exceeds {_MAX_PROJECT_FIELD_LEN} characters.")
 
     for key, value in doc.items():
-        if key != "updated_at":
-            _scan_value(str(key), value, warnings)
+        _scan_value(str(key), value, warnings)
+
+    updated_at = doc.get("updated_at")
+    if updated_at not in (None, "") and not _is_iso_timestamp(updated_at):
+        warnings.append("updated_at must be an ISO-8601 timestamp.")
 
     if len(json.dumps(doc, ensure_ascii=False).encode("utf-8")) > _MAX_CONTEXT_BYTES:
         warnings.append(f"Context file exceeds {_MAX_CONTEXT_BYTES // 1024} KiB.")
@@ -376,7 +390,8 @@ def cmd_inject(args: argparse.Namespace) -> int:
             lines.append(f"- ❌ {_one_line(b)}")
         lines.append("")
 
-    lines.append(f"*Context last updated: {_one_line(ctx.get('updated_at', 'unknown'))}*")
+    updated_at = ctx.get("updated_at")
+    lines.append(f"*Context last updated: {updated_at if _is_iso_timestamp(updated_at) else 'unknown'}*")
     lines.append("</project_context>")
 
     print("\n".join(lines))

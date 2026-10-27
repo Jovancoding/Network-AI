@@ -187,10 +187,13 @@ def blackboard_lock(lock_path: Path = LOCK_PATH):
 class SharedBlackboard:
     """Markdown-based shared state for agent coordination with atomic commits."""
     
-    def __init__(self, path: Path = BLACKBOARD_PATH):
+    def __init__(self, path: Path = BLACKBOARD_PATH, data_dir: Optional[Path] = None):
         self.path = path
+        # Pending changes and the lock share the blackboard's env-scoped directory.
+        self.data_dir = data_dir if data_dir is not None else _DATA_DIR
+        self.lock_path = self.data_dir / ".blackboard.lock"
         self.cache: dict[str, dict[str, Any]] = {}
-        self.pending_dir = PENDING_DIR
+        self.pending_dir = self.data_dir / "pending_changes"
         self.pending_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
         self._load_from_disk()
@@ -319,7 +322,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
             "ttl": ttl,
         }
         
-        with blackboard_lock():
+        with blackboard_lock(self.lock_path):
             # Reload to get latest state
             self._load_from_disk()
             self.cache[key] = entry
@@ -329,7 +332,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
     
     def delete(self, key: str) -> bool:
         """Delete an entry from the blackboard (with file locking)."""
-        with blackboard_lock():
+        with blackboard_lock(self.lock_path):
             self._load_from_disk()
             if key in self.cache:
                 del self.cache[key]
@@ -449,7 +452,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         base_hash = change_set["base_hash"]
         
         # Check for conflicts: has the key changed since we proposed?
-        with blackboard_lock():
+        with blackboard_lock(self.lock_path):
             self._load_from_disk()
             current_entry = self.cache.get(key)
         
@@ -520,7 +523,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
             }
         
         # Apply the change atomically
-        with blackboard_lock():
+        with blackboard_lock(self.lock_path):
             self._load_from_disk()
             
             if change_set["operation"] == "delete":
@@ -700,9 +703,9 @@ Examples:
     )
     
     args = parser.parse_args()
-    # Re-resolve data dir if --env was provided explicitly
+    # One env-scoped data dir drives the blackboard, pending changes, and lock.
+    _data = _resolve_data_dir(args.env) if args.env else _DATA_DIR
     if args.env:
-        _data = _resolve_data_dir(args.env)
         args.path = _data / "swarm-blackboard.md"
 
     # Validate --path against the project root to prevent path traversal (CWE-22).
@@ -718,7 +721,7 @@ Examples:
         )
         sys.exit(1)
 
-    bb = SharedBlackboard(args.path)
+    bb = SharedBlackboard(args.path, data_dir=_data)
     
     try:
         if args.command == "write":

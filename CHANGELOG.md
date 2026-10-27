@@ -5,6 +5,13 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.16.2] - 2026-10-27
+
+### Security
+- **Environment isolation (`--env`)** — ClawScan showed that `blackboard.py --env X` moved the blackboard file but kept pending changes and the lock in the startup environment, so a development proposal could be committed to the production blackboard. `SharedBlackboard` now derives the blackboard, `pending_changes/`, and the lock from one env-scoped directory. `check_permission.py --env` now also moves the signing key (and `ensure_data_dir()`), so grants, audit log, and key always share one environment.
+- **Saved-context prompt safety** — `context_manager.py` skipped validation of `updated_at` yet printed it inside the injected `<project_context>` block, so a hand-edited timestamp could carry an instruction and a closing delimiter past the checks. `updated_at` is now validated as an ISO-8601 timestamp, and `inject` prints it only when it is one (even with `--force`).
+- **Audit summary token masking** — `--audit-summary --json` echoed full grant tokens and their HMAC signatures from `permission_granted` entries. Tokens are now masked to a 16-character prefix and signatures are omitted, matching `--active-grants`.
+
 ## [5.16.1] - 2026-10-27
 
 ### Security

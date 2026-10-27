@@ -129,9 +129,8 @@ RESTRICTIONS = {
 
 def ensure_data_dir():
     """Ensure the active (env-scoped) data directory exists."""
-    data_dir = _resolve_data_dir()
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    return _DATA_DIR
 
 
 def detect_injection(justification: str) -> bool:
@@ -731,12 +730,17 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
     last_ts = entries[-1].get("timestamp", "unknown")
 
     if as_json:
-        # Omit justification text from summary output to avoid re-exposing
-        # sensitive content that was logged earlier (SkillSpector Ssd3).
+        # Omit justification text and mask grant tokens/signatures in summary
+        # output so it never re-exposes sensitive or live values (SkillSpector Ssd3).
         def _redact_entry(e: dict[str, Any]) -> dict[str, Any]:
-            if "details" not in e or "justification" not in e["details"]:
+            details = e.get("details")
+            if not isinstance(details, dict):
                 return e
-            return {**e, "details": {k: v for k, v in e["details"].items() if k != "justification"}}
+            clean = {k: v for k, v in details.items() if k not in ("justification", "_sig")}
+            token = clean.get("token")
+            if isinstance(token, str):
+                clean["token"] = token[:16] + "..." if len(token) > 16 else token
+            return {**e, "details": clean}
 
         output: dict[str, Any] = {
             "total_entries": len(entries),
@@ -876,10 +880,12 @@ Examples:
 
     args = parser.parse_args()
 
-    # Re-resolve data paths if --env was provided explicitly.
+    # Re-resolve every data path (grants, audit log, signing key) from one
+    # env-scoped directory when --env is given.
     # Use globals() to avoid Pyright reportConstantRedefinition on uppercase names.
     if args.env:
         _data = _resolve_data_dir(args.env)
+        globals()['_DATA_DIR'] = _data
         globals()['GRANTS_FILE'] = _data / "active_grants.json"
         globals()['AUDIT_LOG'] = _data / "audit_log.jsonl"
 
