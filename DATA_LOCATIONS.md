@@ -20,6 +20,22 @@ All paths are relative to the **data directory** (default: `./data/`, override w
 | `project-context.json` | `GoalDecomposer` | Active project metadata for LLM-assisted goal decomposition | Internal | No |
 | `backups/` | `EnvironmentManager` | Point-in-time snapshots created by `env backup create` | Sensitive | Same as source |
 
+## Perpetual Runtime (`data/perpetual/` and audit files)
+
+Created only when the operator uses the opt-in Perpetual Runtime (`network-ai perpetual …`). Keep everything under `data/perpetual/` outside the agents' writable paths — it is on the default guarded-path list.
+
+| File / Directory | Created by | Purpose | Data class | Contains secrets? |
+|---|---|---|---|---|
+| `perpetual/keys/<name>.key` | `perpetual keygen` | Ed25519 private key (PKCS#8 PEM, mode 0600, never overwritten) — operator or authority key | **Critical** | **Yes** |
+| `perpetual/keys/<name>.pub` | `perpetual keygen` | Matching public key (SPKI PEM) | Public | No |
+| `perpetual/snapshots/snap_<id>.json` | `StateSnapshotter` / `perpetual snapshot` | Verified blackboard snapshot | Sensitive | Mirrors blackboard |
+| `perpetual/snapshots/manifest.jsonl` | `StateSnapshotter` | HMAC-signed, hash-chained snapshot manifest | Sensitive | No |
+| `perpetual_audit.jsonl` | `perpetual authority` | Every lease decision: issue, renew, refuse, revoke, pause, resume, tighten, alert, policy, stop | Sensitive | No |
+| `egress_audit.jsonl` | `perpetual proxy` | Every egress decision: forwarded, denied, error (route, lease, run, status, reason) | Sensitive | No |
+| `sentry_<id>.jsonl` | `perpetual sentry` | Findings from one sentry (detector, level, reason) | Sensitive | No |
+
+Signed policies (`policy.signed.json`, budget policies, guarded-path approvals) are written only where the operator points `--out`. Role secrets, the snapshot secret, and upstream credentials are read from environment variables and never written to disk.
+
 ## Operator-Configured Paths
 
 These files are written **only** when the operator explicitly sets the corresponding option. They are not created by default.
@@ -107,8 +123,8 @@ Key fields:
 
 | Class | Definition | Examples in Network-AI |
 |-------|-----------|----------------------|
-| **Critical** | Compromise enables privilege escalation or token forgery | `.signing_key` |
-| **Sensitive** | Contains operational data; exposure enables information disclosure or replay | `audit_log.jsonl`, `blackboard.json`, `trust_levels.json` |
+| **Critical** | Compromise enables privilege escalation or token forgery | `.signing_key`, `perpetual/keys/*.key` |
+| **Sensitive** | Contains operational data; exposure enables information disclosure or replay | `audit_log.jsonl`, `blackboard.json`, `trust_levels.json`, `perpetual_audit.jsonl`, `egress_audit.jsonl`, snapshots |
 | **Internal** | Non-secret operational metadata | `project-context.json`, lock files |
 | **Public** | Intentionally readable | `package.json`, source files |
 
@@ -131,6 +147,10 @@ Key fields:
 5. **Multi-project isolation**: Clear `data/` (or use a separate `--data` path) between
    unrelated projects to prevent cross-project context leakage.
 
+6. **Perpetual Runtime keys**: Keep the operator private key off the hosts where agents
+   run (sign policies and approvals on an operator machine); the authority host needs only
+   the operator *public* key and its own authority key.
+
 ---
 
 ## Files Never Created by Network-AI
@@ -139,5 +159,5 @@ The following are **never** written by Network-AI and should be treated as suspi
 they appear in the data directory:
 
 - Executable files (`*.sh`, `*.exe`, `*.bat`)
-- Private key files in PEM/DER format (`*.pem`, `*.key`, `*.p12`)
+- Private key files in PEM/DER format (`*.pem`, `*.key`, `*.p12`) — except `perpetual/keys/*.key`, written only by an explicit `network-ai perpetual keygen`
 - Any file outside the `data/` directory tree (path traversal is blocked)

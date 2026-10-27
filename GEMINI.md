@@ -43,6 +43,8 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/locked-blackboard.ts` — LockedBlackboard with atomic propose → validate → commit
 - `lib/auth-guardian.ts` — Weighted permission scoring (justification 40%, trust 30%, risk 30%)
 - `lib/a2a-server.ts` — A2AServer: expose the orchestrator as a Google A2A agent (agent card + tasks)
+- `lib/asi/` — ASI Strict Mode (opt-in): proof-gated actions, BFT consensus, auditor receipts, kill switch
+- `lib/perpetual/` — Perpetual Runtime (opt-in): operator-signed leases + dead-man switch, egress proxy, guarded paths, sandbox runner, sentry swarm, self-improvement pipeline, verified snapshots, budget balancer
 - `adapters/` — 32 framework adapters, including `GeminiAdapter` (Gemini Developer API)
   and `VertexAIAdapter` (Vertex AI / Gemini on GCP)
 - `bin/mcp-server.ts` — the MCP server this extension launches (stdio transport)

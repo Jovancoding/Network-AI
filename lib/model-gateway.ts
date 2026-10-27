@@ -32,6 +32,7 @@ import type { ConsensusEngine } from './asi/consensus';
 import type { CanaryRegistry } from './asi/canary';
 import type { HaltCoordinator } from './asi/shutdown';
 import type { AsiStrictConfig, CognitiveBudget, ConsensusEvaluator, ConsensusResult } from './asi/types';
+import type { LeaseCheck } from './perpetual/types';
 
 // ============================================================================
 // NORMALIZED MODEL I/O (provider-agnostic)
@@ -210,6 +211,8 @@ export interface GovernedModelGatewayConfig {
   cognitive?: CognitiveSink;
   /** ASI strict-mode controls (opt-in). */
   asi?: GatewayAsiOptions;
+  /** Perpetual runtime: every model call needs a valid lease with the `model_call` tool. */
+  lease?: LeaseCheck;
 }
 
 /** A single attempt in the fallback chain — the source of truth for billing. */
@@ -310,6 +313,7 @@ export class GovernedModelGateway {
   private readonly cognitive: CognitiveSink | undefined;
   private readonly asi: GatewayAsiOptions | undefined;
   private readonly asiConfig: AsiStrictConfig;
+  private readonly lease: LeaseCheck | undefined;
 
   constructor(config: GovernedModelGatewayConfig) {
     if (typeof config.caller !== 'function') {
@@ -332,6 +336,7 @@ export class GovernedModelGateway {
     this.cognitive = config.cognitive;
     this.asi = config.asi;
     this.asiConfig = config.asi?.config ?? getAsiConfig();
+    this.lease = config.lease;
   }
 
   /**
@@ -348,6 +353,7 @@ export class GovernedModelGateway {
     if (!request || !Array.isArray(request.messages)) {
       throw new TypeError('GovernedModelGateway.send: request.messages must be an array');
     }
+    this.lease?.assertActive({ tool: 'model_call' });
 
     const strict = isAsiActive(this.asiConfig);
     let budget: CognitiveBudget | undefined;

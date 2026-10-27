@@ -1,8 +1,8 @@
-# Adapter System — 29 Plug-and-Play Agent Framework Adapters
+# Adapter System — 32 Plug-and-Play Agent Framework Adapters
 
 ## Overview
 
-The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.15.1, 32 adapters are included.
+The SwarmOrchestrator uses an **adapter pattern** to work with any agent framework. Instead of being locked to one system, you bring your own agents — from any framework — and the orchestrator handles coordination, shared state, permissions, and parallel execution. As of v5.17.0, 32 adapters are included.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -266,6 +266,16 @@ That's it. Three methods to implement (the base class handles the rest):
 - `executeAgent()` — run an agent (REQUIRED)
 - `initialize()` — set up connections (optional, has default)
 - `shutdown()` — clean up (optional, has default)
+
+Extend `StreamingBaseAdapter` instead when your framework streams tokens; implement `executeAgentStream()` to yield chunks and the base class falls back to a single chunk for non-streaming calls.
+
+### Adapters under the Perpetual Runtime (v5.17.0, opt-in)
+
+Adapters stay BYOC and dependency-free; nothing changes for them by default. When a deployment runs agents under a lease:
+
+- Point the client you pass in at the egress proxy (`http://127.0.0.1:4711/<route>/...`) and send the current lease in the `X-Network-AI-Lease` header (`encodeLeaseHeader(guard.currentLease!)`). The proxy injects the real credential, so the adapter never holds an API key.
+- Do not read credentials from `process.env` inside an adapter — the sandbox withholds them, and the improvement pipeline escalates new `process.env` reads to human review.
+- Keep network calls in the client you were given; an adapter that opens its own connections bypasses the proxy's scope, rate, and financial limits.
 
 ## Routing
 

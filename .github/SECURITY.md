@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 5.16.x  | ✅ Yes — full support (current) |
+| 5.17.x  | ✅ Yes — full support (current) |
+| 5.16.x  | ✅ Security fixes only |
 | 5.15.x  | ✅ Security fixes only |
 | 5.14.x  | ✅ Security fixes only |
 | 5.13.x  | ✅ Security fixes only |
@@ -87,6 +88,8 @@ Network-AI includes built-in security features:
 - **Streamable HTTP MCP Transport Fail-Closed** (v5.11.0) — `McpStreamableServer` enforces a non-empty bearer secret before `listen()` will bind; empty secret causes immediate rejection, consistent with the SSE transport policy (GHSA-j3vx-cx2r-pvg8).
 - **SkillSpector (v5.11.0) — `check_permission.py` two findings resolved**: `FILE_EXPORT` added to `HIGH_RISK_RESOURCES` (was missing despite comment/policy requiring `--confirm-high-risk`); `ensure_data_dir()` now delegates to `_resolve_data_dir()` for env-scoped correctness.
 - **CodeQL #174 (CWE-377) — Insecure temporary file path in `AuthGuardian`** (v5.11.0): All `join(tmpdir(), ...)` sources in `test-claim-verifier.ts` replaced with `join('.', 'data', ...)` paths, eliminating the taint source. `AuthGuardian` constructor retains `path.resolve()` for defense-in-depth.
+- **ASI Strict Mode** (v5.16.0, opt-in `ASI_STRICT_MODE=audit|enforce`) — proof-carrying actions, BFT consensus on high-stakes model turns, auditor receipts for low-trust commits, Password-Activated Shutdown, trust-tiered context, cognitive caps, canaries, hash-chained event export. Config can only be tightened at runtime; unknown values fail closed to `enforce`.
+- **Perpetual Runtime** (v5.17.0, opt-in) — out-of-process `LeaseAuthority` with operator-signed policies and short-lived Ed25519 leases; `LeaseGuard` dead-man switch; credential-holding `EgressProxy` with per-route and financial limits; `GuardedPaths` (governance writes need a single-use operator-signed approval of the exact content); gVisor-default sandbox; sentry swarm limited to alert/tighten with authenticated identities and quorum; self-improvement receipts bound to the patch hash; HMAC-signed, hash-chained snapshots; lower-only budget ceilings. See [SECURITY.md](../SECURITY.md) for details and limits.
 
 ## Security Scan Results
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Network-AI v5.16.2 — TypeScript/Node.js multi-agent orchestrator with 32 adapters, 3,888 tests, 80+ modules.
+Network-AI v5.17.0 — TypeScript/Node.js multi-agent orchestrator with 32 adapters, 4,180 tests, 80+ modules.
 
 > **Two governance layers.** Policy engines govern *what an agent may do* before it acts (pre-wire tool gating). Network-AI adds the layer underneath — **model-interaction lifecycle governance**: when a frontier model returns a classifier refusal, the `GovernedModelGateway` audits it, falls over to another model, reprices the retry with fallback credit, hands off thinking blocks, and accounts the cost — one governed, budgeted, audited call. The two layers are complementary.
 
@@ -386,6 +386,43 @@ Threat assumptions: at most f faulty and independent consensus evaluators; signi
 
 ---
 
+## Perpetual Runtime (`lib/perpetual/`)
+
+Opt-in long-running execution under human control. A run continues only while an operator-signed policy keeps renewing its lease. Invariants: **I1** the external stop works without agent cooperation; **I2** agents can modify themselves, never their limits; **I3** spending stays inside operator-signed ceilings.
+
+```
+            OPERATOR (Ed25519 key, role secrets, credentials)
+                 │ signed policy · revoke · pause · resume · tighten · rollback
+                 ▼
+ LeaseAuthority (own process) ◀── alert / tighten only ── Sentry swarm (own processes, read-only audit tail, quorum)
+                 │ short-lived signed leases
+                 ▼
+ Agent process: LeaseGuard ──vetoes──▶ AgentRuntime · GovernedModelGateway · LockedBlackboard
+                GuardedPaths (operator-signed writes) · ISandboxRunner (gVisor) · BudgetBalancer · SelfHealer
+                 │ lease header                                   │ patches
+                 ▼                                                ▼
+ EgressProxy (own process, holds credentials,           ImprovementPipeline (outside the agent):
+ financial limits)                                        static → sandbox tests → consensus → signed receipt
+```
+
+| Module | Role |
+|---|---|
+| `types.ts`, `signing.ts` | Lease, policy, heartbeat types; Ed25519 signing over canonical JSON; policy validation (TTL 10 s–24 h, scope, budget, sentry quorum) |
+| `lease-authority.ts` | Issue/renew under the signed policy; spend only grows; stop conditions; role-gated revoke/pause/resume/tighten/install-policy; per-sentry identities and alert quorum; loopback HTTP API with constant-time auth and failure rate limits |
+| `lease-guard.ts` | In-process `LeaseCheck`: renew before expiry, revocation polling, monotonic clock, scope checks for tools/paths/destinations, halt on loss; `HttpLeaseTransport` |
+| `egress-proxy.ts` | Lease-gated forward gateway: signature + scope + live-status checks, method/path allowlists, credential injection and response scrubbing, per-lease rate limit, per-request/per-run financial caps |
+| `guarded-paths.ts` | `GuardedMatcher` (governance paths/keys) and `GuardedPaths` (single-use operator approvals bound to the exact content hash) |
+| `sandbox.ts` | `ISandboxRunner`; `ContainerSandboxRunner` (gVisor default, read-only root, `--cap-drop ALL`, no-new-privileges, no network or egress network only, minimal engine env); run receipts |
+| `sentry.ts` | Detectors, `Sentry` (alert + tighten only), `HttpSentryControl`, read-only `AuditTail`, audit → observation mapping |
+| `improvement-pipeline.ts` | Patch evaluation tiers (`auto`/`human`/`operator`), static checks incl. dependency diff, sandbox tests on a project copy, consensus with model-family minimum, Ed25519 receipts bound to the patch hash, atomic apply |
+| `self-healing.ts` | `StateSnapshotter` (HMAC-signed, hash-chained manifest, verified restore) and `SelfHealer` (canaries → failing health, rollback, session purge) |
+| `budget-balancer.ts` | Operator-signed `BudgetPolicy`; authorize/record spend; cheapest-source selection; effort throttling; lower-only ceilings |
+| `files.ts` | Key files (0600, never overwritten), JSON files, route files (credentials by env-var name only), role and per-sentry secrets |
+
+Threat assumptions: the operator key, role secrets, snapshot secret, pipeline key, and upstream credentials are held outside the agents' reach; the authority, proxy, and sentries run where agents cannot write or signal; agents run in the sandbox with network access only through the proxy.
+
+---
+
 ## Project Structure
 
 ```
@@ -447,7 +484,9 @@ Network-AI/
 │   ├── mcp-elicitation.ts        # StdioElicitationChannel + elicitation ApprovalCallback (v5.14)
 │   ├── a2a-server.ts             # A2AServer: agent card + tasks/send — A2A server mode (v5.14)
 │   ├── context-composer.ts       # ContextComposer: token-budgeted, relevance-ranked context packs (v5.15)
-│   └── mcp-tools-context.ts      # context_pack + blackboard_search MCP tools (v5.15)
+│   ├── mcp-tools-context.ts      # context_pack + blackboard_search MCP tools (v5.15)
+│   ├── asi/                      # ASI Strict Mode: ProofGate, consensus, receipts, kill switch (v5.16)
+│   └── perpetual/                # Perpetual Runtime: leases, egress, guarded paths, sandbox, sentries, pipeline, self-healing, budget (v5.17)
 ├── scripts/                      # Python helper scripts (local orchestration only)
 │   ├── blackboard.py             # Shared state management with atomic commits
 │   ├── swarm_guard.py            # Handoff tax prevention, budget tracking
@@ -473,5 +512,8 @@ Network-AI/
 └── data/
     ├── audit_log.jsonl           # HMAC / Ed25519-signed audit trail (local only)
     ├── SYSTEM_PAUSED             # Kill-switch sentinel (pause/resume CLI) — optional
+    ├── perpetual/                # Perpetual Runtime keys + verified snapshots — optional
+    ├── perpetual_audit.jsonl     # Lease authority decisions — optional
+    ├── egress_audit.jsonl        # Egress proxy decisions — optional
     └── pending_changes/          # In-flight atomic change records (WAL)
 ```

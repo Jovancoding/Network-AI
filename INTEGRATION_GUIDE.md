@@ -134,6 +134,10 @@ Match your problem to the Network-AI primitive:
 | Need to expose all tools to an AI via MCP | `McpSseServer` + `network-ai-server` | HTTP/SSE server at `GET /sse`, `POST /mcp`, `GET /tools` |
 | Runtime AI control of the orchestrator | `ControlMcpTools` | AI can read/set config, spawn/stop agents, drive FSM transitions |
 | Agents lose project context between sessions | `ProjectContextManager` (`context_manager.py`) | Persistent Layer-3 JSON file injected into every agent's system prompt |
+| Agents must run for days but stay stoppable | `LeaseAuthority` + `LeaseGuard` (Perpetual Runtime) | Operator-signed, renewable leases; revoke/pause/expiry halts the run without agent cooperation |
+| Agents must not change their own limits | `GuardedPaths` | Governance files and keys need a single-use operator-signed approval of the exact content |
+| Agents must not hold API or payment credentials | `EgressProxy` | Credentials injected per route in a separate process; per-request and per-run payment caps |
+| Agents improve their own code | `ImprovementPipeline` | Static checks → sandbox tests → multi-family consensus → signed receipt bound to the patch |
 
 ---
 
@@ -385,6 +389,52 @@ Any `FileAccessor.read/write/list` call outside `data/dev/` will throw `SourcePr
 
 ---
 
+### Phase 8 — Long-Running Agents Under Human Control (v5.17.0+, opt-in)
+
+**Goal:** Let a swarm run indefinitely, improve itself, and spend within limits — while an operator can always stop it.
+
+Adopt it in this order; each step is useful on its own:
+
+1. **Leases and the stop button.** Generate keys and sign a renewal policy on an operator machine, then run the authority as its own process:
+
+   ```bash
+   network-ai perpetual keygen operator && network-ai perpetual keygen authority
+   network-ai perpetual sign-policy policy.json --key data/perpetual/keys/operator.key --out policy.signed.json
+   network-ai perpetual authority --operator-pub data/perpetual/keys/operator.pub \
+     --authority-key data/perpetual/keys/authority.key --policy policy.signed.json
+   ```
+
+   In the agent process, start a `LeaseGuard` and pass it to `AgentRuntime`, `GovernedModelGateway`, and `LockedBlackboard` via the `lease` option. `network-ai perpetual pause | revoke` now stops the run within one poll interval; if the authority is unreachable the run halts when the lease expires.
+
+2. **Egress through the proxy.** Move upstream credentials into a routes file (by environment-variable name) and run `network-ai perpetual proxy`. Agents call `http://127.0.0.1:4711/<route>/...` with the `X-Network-AI-Lease` header (`encodeLeaseHeader(guard.currentLease)`); mark payment routes `financial` to cap amounts.
+
+3. **Guarded paths.** Construct `GuardedPaths` with the operator public key and pass it as `guarded` to `AgentRuntime` and `LockedBlackboard`. Approve an individual governance change with `network-ai perpetual sign-guarded` and `guarded.approve(approval)`.
+
+4. **Sandbox.** Configure `sandbox: { runner: new ContainerSandboxRunner({ image, egressNetwork }) }` on `AgentRuntime` so commands run in disposable gVisor containers with network only through the proxy.
+
+5. **Sentries.** Give each sentry its own secret (`NETWORK_AI_LEASE_SENTRY_SECRET_<ID>`), set `stopWhen.sentryQuorum` in the policy, and run `network-ai perpetual sentry --id <id> --audit-log ...` on a host the agents cannot reach.
+
+6. **Self-improvement, self-healing, budget.** Run `ImprovementPipeline` outside the agent process for patches; wire `SelfHealer.health()` and `BudgetBalancer.spend()` into the `LeaseGuard` heartbeat so a failing canary or an exhausted budget stops renewal.
+
+```typescript
+import { LeaseGuard, HttpLeaseTransport, GuardedPaths, AgentRuntime, readPublicKey } from 'network-ai';
+
+const guard = new LeaseGuard({
+  runId: 'invoice-swarm',
+  authorityPublicKey: readPublicKey('authority.pub'),
+  transport: new HttpLeaseTransport('http://127.0.0.1:4710', process.env.NETWORK_AI_LEASE_RUNNER_SECRET!),
+  halt: haltCoordinator,
+});
+await guard.start();
+
+const guarded = new GuardedPaths({ operatorPublicKey: readPublicKey('operator.pub') });
+const runtime = new AgentRuntime({ policy: { basePath: '.', allowedCommands: ['npm *'] }, lease: guard, guarded });
+```
+
+Keep the operator private key off the agent hosts, and run the authority, proxy, and sentries where agents cannot write or signal — the guarantees depend on it.
+
+---
+
 ## 5. Enterprise Concerns
 
 ### Authentication & IAM
@@ -495,11 +545,11 @@ Run these before declaring the integration production-ready:
 - [ ] All agents execute via the adapter registry without errors
 - [ ] `npx ts-node test-standalone.ts` — 88 core tests pass
 - [ ] `npx ts-node test-security.ts` — 34 security tests pass
-- [ ] `npx ts-node test-adapters.ts` — 218 adapter tests pass
+- [ ] `npx ts-node test-adapters.ts` — 271 adapter tests pass
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
 - [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
 - [ ] `npx ts-node test-phase7.ts` — 94 Phase 7 tests pass (hooks, flow control, composer, semantic search)
-- [ ] `npm run test:all` — all 3,888 tests pass across 42 suites
+- [ ] `npm run test:all` — all 4,180 tests pass across 43 suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety
@@ -534,6 +584,15 @@ Run these before declaring the integration production-ready:
 - [ ] `audit_query` returns filtered results correctly
 - [ ] The audit chain signature is intact after N entries (run the chain verifier)
 
+### Perpetual Runtime (if enabled)
+
+- [ ] `network-ai perpetual revoke <runId>` halts the run without any agent action
+- [ ] Stopping the authority process halts the run within one lease period
+- [ ] An agent write to a guarded path without an operator approval is refused
+- [ ] Requests outside the lease scope, or above a financial limit, get 403 from the proxy
+- [ ] Two sentries are needed to stop renewal when `sentryQuorum` is 2
+- [ ] `npx ts-node test-perpetual.ts` and `npx ts-node test-perpetual-safety.ts` pass
+
 ---
 
 ## 8. Common Integration Mistakes
@@ -548,6 +607,7 @@ Run these before declaring the integration production-ready:
 | FSM with no timeout | Stuck workflow holds locks indefinitely | Always set `timeoutMs` on states that involve external calls |
 | Storing PII as blackboard keys | Audit log contains PII in plain text | Use pseudonymised keys; store PII in a separate encrypted store |
 | Running `network-ai-server` on `0.0.0.0` in production | MCP control plane is publicly accessible | Bind to localhost and expose via authenticated internal API gateway only |
+| Running the Perpetual Runtime authority or proxy on the agents' host with write access | Agents can stop or bypass their own control plane | Separate host/user for authority, proxy, sentries; agents sandboxed with network only via the proxy |
 
 ---
 
@@ -556,7 +616,7 @@ Run these before declaring the integration production-ready:
 | Document | What It Covers |
 |----------|---------------|
 | [QUICKSTART.md](QUICKSTART.md) | Get running in 5 minutes |
-| [QUICKSTART.md § CLI](QUICKSTART.md) | CLI reference — bb, auth, budget, audit commands |
+| [QUICKSTART.md § CLI](QUICKSTART.md) | CLI reference — bb, auth, budget, audit, env, perpetual commands |
 | [references/adapter-system.md](references/adapter-system.md) | All 32 adapters with code examples |
 | [references/trust-levels.md](references/trust-levels.md) | Trust scoring formula and agent roles |
 | [references/auth-guardian.md](references/auth-guardian.md) | Permission system, justification scoring, token lifecycle |
@@ -567,4 +627,4 @@ Run these before declaring the integration production-ready:
 
 ---
 
-*Network-AI v5.13.0 · MIT License · https://github.com/Jovancoding/Network-AI*
+*Network-AI v5.17.0 · MIT License · https://github.com/Jovancoding/Network-AI*

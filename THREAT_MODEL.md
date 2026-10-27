@@ -1,6 +1,6 @@
 # Network-AI Threat Model
 
-Version: 5.11.0 — updated with each release that changes a trust boundary or auth mechanism.
+Version: 5.17.0 — updated with each release that changes a trust boundary or auth mechanism.
 
 ---
 
@@ -21,6 +21,11 @@ Network-AI is an in-process multi-agent orchestrator. There is no SaaS or cloud-
 | Agent trust registry | Medium | Trust levels that gate permission scoring |
 | Environment configs | Medium | Per-env data directories and promotion chain |
 | Budget state | Low | Token/cost accounting; denial-of-service vector |
+| Perpetual operator key (Ed25519) | Critical | Signs renewal policies, guarded-path approvals, and budget policies; compromise = agents can be given any limits |
+| Lease authority key (Ed25519) | Critical | Signs leases; compromise = leases can be minted outside the policy |
+| Lease role secrets (operator / sentry / runner) | High | Authenticate control-API callers; the operator secret can resume and install policies |
+| Egress credentials | High | Upstream API and payment credentials held only by the egress proxy |
+| Snapshot secret, pipeline key | High | Sign blackboard snapshots and self-improvement receipts |
 
 ---
 
@@ -93,6 +98,21 @@ or hijack another agent's goal.
 - All CLI mutations are logged to the audit trail.
 - Rate limiting prevents bulk-write abuse from CLI loops.
 
+### 3.6 Self-Modifying, Long-Running Agent (Perpetual Runtime, v5.17.0+)
+
+**Who**: A capable agent swarm running indefinitely with permission to improve its own code and spend money.
+
+**Goal**: Keep running after a human wants it stopped, loosen its own limits (scope, ceilings, sentries, kill switch), acquire funding or compute on its own, or get a harmful patch applied.
+
+**Mitigations**:
+- **I1 external stop**: leases are issued by an out-of-process `LeaseAuthority` under an operator-signed policy; the agent holds only the authority's public key, so it cannot mint or extend a lease. `LeaseGuard` halts the run when the lease is revoked, paused, expired, or cannot be renewed (monotonic clock, so wall-clock rollback does not help). The egress proxy refuses every request without a live lease.
+- **I2 limits stay fixed**: `GuardedPaths` blocks writes to governance files and keys without a single-use operator-signed approval of the exact content; the improvement pipeline sends guarded paths to the operator tier regardless of tests or consensus, and its receipts bind the exact patch hash.
+- **I3 spend inside ceilings**: ceilings come from the signed policy and are enforced by the authority (renewal stops at the ceiling; reported spend never decreases) and by financial egress routes (per-request and per-run caps) in the proxy process; agents can lower ceilings, never raise them or add sources.
+- Sentries watch the audit stream read-only and can only alert or tighten; each has its own secret, and `sentryQuorum` keeps a single compromised sentry from stopping or steering runs.
+- Canary failures stop renewal, roll state back to the last verified (HMAC-signed, hash-chained) snapshot, and purge the session.
+
+**Residual risk**: all of the above assumes the operator key, role secrets, and credentials stay outside the agents' reach, and that agents run in the sandbox with network access only through the proxy. An agent with unrestricted code execution on the host running the authority or proxy defeats these controls.
+
 ---
 
 ## 4. Trust Boundaries
@@ -130,6 +150,16 @@ but does not manage OS-level permissions.
 **Boundary 4 — Python scripts**: Scripts in `scripts/` run as a child process or
 standalone. They validate `NETWORK_AI_ENV` routing and apply HMAC signing to grant
 tokens. The signing key lives at `data[/<env>]/.signing_key`.
+
+**Boundary 5 — Perpetual Runtime control plane** (opt-in): `LeaseAuthority`, `EgressProxy`,
+and sentries run as separate processes the agents cannot write to or signal. The authority
+and proxy bind loopback by default (non-loopback needs `allowRemote` and should sit behind
+TLS) and authenticate every control call with distinct role secrets in constant time.
+Agents reach the network only through the proxy, which holds the credentials.
+
+**Boundary 6 — Sandbox**: with `ISandboxRunner` configured, each command runs in a
+disposable container (gVisor by default) with a read-only root, one writable workspace,
+no capabilities, and no network (or the egress network only).
 
 ---
 
@@ -171,6 +201,14 @@ operators must address them at the infrastructure layer:
 | **ClaimVerifier — Tier 1 agent honesty** | `lib/claim-verifier.ts` | Adversary 3.2 |
 | Rate limiting | `security.ts` | All |
 | Path traversal protection | `scripts/blackboard.py` | Adversary 3.5 |
+| Out-of-process lease authority + dead-man switch | `lib/perpetual/lease-authority.ts`, `lease-guard.ts` | Adversary 3.6 |
+| Credential-holding egress proxy with lease, scope, rate, and financial limits | `lib/perpetual/egress-proxy.ts` | Adversary 3.6 |
+| Guarded governance paths (operator-signed, content-bound, single-use approvals) | `lib/perpetual/guarded-paths.ts` | Adversary 3.2, 3.6 |
+| Disposable gVisor sandbox | `lib/perpetual/sandbox.ts` | Adversary 3.2, 3.6 |
+| Sentry swarm with authenticated identities and quorum | `lib/perpetual/sentry.ts` | Adversary 3.2, 3.3, 3.6 |
+| Self-improvement receipts bound to the patch hash | `lib/perpetual/improvement-pipeline.ts` | Adversary 3.6 |
+| Signed, hash-chained snapshots and canary rollback | `lib/perpetual/self-healing.ts` | Adversary 3.3, 3.6 |
+| Lower-only budget ceilings, approved sources only | `lib/perpetual/budget-balancer.ts` | Adversary 3.6 |
 
 ---
 

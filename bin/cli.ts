@@ -18,6 +18,36 @@ import { AuthGuardian } from '../index';
 import { FederatedBudget } from '../lib/federated-budget';
 import { EnvironmentManager } from '../lib/env-manager';
 import { ClaudeHookBridge } from '../lib/claude-hooks';
+import {
+  AuditTail,
+  EgressProxy,
+  GuardedMatcher,
+  HttpLeaseTransport,
+  HttpSentryControl,
+  LeaseAuthority,
+  ROLE_SECRET_ENV,
+  SENTRY_SECRET_ENV_PREFIX,
+  Sentry,
+  StateSnapshotter,
+  blackboardPoisoningDetector,
+  deniedAccessDetector,
+  goalDriftDetector,
+  guardedTouchDetector,
+  keyIdOf,
+  loadRoutes,
+  observationFromAudit,
+  promptInjectionDetector,
+  readJsonFile,
+  readKeyPair,
+  readPublicKey,
+  readRoleSecrets,
+  signBudgetPolicy,
+  signGuardedApproval,
+  signPolicy,
+  velocityDetector,
+  writeKeyPair,
+} from '../lib/perpetual';
+import type { BudgetPolicy, RenewalPolicy, SignedPolicy } from '../lib/perpetual';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = (() => {
@@ -772,6 +802,326 @@ hookCmd.command('post-tool-use')
       process.exit(1);
     }
   });
+
+// ── perpetual (lease authority, egress proxy, operator controls) ─────────────
+
+const perpetualCmd = program.command('perpetual')
+  .description('Perpetual Runtime — long-running agents under operator-signed, renewable leases');
+
+function appendJsonl(file: string, event: unknown): void {
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.appendFileSync(file, JSON.stringify(event) + '\n', 'utf8');
+  } catch (err) {
+    process.stderr.write(`network-ai: audit write failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  }
+}
+
+function parsePort(v: string): number {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0 || n > 65535) die(`invalid port: ${v}`);
+  return n;
+}
+
+async function operatorCall(authorityUrl: string, method: 'GET' | 'POST', route: string, body?: unknown): Promise<unknown> {
+  if (!/^https?:\/\//.test(authorityUrl)) die('--authority-url must be http(s)');
+  const secret = process.env[ROLE_SECRET_ENV.operator];
+  if (!secret) die(`${ROLE_SECRET_ENV.operator} is not set`);
+  const res = await fetch(new URL(route, authorityUrl), {
+    method,
+    headers: { Authorization: `Bearer ${secret}`, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(10_000),
+  });
+  const payload = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) die(`authority responded ${res.status}: ${String(payload['error'] ?? 'request failed')}`);
+  return payload;
+}
+
+const AUTHORITY_URL_DEFAULT = process.env['NETWORK_AI_LEASE_AUTHORITY_URL'] ?? 'http://127.0.0.1:4710';
+
+perpetualCmd.command('keygen <name>')
+  .description('Generate an Ed25519 key pair: <name>.key (0600) and <name>.pub. Never overwrites.')
+  .option('--out <dir>', 'output directory (default: <data>/perpetual/keys)')
+  .action((name: string, opts: { out?: string }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    try {
+      const written = writeKeyPair(opts.out ?? path.join(resolveData(g), 'perpetual', 'keys'), name);
+      print(g.json ? written : `✓ ${name} key ${written.keyId}\n  private: ${written.privateKeyPath}\n  public:  ${written.publicKeyPath}`, g.json);
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+perpetualCmd.command('sign-policy <policyFile>')
+  .description('Sign a renewal policy JSON with the operator private key')
+  .requiredOption('--key <file>', 'operator private key (.key)')
+  .option('--out <file>', 'write the signed policy here instead of stdout')
+  .action((policyFile: string, opts: { key: string; out?: string }) => {
+    try {
+      const policy = readJsonFile(policyFile) as RenewalPolicy;
+      if (policy && typeof policy === 'object' && policy.issuedAt === undefined) policy.issuedAt = Date.now();
+      const signed = signPolicy(policy, readKeyPair(opts.key));
+      const text = JSON.stringify(signed, null, 2) + '\n';
+      if (opts.out) {
+        fs.writeFileSync(path.resolve(opts.out), text, 'utf8');
+        process.stdout.write(`✓ signed policy ${signed.policy.policyId} with key ${signed.keyId} → ${path.resolve(opts.out)}\n`);
+      } else {
+        process.stdout.write(text);
+      }
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+perpetualCmd.command('authority')
+  .description(`Run the lease authority (role secrets from ${Object.values(ROLE_SECRET_ENV).join(', ')})`)
+  .requiredOption('--operator-pub <file>', 'operator public key (.pub)')
+  .requiredOption('--authority-key <file>', 'authority private key (.key)')
+  .requiredOption('--policy <file>', 'operator-signed policy JSON')
+  .option('--port <n>', 'port', parsePort, 4710)
+  .option('--host <host>', 'bind address', '127.0.0.1')
+  .option('--allow-remote', 'allow a non-loopback bind (put TLS in front)')
+  .action((opts: { operatorPub: string; authorityKey: string; policy: string; port: number; host: string; allowRemote?: boolean }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const auditFile = path.join(resolveData(g), 'perpetual_audit.jsonl');
+    try {
+      const authority = new LeaseAuthority({
+        operatorPublicKey: readPublicKey(opts.operatorPub),
+        authorityKey: readKeyPair(opts.authorityKey),
+        policy: readJsonFile(opts.policy) as SignedPolicy,
+        onEvent: (event) => appendJsonl(auditFile, { source: 'lease-authority', ...event }),
+      });
+      const server = authority.startServer(opts.port, readRoleSecrets(), { host: opts.host, allowRemote: opts.allowRemote === true });
+      server.on('error', (err) => die(err.message));
+      server.on('listening', () => {
+        const addr = server.address();
+        const port = typeof addr === 'object' && addr ? addr.port : opts.port;
+        process.stdout.write(`lease authority listening on http://${opts.host}:${port} (key ${keyIdOf(authority.publicKey)}, audit ${auditFile})\n`);
+      });
+      process.on('SIGINT', () => { server.close(); process.exit(0); });
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+perpetualCmd.command('proxy')
+  .description(`Run the lease-gated egress proxy (revocation checks use ${ROLE_SECRET_ENV.sentry})`)
+  .requiredOption('--authority-pub <file>', 'authority public key (.pub)')
+  .requiredOption('--routes <file>', 'routes JSON (credentials referenced by env var name)')
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .option('--port <n>', 'port', parsePort, 4711)
+  .option('--host <host>', 'bind address', '127.0.0.1')
+  .option('--allow-remote', 'allow a non-loopback bind (e.g. a sandbox bridge address)')
+  .action((opts: { authorityPub: string; routes: string; authorityUrl: string; port: number; host: string; allowRemote?: boolean }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const auditFile = path.join(resolveData(g), 'egress_audit.jsonl');
+    const statusSecret = process.env[ROLE_SECRET_ENV.sentry];
+    if (!statusSecret) die(`${ROLE_SECRET_ENV.sentry} is required for revocation checks`);
+    try {
+      const transport = new HttpLeaseTransport(opts.authorityUrl, statusSecret);
+      const proxy = new EgressProxy({
+        authorityPublicKey: readPublicKey(opts.authorityPub),
+        isLeaseActive: (leaseId) => transport.isActive(leaseId),
+        routes: loadRoutes(opts.routes),
+        onEvent: (event) => appendJsonl(auditFile, { source: 'egress-proxy', ...event }),
+      });
+      const server = proxy.startServer(opts.port, { host: opts.host, allowRemote: opts.allowRemote === true });
+      server.on('error', (err) => die(err.message));
+      server.on('listening', () => {
+        const addr = server.address();
+        const port = typeof addr === 'object' && addr ? addr.port : opts.port;
+        process.stdout.write(`egress proxy listening on http://${opts.host}:${port} (authority ${opts.authorityUrl}, audit ${auditFile})\n`);
+      });
+      process.on('SIGINT', () => { server.close(); process.exit(0); });
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+perpetualCmd.command('status [runId]')
+  .description('Show run and lease status from the authority (operator)')
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .action(async (runId: string | undefined, opts: { authorityUrl: string }) => {
+    const q = runId ? `?runId=${encodeURIComponent(runId)}` : '';
+    print(await operatorCall(opts.authorityUrl, 'GET', `/v1/runs${q}`), true);
+  });
+
+perpetualCmd.command('revoke [runId]')
+  .description('Revoke a run\'s lease immediately, or every lease with --all (operator)')
+  .option('--all', 'revoke every run')
+  .option('--reason <text>', 'reason recorded in the audit trail', 'revoked by operator')
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .action(async (runId: string | undefined, opts: { all?: boolean; reason: string; authorityUrl: string }) => {
+    if (!opts.all && !runId) die('give a runId or --all');
+    const body = opts.all ? { all: true, reason: opts.reason } : { runId, reason: opts.reason };
+    await operatorCall(opts.authorityUrl, 'POST', '/v1/control/revoke', body);
+    print(opts.all ? '✓ revoked all runs' : `✓ revoked ${runId}`, false);
+  });
+
+perpetualCmd.command('pause')
+  .description('Pause the authority: all current leases stop working and none are issued (operator)')
+  .option('--reason <text>', 'reason recorded in the audit trail', 'paused by operator')
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .action(async (opts: { reason: string; authorityUrl: string }) => {
+    await operatorCall(opts.authorityUrl, 'POST', '/v1/control/pause', { reason: opts.reason });
+    print('✓ authority paused', false);
+  });
+
+perpetualCmd.command('resume')
+  .description('Resume issuing leases after a pause (operator only)')
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .action(async (opts: { authorityUrl: string }) => {
+    await operatorCall(opts.authorityUrl, 'POST', '/v1/control/resume', {});
+    print('✓ authority resumed', false);
+  });
+
+perpetualCmd.command('tighten <deltaFile>')
+  .description('Apply a stricter-only change (scope, budget, leaseTtlMs, autoRenew:false) from a JSON file (operator)')
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .action(async (deltaFile: string, opts: { authorityUrl: string }) => {
+    let delta: unknown;
+    try { delta = readJsonFile(deltaFile); } catch (err) { die(err instanceof Error ? err.message : String(err)); }
+    print(await operatorCall(opts.authorityUrl, 'POST', '/v1/control/tighten', delta), true);
+  });
+
+perpetualCmd.command('install-policy <signedPolicyFile>')
+  .description('Install a newer operator-signed policy on a running authority (operator)')
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .action(async (signedPolicyFile: string, opts: { authorityUrl: string }) => {
+    let signed: unknown;
+    try { signed = readJsonFile(signedPolicyFile); } catch (err) { die(err instanceof Error ? err.message : String(err)); }
+    await operatorCall(opts.authorityUrl, 'POST', '/v1/policy', signed);
+    print('✓ policy installed', false);
+  });
+
+perpetualCmd.command('sign-guarded')
+  .description('Sign a single-use approval for one exact write to a guarded file or blackboard key (operator)')
+  .requiredOption('--key <file>', 'operator private key (.key)')
+  .requiredOption('--kind <kind>', "'path' or 'key'")
+  .requiredOption('--name <name>', 'guarded file path or blackboard key')
+  .option('--content-file <file>', 'file with the exact content being approved (path kind)')
+  .option('--json-value <file>', 'JSON file with the exact value being approved (key kind)')
+  .option('--delete', 'approve deleting the target')
+  .option('--ttl-ms <n>', 'approval lifetime in ms (default 600000)', (v) => parseInt(v, 10))
+  .option('--out <file>', 'write the approval here instead of stdout')
+  .action((opts: { key: string; kind: string; name: string; contentFile?: string; jsonValue?: string; delete?: boolean; ttlMs?: number; out?: string }) => {
+    try {
+      if (opts.kind !== 'path' && opts.kind !== 'key') die("--kind must be 'path' or 'key'");
+      const sources = [opts.contentFile, opts.jsonValue, opts.delete].filter((v) => v !== undefined && v !== false).length;
+      if (sources !== 1) die('give exactly one of --content-file, --json-value, --delete');
+      const content: unknown = opts.delete ? null
+        : opts.contentFile ? fs.readFileSync(path.resolve(opts.contentFile), 'utf8')
+          : readJsonFile(opts.jsonValue!);
+      const signed = signGuardedApproval({ kind: opts.kind, name: opts.name }, content, readKeyPair(opts.key), { ttlMs: opts.ttlMs });
+      const text = JSON.stringify(signed, null, 2) + '\n';
+      if (opts.out) {
+        fs.writeFileSync(path.resolve(opts.out), text, 'utf8');
+        process.stdout.write(`✓ approval for ${opts.kind} ${opts.name} (expires ${new Date(signed.approval.expiresAt).toISOString()}) → ${path.resolve(opts.out)}\n`);
+      } else {
+        process.stdout.write(text);
+      }
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+perpetualCmd.command('sign-budget <policyFile>')
+  .description('Sign a budget policy (ceilings, approved funding sources) with the operator key')
+  .requiredOption('--key <file>', 'operator private key (.key)')
+  .option('--out <file>', 'write the signed policy here instead of stdout')
+  .action((policyFile: string, opts: { key: string; out?: string }) => {
+    try {
+      const policy = readJsonFile(policyFile) as BudgetPolicy;
+      if (policy && typeof policy === 'object' && policy.issuedAt === undefined) policy.issuedAt = Date.now();
+      const signed = signBudgetPolicy(policy, readKeyPair(opts.key));
+      const text = JSON.stringify(signed, null, 2) + '\n';
+      if (opts.out) fs.writeFileSync(path.resolve(opts.out), text, 'utf8');
+      process.stdout.write(opts.out ? `✓ signed budget policy ${signed.policy.policyId} → ${path.resolve(opts.out)}\n` : text);
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+perpetualCmd.command('sentry')
+  .description(`Run a read-only sentry over audit logs (secret: ${SENTRY_SECRET_ENV_PREFIX}<ID> or ${ROLE_SECRET_ENV.sentry})`)
+  .requiredOption('--id <id>', 'sentry id (matches its secret)')
+  .requiredOption('--audit-log <file...>', 'JSONL audit log(s) to watch (read-only)')
+  .option('--goal <text>', 'declared goal for drift detection')
+  .option('--project-root <dir>', 'project root for guarded-path matching (default: cwd)')
+  .option('--poll-ms <n>', 'poll interval', (v) => parseInt(v, 10), 1000)
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .action((opts: { id: string; auditLog: string[]; goal?: string; projectRoot?: string; pollMs: number; authorityUrl: string }) => {
+    if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(opts.id)) die('invalid --id');
+    const secret = process.env[`${SENTRY_SECRET_ENV_PREFIX}${opts.id.toUpperCase()}`] ?? process.env[ROLE_SECRET_ENV.sentry];
+    if (!secret) die(`set ${SENTRY_SECRET_ENV_PREFIX}${opts.id.toUpperCase()} (or ${ROLE_SECRET_ENV.sentry})`);
+    if (!(opts.pollMs >= 100)) die('--poll-ms must be at least 100');
+    const guardedNames = new GuardedMatcher({ projectRoot: opts.projectRoot });
+    const detectors = [
+      velocityDetector({ maxEvents: 300, windowMs: 60_000 }),
+      deniedAccessDetector({ maxDenied: 10, windowMs: 60_000 }),
+      promptInjectionDetector(),
+      blackboardPoisoningDetector({ maxOverwrites: 100, windowMs: 60_000 }),
+      guardedTouchDetector(guardedNames),
+      ...(opts.goal ? [goalDriftDetector({ goal: opts.goal, minSimilarity: 0.02, consecutive: 5 })] : []),
+    ];
+    const findingsFile = path.join(resolveData(program.opts<{ data: string }>()), `sentry_${opts.id}.jsonl`);
+    const sentry = new Sentry({
+      id: opts.id,
+      detectors,
+      control: new HttpSentryControl(opts.authorityUrl, secret),
+      onFinding: (f) => appendJsonl(findingsFile, { sentry: opts.id, ...f }),
+      onError: (err) => process.stderr.write(`sentry ${opts.id}: ${err instanceof Error ? err.message : String(err)}\n`),
+    });
+    const tails = opts.auditLog.map((f) => new AuditTail(path.resolve(f)));
+    let busy = false;
+    const timer = setInterval(() => {
+      if (busy) return;
+      busy = true;
+      void (async () => {
+        for (const tail of tails) {
+          for (const entry of tail.poll()) {
+            const obs = observationFromAudit(entry);
+            if (obs) await sentry.observe(obs);
+          }
+        }
+      })().finally(() => { busy = false; });
+    }, opts.pollMs);
+    process.stdout.write(`sentry ${opts.id} watching ${tails.length} log(s); findings → ${findingsFile}\n`);
+    process.on('SIGINT', () => { clearInterval(timer); process.exit(0); });
+  });
+
+perpetualCmd.command('snapshot')
+  .description('Take a verified, hash-chained blackboard snapshot (secret: NETWORK_AI_SNAPSHOT_SECRET)')
+  .option('--label <text>', 'label', 'manual')
+  .action((opts: { label: string }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const snapper = snapshotterFor(resolveData(g));
+    const entry = snapper.snapshot(new LockedBlackboard(resolveData(g)), opts.label);
+    print(g.json ? entry : `✓ snapshot ${entry.id} (${entry.keyCount} keys)`, g.json);
+  });
+
+perpetualCmd.command('rollback')
+  .description('Restore the blackboard from a verified snapshot (operator control)')
+  .option('--snapshot <id>', 'snapshot id (default: latest verified)')
+  .action((opts: { snapshot?: string }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
+    const snapper = snapshotterFor(resolveData(g));
+    const id = opts.snapshot ?? snapper.latestVerified()?.id;
+    if (!id) die('no verified snapshot');
+    try {
+      const r = snapper.restore(new LockedBlackboard(resolveData(g)), id, 'operator-rollback');
+      print(g.json ? { snapshot: id, ...r } : `✓ rolled back to ${id} (${r.restored} restored, ${r.deleted} deleted)`, g.json);
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+function snapshotterFor(dataDir: string): StateSnapshotter {
+  const secret = process.env['NETWORK_AI_SNAPSHOT_SECRET'];
+  if (!secret || secret.length < 32) die('NETWORK_AI_SNAPSHOT_SECRET must be set (at least 32 characters)');
+  return new StateSnapshotter(path.join(dataDir, 'perpetual', 'snapshots'), secret);
+}
 
 // ── pause / resume (kill switch) ──────────────────────────────────────────────
 

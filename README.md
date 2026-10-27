@@ -5,9 +5,9 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.16.2-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.17.0-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-3888%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-4180%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-32%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -145,6 +145,60 @@ await runtime.exec('npm test', 'agent-7', { proof });
 
 > **Limits.** Strict mode raises the cost of misbehaviour; it is not a containment proof. An agent with arbitrary code execution on the same host can restart the process with different settings — pair strict mode with OS-level isolation and an out-of-process `ExternalAuthority`. Consensus assumes at most f faulty, independent evaluators.
 
+### ♾️ Perpetual Runtime (opt-in)
+
+Lets agent swarms **run indefinitely, improve themselves, and fund their own work while humans keep control**. A run continues only while an operator-signed policy keeps renewing its lease, never because the agents arrange it. Nothing starts automatically, and every integration point is a single check when unused.
+
+Three invariants hold whatever the configuration:
+
+| # | Invariant | Mechanism |
+|---|---|---|
+| I1 | The external stop always works without agent cooperation | Out-of-process `LeaseAuthority`; short-lived Ed25519 leases; `LeaseGuard` halts the run when a lease is revoked, paused, expired, or cannot be renewed (dead-man switch); the egress proxy refuses traffic without a live lease |
+| I2 | Agents can modify themselves, never their limits | `GuardedPaths`: governance files and blackboard keys are writable only with a single-use, operator-signed approval of the exact content |
+| I3 | Self-funding stays inside human-set ceilings | Ceilings in the signed policy; agents can lower, never raise; new sources need a new signed policy; payments only through the egress proxy with per-request and per-run limits |
+
+| Component | What it does |
+|---|---|
+| **`LeaseAuthority`** (own process) | Issues and renews leases under an operator-signed `RenewalPolicy`: TTL, end date, scope (tools, paths, egress routes), budget ceilings, stop conditions (canary failure, failing health, sentry alerts). Operator: revoke, pause, resume, tighten, install policy. Sentries: alert and tighten only. |
+| **`LeaseGuard`** (in the agent) | Holds the current lease, renews it with spend and health heartbeats, polls for revocation, and vetoes `AgentRuntime.exec`/`writeFile`, `GovernedModelGateway.send`, and `LockedBlackboard` writes without a valid, in-scope lease. |
+| **`EgressProxy`** (own process) | The agents' only route to the network: lease-checked, per-route allowlist, injects credentials the agents never see, scrubs them from responses, rate-limits, and caps financial requests. |
+| **`ISandboxRunner`** | Disposable sandbox per command; `ContainerSandboxRunner` defaults to gVisor (`runsc`), read-only root, no capabilities, no network or egress-proxy only. |
+| **Sentry swarm** | Read-only processes over the audit stream: velocity, denied-access probing, prompt injection, blackboard poisoning, guarded-path attempts, canary leaks, goal drift. Each sentry has its own identity; with `sentryQuorum` set, renewal stops only when enough of them agree. |
+| **`ImprovementPipeline`** | Self-modification with evidence: static checks, sandbox tests on a copy, multi-family consensus, then a signed receipt bound to the patch hash. Tiers: `auto` (agent task code), `human`, `operator` (guarded paths, always). |
+| **`StateSnapshotter` / `SelfHealer`** | HMAC-signed, hash-chained blackboard snapshots; canary failure ⇒ failing health (renewal stops), rollback to the last verified snapshot, session purge. |
+| **`BudgetBalancer`** | Picks the cheapest approved source with headroom, throttles effort (`full` → `reduced` → `minimal` → `stopped`), feeds spend into lease heartbeats. |
+
+```bash
+network-ai perpetual keygen operator && network-ai perpetual keygen authority
+network-ai perpetual sign-policy policy.json --key data/perpetual/keys/operator.key --out policy.signed.json
+
+# Role secrets come from the environment (each ≥ 32 chars, all distinct)
+NETWORK_AI_LEASE_OPERATOR_SECRET=… NETWORK_AI_LEASE_RUNNER_SECRET=… \
+NETWORK_AI_LEASE_SENTRY_SECRET_S1=… NETWORK_AI_LEASE_SENTRY_SECRET_S2=… \
+  network-ai perpetual authority --operator-pub data/perpetual/keys/operator.pub \
+    --authority-key data/perpetual/keys/authority.key --policy policy.signed.json
+
+network-ai perpetual status            # the human controls
+network-ai perpetual pause | resume | revoke <runId> | revoke --all
+```
+
+```typescript
+import { LeaseGuard, HttpLeaseTransport, HaltCoordinator, AgentRuntime } from 'network-ai';
+
+const guard = new LeaseGuard({
+  runId: 'research-swarm',
+  authorityPublicKey,                      // the authority's public key only
+  transport: new HttpLeaseTransport('http://127.0.0.1:4710', process.env.NETWORK_AI_LEASE_RUNNER_SECRET!),
+  halt: haltCoordinator,                   // fired when the lease is lost
+  spend: () => balancer.spend(),
+  health: () => healer.health(),
+});
+await guard.start();
+const runtime = new AgentRuntime({ policy: { basePath: '.' }, lease: guard, guarded, sandbox: { runner } });
+```
+
+> **Limits.** The guarantees rest on the operator key, role secrets, and credentials staying outside the agents' reach, and on the authority, proxy, and sentries running where agents cannot write or signal. Run agents in the sandbox with network access only through the proxy; without that isolation an agent with host code execution can bypass in-process checks.
+
 ---
 
 ## ⚡ Try in 60 Seconds
@@ -225,6 +279,8 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | ✅ IAuthValidator | Interface to decouple authorization from concrete AuthGuardian |
 | ✅ Kill switch | `network-ai pause` / `resume` — `SYSTEM_PAUSED` sentinel; `doctor` self-diagnostics; `inspect <key>` metadata + audit trail |
 | ✅ Minimal mode | `--minimal` / `NETWORK_AI_MINIMAL=1` — skips WAL replay and sweep for fast CI/test startup |
+| ✅ ASI Strict Mode | Opt-in proof-carrying actions, BFT consensus, auditor receipts, kill switch, trust-tiered context, cognitive caps |
+| ✅ Perpetual Runtime | Opt-in indefinite runs under operator-signed leases: dead-man switch, egress proxy, guarded paths, sandbox, sentry swarm, self-improvement pipeline, self-healing state, budget balancer |
 | ✅ TypeScript native | ES2022 strict mode, zero native dependencies |
 
 ---
@@ -240,6 +296,7 @@ Runs priority preemption, AuthGuardian permission gating, FSM governance, and co
 | Agents escalating beyond their scope | `AuthGuardian` — scoped permission tokens required before sensitive operations |
 | Agents lack project context between runs | `ProjectContextManager` (Layer 3) — inject decisions, goals, stack, and milestones into every system prompt |
 | No regression tracking on agent output quality | `QAOrchestratorAgent` — scenario replay, feedback loops, cross-agent contradiction detection, historical trend tracking |
+| Long-running agents you cannot reliably stop | Perpetual Runtime — out-of-process lease authority, dead-man switch, and guarded governance paths keep humans in control |
 
 ---
 
@@ -477,6 +534,7 @@ network-ai auth token my-bot --resource blackboard
 | `network-ai doctor` | Self-diagnostics — validate data dir, env routing, audit log, WAL, kill-switch, MCP secret |
 | `network-ai inspect <key>` | Inspect a blackboard key — value, metadata, pending history, audit trail |
 | `network-ai pause` / `resume` | Kill switch — write/remove `SYSTEM_PAUSED` sentinel |
+| `network-ai perpetual` | Perpetual Runtime — keygen, sign-policy, authority, proxy, sentry, status, pause, resume, revoke, tighten, install-policy, sign-guarded, sign-budget, snapshot, rollback |
 
 Global flags on every command: `--data <path>` (data directory, default `./data`) · `--env <name>` (environment) · `--json` (machine-readable output) · `--minimal` (skip WAL replay + sweep — CI/test fast startup)
 
@@ -608,7 +666,7 @@ Extend `BaseAdapter` (or `StreamingBaseAdapter` for streaming) to add your own i
 
 | Capability | Network-AI | LangGraph | CrewAI | AutoGen |
 |---|---|---|---|---|
-| Cross-framework agents in one swarm | ✅ 29 built-in adapters | ⚠️ Nodes can call any code; no adapter abstraction | ⚠️ Extensible via tools; CrewAI-native agents only | ⚠️ Extensible via plugins; AutoGen-native agents only |
+| Cross-framework agents in one swarm | ✅ 32 built-in adapters | ⚠️ Nodes can call any code; no adapter abstraction | ⚠️ Extensible via tools; CrewAI-native agents only | ⚠️ Extensible via plugins; AutoGen-native agents only |
 | Atomic shared state (conflict-safe) | ✅ `propose → validate → commit` mutex | ⚠️ State passed between nodes; last-write-wins | ⚠️ Shared memory available; no conflict resolution | ⚠️ Shared context available; no conflict resolution |
 | Hard token ceiling per agent | ✅ `FederatedBudget` (first-class API) | ⚠️ Via callbacks / custom middleware | ⚠️ Via callbacks / custom middleware | ⚠️ Built-in token tracking in v0.4+; no swarm-level ceiling |
 | Permission gating before sensitive ops | ✅ `AuthGuardian` (built-in) | ⚠️ Possible via custom node logic | ⚠️ Possible via custom tools | ⚠️ Possible via custom middleware |
@@ -632,9 +690,12 @@ npm run test:priority     # Priority & preemption
 npm run test:cli          # CLI layer
 npm run test:phase9       # Agent runtime, console, strategy agent
 npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate, Route Classifier
+npx ts-node test-asi.ts   # ASI Strict Mode
+npx ts-node test-perpetual.ts         # Perpetual Runtime: leases, egress proxy, CLI
+npx ts-node test-perpetual-safety.ts  # Perpetual Runtime: guarded paths, sandbox, sentries, pipeline, self-healing, budget
 ```
 
-**3,888 passing assertions across 42 test suites** (`npm run test:all`):
+**4,180 passing assertions across 43 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -676,7 +737,10 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | `test-phase17.ts` | 15 | `ApprovalInbox` GHSA-m4jg-6w3q-gm86 fix: read-route auth gating, token validation, fail-closed default without a secret, CORS allowlist |
 | `test-phase18.ts` | 85 | `ClaudeHookBridge` observe/enforce gating, MCP elicitation channel + fail-closed approval callback, `A2AServer` agent card / tasks / auth / eviction |
 | `test-phase19.ts` | 78 | `ContextComposer` ranking/budget/pinning/staleness/layout, `estimateTokens`, `context_pack` + `blackboard_search` MCP tools (lexical + semantic modes) |
-| `test-phase20.ts` | 134 | Security regressions: `ClaudeHookBridge` full-target and all-field deny matching (GHSA-743h-jr5x-mpcr, GHSA-9p2w-prp8-5722), deny/allow regex validation + fail-closed hook exit code, `SandboxPolicy` canonicalized command matching (GHSA-9v4f-j8cv-fhxw), `DashboardServer` Origin/Host validation (GHSA-hr6v-mfxm-4438), MCP SSE loopback-only CORS (GHSA-4pvg-m42h-c3x2), per-instance orchestrator token + MCP server-held identity, `sanitizePath` segment-boundary containment (GHSA-5mm5-4mh4-6gm6), `FileJobStore` / `AgentVCR` name confinement (GHSA-v64j-mc7x-c7x7, GHSA-mfxv-jg44-xj48), `A2AServer` fail-closed auth (GHSA-qvf5-9prv-7r9c), `ApprovalInbox` / `SwarmTransportServer` fail-closed auth with replay protection, `ControlPlane` / `WorkTreeDashboard` Host/Origin checks |
+| `test-phase20.ts` | 135 | Security regressions: `ClaudeHookBridge` full-target and all-field deny matching (GHSA-743h-jr5x-mpcr, GHSA-9p2w-prp8-5722), deny/allow regex validation + fail-closed hook exit code, `SandboxPolicy` canonicalized command matching (GHSA-9v4f-j8cv-fhxw), `DashboardServer` Origin/Host validation (GHSA-hr6v-mfxm-4438), MCP SSE loopback-only CORS (GHSA-4pvg-m42h-c3x2), per-instance orchestrator token + MCP server-held identity, `sanitizePath` segment-boundary containment (GHSA-5mm5-4mh4-6gm6), `FileJobStore` / `AgentVCR` name confinement (GHSA-v64j-mc7x-c7x7, GHSA-mfxv-jg44-xj48), `A2AServer` fail-closed auth (GHSA-qvf5-9prv-7r9c), `ApprovalInbox` / `SwarmTransportServer` fail-closed auth with replay protection, `ControlPlane` / `WorkTreeDashboard` Host/Origin checks |
+| `test-asi.ts` | 148 | ASI Strict Mode: config parsing/tightening, `ProofGate`, `ConsensusEngine`, auditor receipts, `HaltCoordinator`, trust tiers, cognitive caps, canaries, hash-chained export |
+| `test-perpetual.ts` | 141 | Perpetual Runtime: signing, `LeaseAuthority` (renewal, stop conditions, revoke/pause/tighten, HTTP API), `LeaseGuard` dead-man switch, `EgressProxy`, integration hooks, key/route files, out-of-process CLI authority and operator controls |
+| `test-perpetual-safety.ts` | 151 | Perpetual Runtime: `GuardedPaths` (I2), sandbox runner, sentry detectors + quorum + authenticated identities, `ImprovementPipeline` tiers/receipts, verified snapshots + `SelfHealer`, `BudgetBalancer` (I3), egress financial limits |
 | `test.ts` | 39 | Core orchestrator smoke tests |
 
 ---
@@ -686,16 +750,16 @@ npm run test:phase12      # Context Throttler, Partition Planner, Coverage Gate,
 | Doc | Contents |
 |---|---|
 | [QUICKSTART.md](QUICKSTART.md) | Installation, first run, CLI reference, PowerShell guide, Python scripts CLI |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Race condition problem, FSM design, handoff protocol, model-interaction lifecycle governance, module inventory, project structure |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Race condition problem, FSM design, handoff protocol, model-interaction lifecycle governance, ASI Strict Mode, Perpetual Runtime, module inventory, project structure |
 | [BENCHMARKS.md](BENCHMARKS.md) | Provider performance, rate limits, local GPU, `max_completion_tokens` guide |
-| [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail, OWASP Agentic Top 10 coverage, disclosure SLA, ClawHub scan findings |
-| [THREAT_MODEL.md](THREAT_MODEL.md) | Adversary profiles, trust boundaries, explicit non-goals, security controls summary |
-| [DATA_LOCATIONS.md](DATA_LOCATIONS.md) | Every file Network-AI creates — path, purpose, data classification, operator responsibilities |
-| [SUPPLY_CHAIN.md](SUPPLY_CHAIN.md) | Runtime dependencies, what runs at install, network surface, SLSA/npm provenance verification |
+| [SECURITY.md](SECURITY.md) | Security module, permission system, trust levels, audit trail, OWASP Agentic Top 10 coverage, Perpetual Runtime controls, disclosure SLA, ClawHub scan findings |
+| [THREAT_MODEL.md](THREAT_MODEL.md) | Adversary profiles (incl. self-modifying long-running agents), trust boundaries, explicit non-goals, security controls summary |
+| [DATA_LOCATIONS.md](DATA_LOCATIONS.md) | Every file Network-AI creates — path, purpose, data classification, operator responsibilities (incl. Perpetual Runtime keys, audits, snapshots) |
+| [SUPPLY_CHAIN.md](SUPPLY_CHAIN.md) | Runtime dependencies, what runs at install, network surface (incl. lease authority and egress proxy), SLSA/npm provenance verification |
 | [ENTERPRISE.md](ENTERPRISE.md) | Evaluation checklist, stability policy, security summary, integration entry points |
-| [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md) | Audit log field reference, all event types (including `model.refusal` / `model.attempt`), scoring formula |
+| [AUDIT_LOG_SCHEMA.md](AUDIT_LOG_SCHEMA.md) | Audit log field reference, all event types (including `model.refusal` / `model.attempt` and Perpetual Runtime authority/egress/sentry events), scoring formula |
 | [ADOPTERS.md](ADOPTERS.md) | Known adopters — open a PR to add yourself |
-| [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | End-to-end integration walkthrough with v5.15 modules |
+| [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | End-to-end integration walkthrough with v5.17 modules, including the Perpetual Runtime |
 | [SKILL.md](SKILL.md) | OpenClaw/ClawHub Python skill — setup, orchestrator protocol, OWASP engine coverage, security scan findings |
 | [AGENTS.md](AGENTS.md) | Cross-vendor agent instructions (Codex, Gemini CLI, Cursor, Factory) — build commands, conventions, architecture patterns |
 | [references/adapter-system.md](references/adapter-system.md) | Adapter architecture, all 32 adapters (incl. `AnthropicMessagesAdapter`), writing custom adapters |
@@ -718,7 +782,7 @@ Three integration files are included in the repo root:
 |---|---|
 | [`claude-tools.json`](claude-tools.json) | Claude API tool use & OpenAI Codex — drop into the `tools` array |
 | [`openapi.yaml`](openapi.yaml) | Custom GPT Actions — import directly in the GPT editor |
-| [`claude-project-prompt.md`](claude-project-prompt.md) | Claude Projects — paste into Custom Instructions (includes lifecycle governance context) |
+| [`claude-project-prompt.md`](claude-project-prompt.md) | Claude Projects — paste into Custom Instructions (includes lifecycle governance and Perpetual Runtime context) |
 
 **Claude API / Codex:**
 ```js

@@ -1139,6 +1139,8 @@ export { ContextMcpTools, CONTEXT_TOOL_DEFINITIONS } from './lib/mcp-tools-conte
 export type { ContextMcpToolsOptions } from './lib/mcp-tools-context';
 // ASI Strict Mode — opt-in controls for highly capable agents (ASI_STRICT_MODE=audit|enforce)
 export * from './lib/asi';
+// Perpetual Runtime — long-running agents under operator-signed, renewable leases (opt-in)
+export * from './lib/perpetual';
 export { createAdapterTestSuite } from './lib/adapter-test-harness';
 export type { AdapterTestSuiteConfig, AdapterTestResult, AssertFn, SectionFn } from './lib/adapter-test-harness';
 export { SwarmTransportServer, SwarmTransportClient } from './lib/swarm-transport';

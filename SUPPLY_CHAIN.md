@@ -62,6 +62,8 @@ maintainer publishes a new version. It is not executed on the operator's machine
 | `LockedBlackboard` | Filesystem mutex | `data/.lock` |
 | `PhasePipeline` | DAG checkpoint JSON (when `checkpointPath` is set) | operator-configured path |
 | `SemanticMemory` | Persisted vector index JSON (when `persistPath` is set) | operator-configured path |
+| Perpetual Runtime CLI (opt-in) | Ed25519 key files (0600), lease/egress/sentry audit JSONL, signed snapshots | `data/perpetual/`, `data/*_audit.jsonl`, `data/sentry_<id>.jsonl` |
+| `ImprovementPipeline` (opt-in) | Approved patch files, written atomically after receipt verification; scratch copies for sandbox tests | project root; OS temp dir (removed after each run) |
 
 All writes are confined to the configured data directory. Path traversal is blocked: all
 file operations resolve the final path and assert it is within the data root before I/O.
@@ -80,6 +82,16 @@ All network I/O is performed by:
   connections — it does not initiate outbound connections
 - The Streamable HTTP MCP transport (`lib/mcp-transport-http.ts`), which also **receives**
   inbound connections — no outbound calls
+
+### Perpetual Runtime (opt-in): operator-started listeners and configured upstreams
+
+Nothing in `lib/perpetual/` opens a socket on import. When the operator starts them:
+
+| Component | Inbound | Outbound |
+|---|---|---|
+| `LeaseAuthority` (`network-ai perpetual authority`) | Control API, default `127.0.0.1:4710`; non-loopback only with `--allow-remote` | None |
+| `EgressProxy` (`network-ai perpetual proxy`) | Agent requests, default `127.0.0.1:4711` | Only to the upstream URLs in the operator's routes file, plus the authority's lease-status endpoint |
+| `LeaseGuard` / `HttpLeaseTransport`, `HttpSentryControl` | None | Only to the configured authority URL |
 
 ### Adapters: outbound calls only to operator-configured endpoints
 
@@ -124,6 +136,13 @@ instance with an explicit `allowedCommands` allowlist.
 The `shellAccess` and `shellExec` alerts shown on the Socket.dev package page are
 **expected and intentional** for this class of tool. They reflect the presence of the
 shell sandbox, not a security defect.
+
+**Container sandbox (opt-in, v5.17.0).** `ContainerSandboxRunner` (`lib/perpetual/sandbox.ts`)
+spawns the operator's container engine (`docker` or `podman`) with `shell: false` and an
+argument array; the workload's argv is passed after the image name and never parsed by a
+shell. It defaults to gVisor (`--runtime runsc`), `--read-only`, `--cap-drop ALL`,
+`no-new-privileges`, an unprivileged user, and `--network none`; the engine process receives
+only a minimal environment, never the agent's secrets.
 
 ---
 
@@ -218,6 +237,6 @@ Notably **excluded** from the published package:
 ## 10. Dependency Update Policy
 
 - Dependabot is enabled for npm (weekly PRs for patch/minor updates).
-- All dependency update PRs run the full test suite (3,888 tests) before merge.
+- All dependency update PRs run the full test suite (4,180 tests) before merge.
 - Major version bumps require manual review and a CHANGELOG entry.
 - New **runtime** dependencies require explicit approval and an update to this file.

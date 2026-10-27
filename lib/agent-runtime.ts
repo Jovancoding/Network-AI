@@ -27,6 +27,8 @@ import { getAsiConfig, isAsiActive, isAsiEnforcing, AsiPolicyError } from './asi
 import type { ProofGate } from './asi/proof-gate';
 import type { HaltCoordinator } from './asi/shutdown';
 import type { AsiStrictConfig, FormalProof } from './asi/types';
+import type { GuardedCheck, LeaseCheck } from './perpetual/types';
+import type { ISandboxRunner, SandboxLimits, SandboxNetwork } from './perpetual/sandbox';
 
 // ============================================================================
 // ERRORS
@@ -202,6 +204,16 @@ export interface AgentRuntimeOptions {
     proofGate?: ProofGate;
     halt?: HaltCoordinator;
     config?: AsiStrictConfig;
+  };
+  /** Perpetual runtime: every exec/writeFile needs a valid, in-scope lease (`LeaseGuard`). */
+  lease?: LeaseCheck;
+  /** Perpetual runtime: writes to governance files need an operator-signed approval (`GuardedPaths`). */
+  guarded?: GuardedCheck;
+  /** Perpetual runtime: run every `exec` inside a disposable sandbox instead of on the host. */
+  sandbox?: {
+    runner: ISandboxRunner;
+    network?: SandboxNetwork;
+    limits?: Partial<SandboxLimits>;
   };
 }
 
@@ -948,9 +960,15 @@ export class AgentRuntime extends EventEmitter {
   private auditLog: RuntimeAuditEntry[] = [];
   private readonly receiptManager = new SecureTokenManager();
   private readonly asi: AgentRuntimeOptions['asi'] & { config: AsiStrictConfig } | undefined;
+  private readonly lease: LeaseCheck | undefined;
+  private readonly guarded: GuardedCheck | undefined;
+  private readonly sandbox: AgentRuntimeOptions['sandbox'];
 
   constructor(opts: AgentRuntimeOptions) {
     super();
+    this.lease = opts.lease;
+    this.guarded = opts.guarded;
+    this.sandbox = opts.sandbox;
     const asiConfig = opts.asi ? (opts.asi.config ?? getAsiConfig()) : undefined;
     const enforcing = asiConfig !== undefined && isAsiEnforcing(asiConfig);
     this.asi = opts.asi && asiConfig ? { ...opts.asi, config: asiConfig } : undefined;
@@ -982,6 +1000,7 @@ export class AgentRuntime extends EventEmitter {
    */
   async exec(command: string, agentId: string, opts: ShellOptions = {}): Promise<ShellResult> {
     this.asi?.halt?.assertNotHalted();
+    this.lease?.assertActive({ tool: 'shell_exec' });
     // Policy check
     if (!this.policy.isCommandAllowed(command)) {
       this.emit('policy:violation', agentId, command, 'Command not allowed by policy');
@@ -1009,7 +1028,7 @@ export class AgentRuntime extends EventEmitter {
 
     // Execute
     this.emit('command:start', agentId, command);
-    const result = await this.shell.execute(command, { ...opts, agentId });
+    const result = this.sandbox ? await this.execSandboxed(command, opts) : await this.shell.execute(command, { ...opts, agentId });
     this.emit('command:complete', agentId, command, result);
     // Issue outcome-bound receipt — runtime authority, not agent's word
     const outputHash = createHash('sha256')
@@ -1061,6 +1080,19 @@ export class AgentRuntime extends EventEmitter {
    */
   async writeFile(filePath: string, content: string, agentId: string, opts: { proof?: FormalProof } = {}): Promise<FileResult> {
     this.asi?.halt?.assertNotHalted();
+    if (this.lease) {
+      try {
+        this.lease.assertActive({ tool: 'file_write', path: filePath });
+      } catch (err) {
+        this.audit({ action: 'file_write', agentId, target: filePath, result: 'blocked', details: { lease: err instanceof Error ? err.message : 'no lease' } });
+        return { success: false, path: filePath, error: err instanceof Error ? err.message : 'No valid lease', durationMs: 0 };
+      }
+    }
+    const guardedReason = this.guarded?.check({ kind: 'path', name: resolve(this.policy.basePath, filePath) }, content) ?? null;
+    if (guardedReason) {
+      this.audit({ action: 'file_write', agentId, target: filePath, result: 'blocked', details: { guarded: guardedReason } });
+      return { success: false, path: filePath, error: guardedReason, durationMs: 0 };
+    }
     if (!this.policy.isPathAllowed(filePath)) {
       this.emit('policy:violation', agentId, filePath, 'Path not allowed');
       this.audit({ action: 'file_write', agentId, target: filePath, result: 'blocked' });
@@ -1136,6 +1168,23 @@ export class AgentRuntime extends EventEmitter {
     const killed = this.shell.killAll();
     this.audit({ action: 'shell_execute', agentId: 'system', target: 'halt', result: 'blocked', details: { reason, killed } });
     return killed;
+  }
+
+  private async execSandboxed(command: string, opts: ShellOptions): Promise<ShellResult> {
+    const sandbox = this.sandbox!;
+    const argv = this.policy.tokenizeCommand(command);
+    if (!argv || argv.length === 0) throw new RuntimePolicyError(`Command rejected — shell metacharacters are not permitted: ${command}`);
+    const workspace = opts.cwd ? this.policy.resolvePath(opts.cwd) : this.policy.basePath;
+    if (!workspace) throw new RuntimePolicyError(`Working directory not allowed: ${opts.cwd}`);
+    const r = await sandbox.runner.run({
+      argv,
+      workspace,
+      env: opts.env,
+      network: sandbox.network ?? 'none',
+      limits: { ...sandbox.limits, ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}) },
+      maxOutputBytes: opts.maxOutputBytes ?? this.policy.defaultMaxOutputBytes,
+    });
+    return { exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr, durationMs: r.durationMs, timedOut: r.timedOut, truncated: r.truncated };
   }
 
   private async checkProof(tool: string, args: unknown, agentId: string, target: string, proof: FormalProof | undefined): Promise<void> {

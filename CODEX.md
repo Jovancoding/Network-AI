@@ -4,14 +4,14 @@ This file is read automatically by OpenAI Codex CLI when working in this reposit
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.16.2.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.17.0.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 3,888 tests across 42 suites
+npm run test:all              # Run all 4,180 tests across 43 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 32 adapter tests
@@ -39,6 +39,7 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/strategy-agent.ts` — StrategyAgent: meta-orchestrator with AgentPool, WorkloadPartitioner, adaptive scaling
 - `lib/goal-decomposer.ts` — GoalDecomposer, TeamRunner, runTeam: LLM-powered goal → task DAG → parallel execution
 - `lib/env-manager.ts` — EnvironmentManager: promotion chain dev→st→sit→qa→preprod→prod, backup/restore, env diff, NETWORK_AI_ENV routing
+- `lib/perpetual/` — Perpetual Runtime (opt-in): operator-signed leases + dead-man switch, egress proxy, guarded paths, sandbox runner, sentry swarm, self-improvement pipeline, verified snapshots, budget balancer (`network-ai perpetual` CLI)
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, Gemini, OpenAI Responses, Claude Agent SDK, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)

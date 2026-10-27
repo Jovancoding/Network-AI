@@ -1,4 +1,4 @@
-# Audit Log Schema — Network-AI v5.16.2
+# Audit Log Schema — Network-AI v5.17.0
 
 Network-AI writes a JSONL audit trail during permission management and swarm execution. This document describes every field and event type.
 
@@ -266,6 +266,38 @@ The following event types were added in v5.11.0 (ClaimVerifier / Tier 1 agent ho
 | `shell_execute` | `AgentRuntime` | Shell command executed; `details.exitCode` and `details.timedOut` record the real outcome. An `ExecutionReceipt` is attached to the `ShellResult` (signed by runtime, committed to `exitCode + outputHash`). |
 | `file_write` | `AgentRuntime` | File write completed; an `ExecutionReceipt` is attached to the `FileResult` committing to content hash. |
 | `trust_decay` | `AuthGuardian` | Agent trust level decremented after N consecutive `UNSUPPORTED_CLAIM` violations; `details.previousTrust`, `details.newTrust`, and `details.consecutiveViolations` recorded. |
+
+## v5.17 Perpetual Runtime Events
+
+Opt-in. These go to separate JSONL files written by the CLI processes (or to your own sink through each component's `onEvent` callback), so a sentry can tail them read-only. Timestamps are epoch milliseconds in `at`. No secrets are ever written.
+
+**`data/perpetual_audit.jsonl`** — one line per `LeaseAuthority` decision:
+
+```json
+{ "source": "lease-authority", "at": 1800000000000, "action": "renew", "role": "runner", "runId": "research-swarm", "leaseId": "lease_3f…", "reason": null }
+```
+
+| `action` | Meaning |
+|---|---|
+| `issue` / `renew` | Lease granted (first lease of a run / renewal) |
+| `refuse` | Issue or renewal refused (`reason`: stale heartbeat, run not active, invalid runId, …) |
+| `stop` | Renewal stopped by the policy (`reason`: budget ceiling, canary failure, failing health, sentry alert, end date, auto-renew off) |
+| `revoke` / `pause` / `resume` | Human or sentry control (`role` records who) |
+| `tighten` | Policy narrowed (stricter only) |
+| `alert` | Sentry or operator alert (`reason`: `<level> from <authenticated identity>`) |
+| `policy` | Newer operator-signed policy installed (`reason`: policy id) |
+
+**`data/egress_audit.jsonl`** — one line per `EgressProxy` decision:
+
+```json
+{ "source": "egress-proxy", "at": 1800000000000, "outcome": "denied", "route": "pay", "leaseId": "lease_3f…", "runId": "research-swarm", "status": 403, "reason": "amount would exceed the per-run limit" }
+```
+
+`outcome` is `forwarded`, `denied`, or `error`; `status` is the HTTP status returned to the agent.
+
+**`data/sentry_<id>.jsonl`** — one line per finding: `{ "sentry", "detector", "level" (info|warning|critical), "reason", "agentId", "runId", "at" }`. Detectors: `velocity`, `denied-access`, `prompt-injection`, `blackboard-poisoning`, `guarded-touch`, `canary-leak`, `goal-drift`.
+
+**Runtime / blackboard entries** gain one field when the Perpetual Runtime refuses a write: `AgentRuntime` `file_write` entries with `result: "blocked"` carry `details.lease` or `details.guarded`; `LockedBlackboard` logs `BLACKBOARD_WRITE` with action `guarded` and outcome `denied` (`details.key`, `details.reason`).
 
 ---
 

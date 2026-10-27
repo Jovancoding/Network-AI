@@ -37,6 +37,8 @@ import type { SecureAuditLogger } from '../security';
 import { asiViolation, getAsiConfig, isAsiActive, trustRank } from './asi/config';
 import type { BlackboardValidator, ReceiptSigner } from './asi/receipts';
 import type { AsiStrictConfig, TrustResolver, ValidationReceipt } from './asi/types';
+import type { GuardedCheck, LeaseCheck } from './perpetual/types';
+import { GuardedPathError } from './perpetual/guarded-paths';
 
 const log = Logger.create('LockedBlackboard');
 
@@ -85,6 +87,10 @@ export interface LockedBlackboardOptions {
    * designated auditor. Inert unless strict mode is on.
    */
   asi?: LockedBlackboardAsiOptions;
+  /** Perpetual runtime: propose/commit need a valid lease with the `blackboard_write` tool. */
+  lease?: LeaseCheck;
+  /** Perpetual runtime: writes to governance keys need an operator-signed approval (`GuardedPaths`). */
+  guarded?: GuardedCheck;
 }
 
 /** ASI strict-mode options for {@link LockedBlackboard}. */
@@ -430,6 +436,8 @@ export class LockedBlackboard {
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
   private disableWal = false;
   private asi: (LockedBlackboardAsiOptions & { config: AsiStrictConfig }) | undefined;
+  private lease: LeaseCheck | undefined;
+  private guarded: GuardedCheck | undefined;
 
   constructor(basePath: string = '.', auditLoggerOrOptions?: SecureAuditLogger | LockedBlackboardOptions, options?: LockedBlackboardOptions) {
     // Resolve to an absolute path to prevent insecure relative/temp-dir path propagation
@@ -441,13 +449,15 @@ export class LockedBlackboard {
     //   new LockedBlackboard(path, options)
     let env: string | undefined;
     let asi: LockedBlackboardAsiOptions | undefined;
-    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && ('conflictResolution' in auditLoggerOrOptions || 'throttleMs' in auditLoggerOrOptions || 'env' in auditLoggerOrOptions || 'disableWal' in auditLoggerOrOptions || 'asi' in auditLoggerOrOptions)) {
+    if (auditLoggerOrOptions && typeof auditLoggerOrOptions === 'object' && ('conflictResolution' in auditLoggerOrOptions || 'throttleMs' in auditLoggerOrOptions || 'env' in auditLoggerOrOptions || 'disableWal' in auditLoggerOrOptions || 'asi' in auditLoggerOrOptions || 'lease' in auditLoggerOrOptions || 'guarded' in auditLoggerOrOptions)) {
       const opts = auditLoggerOrOptions as LockedBlackboardOptions;
       this.conflictResolution = opts.conflictResolution ?? 'first-commit-wins';
       this.throttleMs = opts.throttleMs ?? 0;
       env = opts.env;
       this.disableWal = opts.disableWal ?? false;
       asi = opts.asi;
+      this.lease = opts.lease;
+      this.guarded = opts.guarded;
     } else {
       this.auditLogger = auditLoggerOrOptions as SecureAuditLogger | undefined;
       this.conflictResolution = options?.conflictResolution ?? 'first-commit-wins';
@@ -455,6 +465,8 @@ export class LockedBlackboard {
       env = options?.env;
       this.disableWal = options?.disableWal ?? false;
       asi = options?.asi;
+      this.lease = options?.lease;
+      this.guarded = options?.guarded;
     }
     if (asi) {
       if (typeof asi.trustOf !== 'function' || !asi.receipts) {
@@ -792,6 +804,8 @@ ${cacheContent}
    * @returns change_id for use in validate/commit/abort
    */
   propose(key: string, value: unknown, sourceAgent: string, ttl?: number, priority?: AgentPriority): string {
+    this.lease?.assertActive({ tool: 'blackboard_write' });
+    this.assertNotGuarded(key, value, sourceAgent);
     const changeId = `chg_${randomUUID().substring(0, 8)}`;
 
     // Validate priority
@@ -828,6 +842,13 @@ ${cacheContent}
     if (priority === undefined || priority === null) return 0;
     if (typeof priority !== 'number' || !Number.isInteger(priority)) return 0;
     return Math.max(0, Math.min(3, priority)) as AgentPriority;
+  }
+
+  private assertNotGuarded(key: string, value: unknown, sourceAgent: string): void {
+    const reason = this.guarded?.check({ kind: 'key', name: key }, value) ?? null;
+    if (!reason) return;
+    this.audit('BLACKBOARD_WRITE', sourceAgent, 'guarded', 'denied', { key, reason });
+    throw new GuardedPathError(reason, { kind: 'key', name: key });
   }
 
   /**
@@ -950,6 +971,7 @@ ${cacheContent}
    */
   commit(changeId: string, receipt?: ValidationReceipt): CommitResult {
     this.enforceFlowControl();
+    this.lease?.assertActive({ tool: 'blackboard_write' });
     const change = this.pendingChanges.get(changeId);
     const lockStart = Date.now();
 
@@ -1250,6 +1272,8 @@ ${cacheContent}
    */
   write(key: string, value: unknown, sourceAgent: string, ttl?: number): BlackboardEntry {
     this.enforceFlowControl();
+    this.lease?.assertActive({ tool: 'blackboard_write' });
+    this.assertNotGuarded(key, value, sourceAgent);
     const holderId = `write-${randomUUID().substring(0, 8)}`;
     const lockStart = Date.now();
     
@@ -1297,6 +1321,8 @@ ${cacheContent}
    */
   delete(key: string): boolean {
     this.enforceFlowControl();
+    this.lease?.assertActive({ tool: 'blackboard_write' });
+    this.assertNotGuarded(key, null, 'system');
     const holderId = `delete-${randomUUID().substring(0, 8)}`;
     const lockStart = Date.now();
     

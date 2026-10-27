@@ -5,6 +5,29 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.17.0] - 2026-10-27
+
+### Added — Perpetual Runtime (opt-in, `lib/perpetual/`)
+Long-running agent swarms that can improve themselves and fund their own work while humans keep control. Off by default; unused integration points cost one check. Invariants: **I1** the external stop works without agent cooperation; **I2** agents can modify themselves, never their limits; **I3** spending stays inside operator-signed ceilings.
+- **Leases** — `LeaseAuthority` (run as its own process) issues short-lived Ed25519 leases under an operator-signed `RenewalPolicy` (TTL 10 s–24 h, optional end date, scope of tools/paths/egress routes, run budget ceilings, stop conditions). Renewal needs a fresh heartbeat; reported spend never decreases. Operator: revoke, pause, resume, tighten, install a newer signed policy. Sentries: alert and tighten only. Loopback HTTP API with distinct ≥ 32-char role secrets, constant-time checks, and failure rate limiting.
+- **Dead-man switch** — `LeaseGuard` renews before expiry, polls for revocation, uses a monotonic clock, and fires the kill switch when the lease is lost. Opt-in `lease` option on `AgentRuntime` (`exec`, `writeFile`), `GovernedModelGateway` (`send`), and `LockedBlackboard` (`propose`, `commit`, `write`, `delete`).
+- **Egress proxy** — `EgressProxy` (own process): lease signature, scope, and live-status checks; per-route method/path allowlists; credentials injected per route and scrubbed from responses; per-lease rate limit; `financial` routes cap the amount per request and per run.
+- **Guarded paths** — `GuardedPaths`: governance files and blackboard keys (core, ASI, perpetual, budgets, keys, audit logs, manifests) are writable only with a single-use, operator-signed approval bound to the exact content. Opt-in `guarded` option on `AgentRuntime` and `LockedBlackboard`.
+- **Sandbox** — `ISandboxRunner` and `ContainerSandboxRunner` (Docker/Podman, gVisor by default; read-only root, all capabilities dropped, no-new-privileges, unprivileged user, no network or egress-proxy network only; shared-kernel runtimes need `allowWeakIsolation`). Opt-in `sandbox` option routes `AgentRuntime.exec` through it.
+- **Sentry swarm** — `Sentry` with detectors for action velocity, denied-access probing, prompt injection, blackboard poisoning, guarded-path attempts, canary leaks, and goal drift; read-only `AuditTail`. Per-sentry secrets give each sentry an authenticated identity; `stopWhen.sentryQuorum` stops renewal only when enough distinct sentries agree, and a single sentry cannot pause or revoke while a quorum is set.
+- **Self-improvement pipeline** — `ImprovementPipeline`: static checks (path safety, risky constructs, dependency diff), tests in the sandbox on a copy of the project, consensus with a minimum number of model families, and an Ed25519 receipt bound to the patch hash; tiers `auto` (agent task code), `human`, `operator` (guarded paths, always).
+- **Self-healing state** — `StateSnapshotter` (HMAC-signed, hash-chained snapshots with verified restore) and `SelfHealer` (canary failure ⇒ failing health so renewal stops, rollback to the last verified snapshot, session purge).
+- **Budget balancer** — `BudgetBalancer` under an operator-signed `BudgetPolicy`: approved sources only, cheapest source with headroom, effort throttling, lower-only ceilings; feeds spend into lease heartbeats.
+- **CLI** — `network-ai perpetual keygen | sign-policy | authority | proxy | sentry | status | pause | resume | revoke | tighten | install-policy | sign-guarded | sign-budget | snapshot | rollback`.
+- Tests: `test-perpetual.ts`, `test-perpetual-safety.ts`. Full suite: **4,180 tests across 43 suites** (the previous "42 suites" figure counted one suite too many).
+
+### Changed
+- `LockedBlackboard.write()` and `delete()` now honour the `lease` option too (previously only `propose`/`commit`); no effect unless a lease is configured.
+- Documentation: README, ARCHITECTURE, SECURITY (both policies), THREAT_MODEL (adversary 3.6, boundaries 5–6), DATA_LOCATIONS, SUPPLY_CHAIN, ENTERPRISE, AUDIT_LOG_SCHEMA (Perpetual Runtime events), INTEGRATION_GUIDE (Phase 8), QUICKSTART (`perpetual` CLI), CONTRIBUTING, CODE_OF_CONDUCT, `references/` (adapter-system, auth-guardian, trust-levels), agent instruction files, and `claude-project-prompt.md` updated; stale adapter counts (28/29 → 32) and support tables corrected.
+
+### Fixed
+- `scripts/check_permission.py`: type annotations for the audit-summary redaction helper (no behaviour change).
+
 ## [5.16.2] - 2026-10-27
 
 ### Security

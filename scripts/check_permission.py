@@ -57,7 +57,7 @@ import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 import os
 
 # Configuration
@@ -733,10 +733,11 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
         # Omit justification text and mask grant tokens/signatures in summary
         # output so it never re-exposes sensitive or live values (SkillSpector Ssd3).
         def _redact_entry(e: dict[str, Any]) -> dict[str, Any]:
-            details = e.get("details")
-            if not isinstance(details, dict):
+            raw_details = e.get("details")
+            if not isinstance(raw_details, dict):
                 return e
-            clean = {k: v for k, v in details.items() if k not in ("justification", "_sig")}
+            details = cast(dict[str, Any], raw_details)
+            clean: dict[str, Any] = {k: v for k, v in details.items() if k not in ("justification", "_sig")}
             token = clean.get("token")
             if isinstance(token, str):
                 clean["token"] = token[:16] + "..." if len(token) > 16 else token

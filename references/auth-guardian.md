@@ -363,3 +363,18 @@ const trust = await aps.apsDelegationToTrust({
 ```
 
 See [references/adapter-system.md § APS Adapter](adapter-system.md#aps-adapter--delegation-chain-trust-bridge) for full usage.
+
+---
+
+## AuthGuardian and the Perpetual Runtime (v5.17.0)
+
+The two layers compose; neither replaces the other:
+
+| | AuthGuardian grant | Perpetual Runtime lease |
+|---|---|---|
+| Question answered | May this agent touch this resource now? | May this run keep running at all? |
+| Decided by | Weighted score (justification, trust, risk) | Operator-signed policy in an out-of-process authority |
+| Lifetime | Grant TTL | Lease TTL; renewed only while the policy allows |
+| Revocation | `revokeToken()` | `network-ai perpetual revoke` / `pause` — halts every guarded action |
+
+With a `LeaseGuard` configured, a valid grant is necessary but not sufficient: `AgentRuntime`, `GovernedModelGateway`, and `LockedBlackboard` also require a live, in-scope lease, and governance paths additionally require an operator-signed approval (`GuardedPaths`). No grant or trust score can substitute for either.

@@ -441,6 +441,46 @@ network-ai doctor   # ⚠ [WARN] kill-switch: system is PAUSED
 
 Creates/removes a `data/SYSTEM_PAUSED` sentinel file. Agents should check for this file before performing writes.
 
+### Perpetual Runtime (`perpetual`) — v5.17.0+, opt-in
+
+Long-running agents under operator-signed, renewable leases. Role secrets come from the environment (`NETWORK_AI_LEASE_OPERATOR_SECRET`, `NETWORK_AI_LEASE_RUNNER_SECRET`, `NETWORK_AI_LEASE_SENTRY_SECRET_<ID>`; each at least 32 characters and all distinct).
+
+```bash
+# Keys (private keys are 0600 and never overwritten)
+network-ai perpetual keygen operator
+network-ai perpetual keygen authority
+
+# Sign a renewal policy (TTL, scope, budget ceilings, stop conditions)
+network-ai perpetual sign-policy policy.json --key data/perpetual/keys/operator.key --out policy.signed.json
+
+# Run the lease authority and the egress proxy as separate processes (loopback by default)
+network-ai perpetual authority --operator-pub data/perpetual/keys/operator.pub \
+  --authority-key data/perpetual/keys/authority.key --policy policy.signed.json
+network-ai perpetual proxy --authority-pub data/perpetual/keys/authority.pub --routes routes.json
+
+# A read-only sentry over the audit logs
+network-ai perpetual sentry --id s1 --audit-log data/audit_log.jsonl data/egress_audit.jsonl
+
+# Human controls
+network-ai perpetual status
+network-ai perpetual pause --reason "investigating"
+network-ai perpetual resume
+network-ai perpetual revoke research-swarm      # or: revoke --all
+network-ai perpetual tighten delta.json         # stricter only
+network-ai perpetual install-policy policy-v2.signed.json
+
+# Approvals and budgets (operator key)
+network-ai perpetual sign-guarded --key data/perpetual/keys/operator.key --kind path \
+  --name lib/asi/config.ts --content-file new-config.ts --out approval.json
+network-ai perpetual sign-budget budget.json --key data/perpetual/keys/operator.key --out budget.signed.json
+
+# Verified snapshots (NETWORK_AI_SNAPSHOT_SECRET, ≥ 32 chars)
+network-ai perpetual snapshot --label before-upgrade
+network-ai perpetual rollback                   # latest verified snapshot, or --snapshot <id>
+```
+
+Routes files name the environment variable that holds each credential (`"credential": { "header": "Authorization", "prefix": "Bearer ", "env": "OPENAI_API_KEY" }`); inline credential values are rejected. See [README § Perpetual Runtime](README.md#️-perpetual-runtime-opt-in).
+
 ### `--why` on `auth token`
 
 ```bash
@@ -757,7 +797,7 @@ import SwarmOrchestrator, {
 // Factory
 import { createSwarmOrchestrator } from 'network-ai';
 
-// All 28 adapters
+// Adapters (32 in total; see references/adapter-system.md)
 import {
   AdapterRegistry, BaseAdapter,
   OpenClawAdapter, LangChainAdapter, AutoGenAdapter,
@@ -776,6 +816,13 @@ import {
   startPlayground, createAdapterTestSuite,
   parseGoal, validateGoal, compileGoal,
   NoOpAuthValidator,
+} from 'network-ai';
+
+// Perpetual Runtime (v5.17.0, opt-in)
+import {
+  LeaseAuthority, LeaseGuard, HttpLeaseTransport, EgressProxy,
+  GuardedPaths, ContainerSandboxRunner, Sentry, ImprovementPipeline,
+  StateSnapshotter, SelfHealer, BudgetBalancer,
 } from 'network-ai';
 
 // Types

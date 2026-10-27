@@ -4,14 +4,14 @@ This file is read automatically by Claude Code when working in this repository.
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.16.2.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 5.17.0.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 3,888 tests across 42 suites
+npm run test:all              # Run all 4,180 tests across 43 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 32 adapter tests
@@ -47,6 +47,7 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/context-composer.ts` — ContextComposer: token-budgeted, relevance-ranked context assembly (semantic/lexical × recency half-life × scope affinity, position-aware layout); estimateTokens()
 - `lib/mcp-tools-context.ts` — ContextMcpTools: `context_pack` + `blackboard_search` MCP tools (signal-over-noise retrieval)
 - `lib/asi/` — ASI Strict Mode (opt-in `ASI_STRICT_MODE=audit|enforce`): ProofGate, ConsensusEngine, auditor receipts, HaltCoordinator kill switch, trust-tiered context, cognitive caps, canaries, HashChainSink
+- `lib/perpetual/` — Perpetual Runtime (opt-in): LeaseAuthority + LeaseGuard (operator-signed leases, dead-man switch), EgressProxy (credentials, financial limits), GuardedPaths, ContainerSandboxRunner, Sentry swarm (authenticated identities, quorum), ImprovementPipeline, StateSnapshotter/SelfHealer, BudgetBalancer; CLI `network-ai perpetual`. Invariants I1–I3: external stop works without agent cooperation; agents never modify their limits; spend stays inside signed ceilings
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, Gemini, OpenAI Responses, Claude Agent SDK, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)

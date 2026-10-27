@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.16.2). 3,888 tests across 42 suites.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.17.0). 4,180 tests across 43 suites.
 
 ## Architecture
 
@@ -47,13 +47,14 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, gu
 - `lib/context-composer.ts` — ContextComposer: token-budgeted, relevance-ranked context assembly; estimateTokens()
 - `lib/mcp-tools-context.ts` — ContextMcpTools: `context_pack` + `blackboard_search` MCP tools
 - `lib/asi/` — ASI Strict Mode (opt-in `ASI_STRICT_MODE=audit|enforce`): ProofGate, ConsensusEngine, auditor receipts, HaltCoordinator kill switch, trust-tiered context, cognitive caps, canaries
+- `lib/perpetual/` — Perpetual Runtime (opt-in): LeaseAuthority + LeaseGuard (operator-signed leases, dead-man switch), EgressProxy, GuardedPaths, ContainerSandboxRunner, Sentry swarm (quorum), ImprovementPipeline, StateSnapshotter/SelfHealer, BudgetBalancer; CLI `network-ai perpetual`. Invariants: external stop works without agent cooperation; agents never modify their limits; spend stays inside signed ceilings
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, Gemini, OpenAI Responses, Claude Agent SDK, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
 
 ## Build & Test
 
 ```bash
 npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # All 3,888 tests across 42 suites
+npm run test:all              # All 4,180 tests across 43 suites
 npm test                      # Core orchestrator tests
 npm run test:adapters         # All 32 adapters
 ```

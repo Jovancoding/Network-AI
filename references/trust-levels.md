@@ -153,6 +153,10 @@ Consider implementing trust decay for agents that:
 - Have had failed requests
 - Are operating outside normal hours
 
+### Trust Levels vs. Perpetual Runtime Roles (v5.17.0)
+
+Agent trust levels score *requests*; they never grant control over the Perpetual Runtime. The lease authority recognises only three roles, each authenticated by its own secret: `operator` (everything, including resume and new policies), `sentry` (alert and tighten only), and `runner` (issue and renew its own lease). No trust score — even 1.0 or AUDITOR — lets an agent renew a revoked lease, loosen a policy, or write a guarded path; those need the operator's key or secret.
+
 ## Monitoring and Adjustment
 
 ### Signs to Increase Trust

@@ -35,6 +35,7 @@ npm run test:cli              # CLI layer tests
 - `lib/mcp-elicitation.ts` — MCP elicitation channel: native in-client approval prompts
 - `lib/a2a-server.ts` — A2AServer: expose the orchestrator as a Google A2A agent
 - `lib/asi/` — ASI Strict Mode (opt-in `ASI_STRICT_MODE=audit|enforce`): proof-gated actions, BFT consensus, auditor receipts, kill switch
+- `lib/perpetual/` — Perpetual Runtime (opt-in): operator-signed leases + dead-man switch, egress proxy, guarded paths, sandbox runner, sentry swarm, self-improvement pipeline, verified snapshots, budget balancer (`network-ai perpetual` CLI)
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Gemini, OpenAI Responses, Claude Agent SDK, etc.)
 - `bin/cli.ts` — CLI entry point (`npx network-ai`)
 - `bin/mcp-server.ts` — MCP server (stdio + SSE transports)

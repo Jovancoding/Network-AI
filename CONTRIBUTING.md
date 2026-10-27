@@ -16,7 +16,7 @@ Unsolicited PRs without a linked, approved issue will be closed.
 
 ### Code Quality
 
-- All 3,888 existing tests must pass (`npm run test:all`)
+- All 4,180 existing tests must pass (`npm run test:all`)
 - Zero TypeScript compile errors (`npx tsc --noEmit`)
 - New features must include tests with >90% branch coverage
 - Follow existing code style and patterns
@@ -28,6 +28,8 @@ Unsolicited PRs without a linked, approved issue will be closed.
 - No new network calls without explicit justification
 - Input validation required on all public API entry points
 - Path traversal and injection protections where applicable
+- New network listeners bind loopback by default and fail closed without a secret
+- Changes to `lib/asi/` or `lib/perpetual/` must keep the control invariants intact — configuration can only be tightened at runtime, the external stop works without agent cooperation, agents never modify their own limits, and spending stays inside operator-signed ceilings — and must add regression tests for each invariant they touch
 
 ### Documentation
 
@@ -41,7 +43,7 @@ Unsolicited PRs without a linked, approved issue will be closed.
 2. Implement your change with tests
 3. Run the full test suite:
    ```bash
-   npm run test:all   # 3,888 tests across 42 suites
+   npm run test:all   # 4,180 tests across 43 suites
    npx tsc --noEmit
    ```
 4. Open a PR referencing the approved issue
@@ -68,6 +70,7 @@ Unsolicited PRs without a linked, approved issue will be closed.
 
 - Breaking API changes without a migration path
 - Features that add external runtime dependencies
+- Options that let an agent loosen its own limits, renew its own lease, or bypass a guarded path, kill switch, or budget ceiling
 - Code that reduces test coverage
 - Cosmetic-only changes (formatting, renaming)
 - AI-generated code without human review and testing
@@ -78,8 +81,10 @@ Unsolicited PRs without a linked, approved issue will be closed.
 git clone https://github.com/Jovancoding/Network-AI.git
 cd Network-AI
 npm install
-npm run test:all  # Run all 3,888 tests (42 suites)
+npm run test:all  # Run all 4,180 tests (43 suites)
 npm run test:phase4  # Phase 4 behavioral control plane tests only
+npx ts-node test-perpetual.ts         # Perpetual Runtime: leases, egress, CLI
+npx ts-node test-perpetual-safety.ts  # Perpetual Runtime: guarded paths, sandbox, sentries, pipeline, budget
 npx tsc --noEmit  # Type-check
 ```
 
