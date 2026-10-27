@@ -2,6 +2,11 @@
 name: network-ai
 description: "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. The bundled Python scripts make no network calls and have zero third-party dependencies. The parent repository also contains a TypeScript engine (not included in this skill bundle)."
 allowed-tools: Read Bash(python3 scripts/blackboard.py:*) Bash(python3 scripts/check_permission.py:*) Bash(python3 scripts/context_manager.py:*) Bash(python3 scripts/swarm_guard.py:*) Bash(python3 scripts/validate_token.py:*) Bash(python3 scripts/revoke_token.py:*)
+# Capabilities used by the bundled scripts: local files under the project root and data/, and the NETWORK_AI_ENV variable. No network, no child processes.
+permissions:
+  - file_read
+  - file_write
+  - env
 metadata:
   openclaw:
     emoji: "\U0001F41D"
@@ -765,7 +770,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.16.0"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "5.16.1"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |

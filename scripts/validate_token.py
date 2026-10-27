@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# SECURITY: This script makes NO network calls and spawns NO subprocesses.
+# SECURITY: Local-only. No network access and no child processes.
 # All I/O is local file operations only:
 #   READS:  data[/<env>]/active_grants.json, data[/<env>]/.signing_key
 #   WRITES: none
 # Imports used: argparse, json, sys, hmac, hashlib, datetime, pathlib, typing
-# No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
+# Standard library only; no networking or process-spawning modules are imported.
 """
 Validate Grant Token
 
@@ -113,27 +113,39 @@ def validate_token(token: str) -> dict[str, Any]:
             "reason": "Token signature invalid — grant record may have been tampered with",
         }
 
-    # Check expiration
-    expires_at = grant.get("expires_at")
-    if expires_at:
-        try:
-            expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
-            
-            if now > expiry:
-                return {
-                    "valid": False,
-                    "reason": "Token has expired",
-                    "expired_at": expires_at
-                }
-        except Exception:
-            pass  # unparseable expiry field — treat token as non-expired
-    
+    # Check expiration. A grant without a parseable expiry is rejected: a
+    # corrupted or edited expires_at must never extend a token's lifetime.
+    expiry = _parse_expiry(grant.get("expires_at"))
+    if expiry is None:
+        return {
+            "valid": False,
+            "reason": "Token has no valid expiry timestamp",
+        }
+    if datetime.now(timezone.utc) >= expiry:
+        return {
+            "valid": False,
+            "reason": "Token has expired",
+            "expired_at": grant.get("expires_at"),
+        }
+
     return {
         "valid": True,
         "grant": grant,
         "sig_verified": sig_result is True,
     }
+
+
+def _parse_expiry(value: Any) -> "Optional[datetime]":
+    """Parse an ISO-8601 expiry as an aware UTC datetime; None if unusable."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 def main():

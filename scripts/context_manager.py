@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# SECURITY: This script makes NO network calls and spawns NO subprocesses.
+# SECURITY: Local-only. No network access and no child processes.
 # All I/O is local file operations only:
 #   READS:  data/project-context.json, data/audit_log.jsonl
 #   WRITES: data/project-context.json, data/audit_log.jsonl
 # Imports used: argparse, json, re, sys, datetime, pathlib, typing
-# No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
+# Standard library only; no networking or process-spawning modules are imported.
 """
 Project Context Manager - Persistent Layer-3 Memory for Agent Swarms
 

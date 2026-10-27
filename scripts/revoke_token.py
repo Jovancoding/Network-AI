@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# SECURITY: This script makes NO network calls and spawns NO subprocesses.
+# SECURITY: Local-only. No network access and no child processes.
 # All I/O is local file operations only:
 #   READS:  data[/<env>]/active_grants.json, data[/<env>]/audit_log.jsonl
 #   WRITES: data[/<env>]/active_grants.json, data[/<env>]/audit_log.jsonl
 # Imports used: argparse, json, os, re, sys, datetime, pathlib, typing
-# No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
+# Standard library only; no networking or process-spawning modules are imported.
 """
 Revoke Grant Token & TTL Enforcement
 
@@ -94,15 +94,17 @@ def revoke_token(token: str) -> dict[str, Any]:
 
 
 def is_token_expired(grant: dict[str, Any]) -> bool:
-    """Check if a grant token has expired."""
+    """Check if a grant token has expired. Missing or unparseable expiry counts as expired."""
     expires_at = grant.get("expires_at")
-    if not expires_at:
-        return False
+    if not isinstance(expires_at, str) or not expires_at.strip():
+        return True
     try:
-        expiry_time = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-        return datetime.now(timezone.utc) > expiry_time
-    except (ValueError, AttributeError):
-        return False
+        expiry_time = datetime.fromisoformat(expires_at.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if expiry_time.tzinfo is None:
+        expiry_time = expiry_time.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) >= expiry_time
 
 
 def list_expired_tokens() -> dict[str, Any]:

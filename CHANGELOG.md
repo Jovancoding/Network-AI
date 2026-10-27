@@ -5,6 +5,19 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.16.1] - 2026-10-27
+
+### Security
+- **`validate_token.py` fails closed on bad expiry** — a grant whose `expires_at` was missing, non-string, or unparseable used to be treated as non-expired, so a corrupted or edited `active_grants.json` record could stay valid indefinitely. It is now rejected; timezone-naive timestamps are read as UTC. `revoke_token.py` treats such grants as expired (removed by `--cleanup`), and `check_permission.py --active-grants` no longer crashes on naive timestamps.
+- **Signing key created owner-only** — `check_permission.py` now creates `data/.signing_key` with mode 0o600 via `os.open` instead of writing it and then calling `chmod`, removing the brief window where the key could be read by other users. A corrupt key file is removed before regeneration.
+
+### Changed
+- ClawHub skill (SkillSpector scan follow-up): script header comments no longer list the modules they do not import (the list itself matched capability keywords); `SKILL.md` frontmatter declares `permissions: [file_read, file_write, env]`; `skill.json` adds `triggers`, an explicit-only `invocation` statement, and `do_not_use_for`.
+- **`check_permission.py --audit-summary --json`** per-agent and per-resource counts are renamed from `requests` / `grants` / `denials` to `requested` / `granted` / `denied` (top-level `total_*` fields unchanged); text output labels match.
+
+### Dependencies
+- Dev and CI only (Dependabot): `openai` 7.43.0, `dotenv` 18.0.9, `codeql-action`, `ai-plugin-scanner-action`.
+
 ## [5.16.0] - 2026-10-17
 
 ### Added — ASI Strict Mode (opt-in)

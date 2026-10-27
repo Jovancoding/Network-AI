@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# SECURITY: This script makes NO network calls and spawns NO subprocesses.
+# SECURITY: Local-only. No network access and no child processes.
 # All I/O is local file operations only:
 #   READS:  data[/<env>]/active_grants.json, data[/<env>]/audit_log.jsonl,
 #           data[/<env>]/.signing_key (HMAC key; auto-created on first run)
 #   WRITES: data[/<env>]/active_grants.json, data[/<env>]/audit_log.jsonl,
-#           data[/<env>]/.signing_key (on first run only; chmod 0o600)
+#           data[/<env>]/.signing_key (on first run only; created owner-only, mode 0o600)
 # Imports used: argparse, json, re, sys, uuid, hmac, hashlib, datetime, pathlib, typing
-# No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
+# Standard library only; no networking or process-spawning modules are imported.
 #
 # SECURITY: Justification strings supplied via --justification are truncated to
 # _JUSTIFICATION_MAX_LOG_LEN characters before being written to audit_log.jsonl.
@@ -21,9 +21,9 @@ AuthGuardian Permission Checker (advisory, local-only)
 The permission-gating component of the Network-AI skill. Blackboard
 coordination, token budgets, and project context live in the sibling scripts
 (blackboard.py, swarm_guard.py, context_manager.py); this script only scores
-requests, records advisory grants, and summarizes the audit log.
+each permission request, records advisory grants, and summarizes the audit log.
 
-Scores permission requests against abstract local resource labels
+Scores every permission request against abstract local resource labels
 (DATABASE, PAYMENTS, EMAIL, FILE_EXPORT) using a weighted model
 (justification 40%, trust 30%, risk 30%) and records advisory grant tokens in
 local files. It holds no credentials and never touches a real database,
@@ -298,8 +298,9 @@ def _load_signing_key() -> bytes:
     Load or create the local HMAC-SHA256 signing key for grant tokens.
 
     The key is stored at data[/<env>]/.signing_key as a 32-byte hex string.
-    It is auto-generated with os.urandom(32) on first use and restricted to
-    mode 0o600.  It lives inside the env-scoped data dir so multi-environment
+    It is auto-generated with os.urandom(32) on first use and created with
+    mode 0o600, so it is never readable by other users (POSIX; Windows ignores
+    the mode).  It lives inside the env-scoped data dir so multi-environment
     deployments each have an independent key.
     """
     key_file = _DATA_DIR / ".signing_key"
@@ -310,13 +311,12 @@ def _load_signing_key() -> bytes:
             pass  # Corrupt key file — regenerate below
     key = os.urandom(32)
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    key_file.write_text(key.hex())
-    try:
-        key_file.chmod(0o600)  # Restrict to owner; no-op on Windows
-    except OSError:
-        # chmod is not supported on all platforms (e.g. Windows NTFS);
-        # the key is still functional — caller must protect the data directory.
-        pass
+    # Remove any corrupt file first: the mode argument applies only on creation.
+    if key_file.exists():
+        key_file.unlink()
+    fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(key.hex())
     return key
 
 
@@ -586,10 +586,12 @@ def list_active_grants(agent_filter: Optional[str] = None, as_json: bool = False
 
     for token, grant in grants.items():
         try:
-            expires_at = datetime.fromisoformat(grant["expires_at"])
+            expires_at = datetime.fromisoformat(str(grant["expires_at"]).replace("Z", "+00:00"))
         except (KeyError, ValueError):
             expired_count += 1
             continue
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
 
         if expires_at <= now:
             expired_count += 1
@@ -650,19 +652,19 @@ def list_active_grants(agent_filter: Optional[str] = None, as_json: bool = False
 
 def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
     """
-    Summarize recent permission requests, grants, and denials.
+    Summarize recent permission activity: requested, granted, and denied.
 
     Parses data/audit_log.jsonl and produces per-agent and per-resource
     breakdowns plus recent activity.  Denial counts are read directly from
     ``permission_denied`` log entries — they are NOT inferred as
-    requests minus grants.  This preserves accuracy when log lines are
+    requested minus granted.  This preserves accuracy when log lines are
     missing, replayed, or arrive out of order.
     """
     if not AUDIT_LOG.exists():
         if as_json:
             print(json.dumps({"entries": 0, "summary": {}, "recent": []}))
         else:
-            print("No audit log found. (No permission requests recorded yet.)")
+            print("No audit log found. (No permission activity recorded yet.)")
         return 0
 
     entries: list[dict[str, Any]] = []
@@ -704,22 +706,22 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
 
         if action == "permission_request":
             total_requests += 1
-            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0, "denials": 0})
-            by_agent[agent_id]["requests"] += 1
-            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0, "denials": 0})
-            by_resource[resource_type]["requests"] += 1
+            by_agent.setdefault(agent_id, {"requested": 0, "granted": 0, "denied": 0})
+            by_agent[agent_id]["requested"] += 1
+            by_resource.setdefault(resource_type, {"requested": 0, "granted": 0, "denied": 0})
+            by_resource[resource_type]["requested"] += 1
         elif action == "permission_granted":
             total_grants += 1
-            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0, "denials": 0})
-            by_agent[agent_id]["grants"] += 1
-            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0, "denials": 0})
-            by_resource[resource_type]["grants"] += 1
+            by_agent.setdefault(agent_id, {"requested": 0, "granted": 0, "denied": 0})
+            by_agent[agent_id]["granted"] += 1
+            by_resource.setdefault(resource_type, {"requested": 0, "granted": 0, "denied": 0})
+            by_resource[resource_type]["granted"] += 1
         elif action == "permission_denied":
             total_denials += 1
-            by_agent.setdefault(agent_id, {"requests": 0, "grants": 0, "denials": 0})
-            by_agent[agent_id]["denials"] += 1
-            by_resource.setdefault(resource_type, {"requests": 0, "grants": 0, "denials": 0})
-            by_resource[resource_type]["denials"] += 1
+            by_agent.setdefault(agent_id, {"requested": 0, "granted": 0, "denied": 0})
+            by_agent[agent_id]["denied"] += 1
+            by_resource.setdefault(resource_type, {"requested": 0, "granted": 0, "denied": 0})
+            by_resource[resource_type]["denied"] += 1
 
     # Recent entries (last N)
     recent = entries[-last_n:]
@@ -755,29 +757,27 @@ def audit_summary(last_n: int = 20, as_json: bool = False) -> int:
         print(f"  Time range:   {first_ts}")
         print(f"                {last_ts}")
         print(f"")
-        print(f"  Requests:     {total_requests}")
-        print(f"  Grants:       {total_grants}")
-        print(f"  Denials:      {total_denials}")
+        print(f"  Requested:    {total_requests}")
+        print(f"  Granted:      {total_grants}")
+        print(f"  Denied:       {total_denials}")
         grant_rate = (total_grants / total_requests * 100) if total_requests > 0 else 0
         print(f"  Grant Rate:   {grant_rate:.0f}%")
 
         if by_agent:
             print(f"\n  By Agent:")
             print(f"  {'-'*50}")
-            print(f"  {'Agent':<20} {'Requests':>10} {'Grants':>10} {'Denials':>10}")
+            print(f"  {'Agent':<20} {'Requested':>10} {'Granted':>10} {'Denied':>10}")
             print(f"  {'-'*50}")
             for agent_id, stats in sorted(by_agent.items()):
-                denials = stats["denials"]
-                print(f"  {agent_id:<20} {stats['requests']:>10} {stats['grants']:>10} {denials:>10}")
+                print(f"  {agent_id:<20} {stats['requested']:>10} {stats['granted']:>10} {stats['denied']:>10}")
 
         if by_resource:
             print(f"\n  By Resource:")
             print(f"  {'-'*50}")
-            print(f"  {'Resource':<20} {'Requests':>10} {'Grants':>10} {'Denials':>10}")
+            print(f"  {'Resource':<20} {'Requested':>10} {'Granted':>10} {'Denied':>10}")
             print(f"  {'-'*50}")
             for resource_type, stats in sorted(by_resource.items()):
-                denials = stats["denials"]
-                print(f"  {resource_type:<20} {stats['requests']:>10} {stats['grants']:>10} {denials:>10}")
+                print(f"  {resource_type:<20} {stats['requested']:>10} {stats['granted']:>10} {stats['denied']:>10}")
 
         print(f"\n  Recent Activity (last {min(last_n, len(recent))}):")
         print(f"  {'-'*66}")

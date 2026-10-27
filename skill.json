@@ -1,11 +1,26 @@
 {
   "name": "SwarmOrchestrator",
-  "version": "5.16.0",
+  "version": "5.16.1",
   "description": "Local Python orchestration skill: multi-agent workflows via shared blackboard file, permission gating, token budget scripts, and persistent project context. The bundled Python scripts make no network calls and have zero third-party dependencies. The parent repository also contains a TypeScript engine (not included in this skill bundle). Workflow delegations via the host platform's sessions_send may invoke external model APIs.",
   "author": "Network-AI Community",
   "homepage": "https://network-ai.org",
   "repository": "https://github.com/Jovancoding/Network-AI",  "source": "https://github.com/Jovancoding/Network-AI",  "license": "MIT",
   "tags": ["multi-agent", "swarm", "orchestration", "governance", "audit", "permissions", "security", "blackboard", "budget", "local-only"],
+  "triggers": [
+    "coordinate several agents through a shared blackboard file",
+    "score a permission request for DATABASE, PAYMENTS, EMAIL, or FILE_EXPORT before acting",
+    "check or record a token budget for a multi-agent task",
+    "validate or revoke a Network-AI advisory grant token",
+    "read or update the persistent Network-AI project context"
+  ],
+  "invocation": "Explicit only: run one of the six bundled scripts with python3 when the user or orchestrator asks for one of the triggers above. Never invoked automatically, on a schedule, or in the background.",
+  "do_not_use_for": [
+    "single-agent tasks that one direct tool call can solve",
+    "calling external APIs or network services",
+    "real authentication or access control (grant tokens are advisory scores only)",
+    "running shell commands or starting servers",
+    "general questions about permissions, budgets, or context unrelated to a Network-AI swarm"
+  ],
   "runtime": "python",
   "entrypoint": "scripts/swarm_guard.py",
   "gateway": "local",

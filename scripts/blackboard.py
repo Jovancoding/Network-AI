@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SECURITY: This script makes NO network calls and spawns NO subprocesses.
+# SECURITY: Local-only. No network access and no child processes.
 # All I/O is local file operations only:
 #   READS:  <data_dir>/swarm-blackboard.md, <data_dir>/pending_changes/<id>.json,
 #           <data_dir>/.blackboard.lock
@@ -19,7 +19,7 @@
 # affected by --path.
 # Imports used: argparse, json, os, re, sys, time, hashlib, datetime, pathlib,
 #               typing, contextlib, fcntl (Unix file-lock only, no network use)
-# No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
+# Standard library only; no networking or process-spawning modules are imported.
 """
 Shared Blackboard - Agent Coordination State Manager (Atomic Commit Edition)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SECURITY: This script makes NO network calls and spawns NO subprocesses.
+# SECURITY: Local-only. No network access and no child processes.
 # All I/O is local file operations only.
 # Base data directory is data/ (root) or data/<env>/ when NETWORK_AI_ENV or --env is set.
 #   READS:  <data_dir>/swarm_budgets.json, <data_dir>/heartbeats.json,
@@ -9,7 +9,7 @@
 #           <data_dir>/audit_log.jsonl, <data_dir>/task_tracking.json,
 #           <data_dir>/agent_health.json, <data_dir>/budget_tracking.json
 # Imports used: argparse, json, os, sys, datetime, pathlib, typing
-# No imports of: requests, socket, subprocess, urllib, http, ssl, ftplib, smtplib
+# Standard library only; no networking or process-spawning modules are imported.
 """
 Swarm Guard - Prevents Handoff Tax, Silent Failures, and Budget Overruns
 
