@@ -704,7 +704,7 @@ export class ShellExecutor {
   }
 }
 
-const SECRET_ENV = /^ASI_|SECRET|TOKEN|PASSW(OR)?D|API_?KEY|PRIVATE_?KEY|CREDENTIAL|_AUTH$/i;
+const SECRET_ENV = /(?:^ASI_)|(?:SECRET|TOKEN|PASSW(?:OR)?D|API_?KEY|PRIVATE_?KEY|CREDENTIAL)|(?:_AUTH$)/i;
 
 /** Copy of `env` without secret-like variables. */
 function scrubSecretEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

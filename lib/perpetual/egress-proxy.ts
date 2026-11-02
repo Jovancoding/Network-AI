@@ -146,8 +146,11 @@ export class EgressProxy {
     if (rest.some((seg) => seg === '..' || seg === '.' || decodeURIComponent(seg).includes('/'))) return this.deny(res, 400, 'invalid path', ctx);
     const upstreamPath = `${route.base.pathname.replace(/\/$/, '')}/${rest.join('/')}`;
     if (route.pathPrefixes && !route.pathPrefixes.some((p) => upstreamPath.startsWith(p))) return this.deny(res, 403, 'path not allowed', ctx);
-    const target = new URL(upstreamPath + url.search, route.base);
-    if (target.origin !== route.base.origin) return this.deny(res, 400, 'invalid path', ctx);
+    // Scheme, host, and port always come from the operator's route; the agent only supplies path and query.
+    const target = new URL(route.base.origin);
+    target.pathname = upstreamPath;
+    target.search = url.search;
+    if (target.origin !== route.base.origin || target.pathname !== upstreamPath) return this.deny(res, 400, 'invalid path', ctx);
 
     const body = await readBody(req, this.options.maxRequestBytes ?? 1024 * 1024);
     if (body === null) return this.deny(res, 413, 'request body too large', ctx);

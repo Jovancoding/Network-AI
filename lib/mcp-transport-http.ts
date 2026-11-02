@@ -29,6 +29,7 @@ import { McpErrorCode } from './mcp-bridge';
 import type { MCPToolDefinition, BlackboardToolResult } from './mcp-blackboard-tools';
 import type { McpToolProvider } from './mcp-transport-sse';
 import { McpCombinedBridge } from './mcp-transport-sse';
+import { isLoopbackHost } from './http-guards';
 
 // Lazy-load http to avoid pulling in node:http unless this transport is used
 let _http: typeof import('node:http') | undefined;
@@ -217,10 +218,7 @@ export class McpStreamableServer {
       ));
     }
 
-    const isLoopback =
-      this._opts.host === '127.0.0.1' ||
-      this._opts.host === 'localhost' ||
-      this._opts.host === '::1';
+    const isLoopback = isLoopbackHost(this._opts.host);
 
     if (!isLoopback) {
       process.stderr.write(
@@ -291,7 +289,8 @@ export class McpStreamableServer {
 
     const origin = req.headers['origin'] ?? '';
     const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-    if (isLocalOrigin) {
+    // A localhost Origin implies same-host only when this server is itself on loopback (GHSA-jw52-p54c-w7hj).
+    if (isLocalOrigin && isLoopbackHost(this._opts.host)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
     }

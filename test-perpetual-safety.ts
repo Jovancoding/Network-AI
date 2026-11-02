@@ -571,7 +571,7 @@ async function testBudget(): Promise<void> {
   assert(!over.granted, 'authority stops renewal when reported spend reaches the run ceiling');
 
   section('Egress financial limits (enforced in the proxy process)');
-  const upstream = http.createServer((req, res) => { req.resume(); req.on('end', () => res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"ok":true}')); });
+  const upstream = http.createServer((req, res) => { req.resume(); req.on('end', () => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true, path: req.url }))); });
   const upstreamBase = await listen(upstream);
   const a = authorityWith();
   throwsSync(() => new EgressProxy({ authorityPublicKey: a.authority.publicKey, isLeaseActive: async () => true, routes: [{ name: 'pay', upstream: upstreamBase, financial: { amountField: 'a..b', maxPerRequestUsd: 1, maxPerRunUsd: 1 } }] }), 'invalid financial config rejected');
@@ -593,6 +593,9 @@ async function testBudget(): Promise<void> {
     assert((await pay({ payment: { amountUsd: 10 } })).status === 200, 'second payment forwarded (20 of 25)');
     assert((await pay({ payment: { amountUsd: 6 } })).status === 403, 'payment that would pass the per-run limit refused');
     assert((await pay({ payment: { amountUsd: '5' } })).status === 200, 'numeric string amount accepted up to the limit');
+    const hostLike = await fetch(`${base}/pay//evil.example/charge?x=1`, { method: 'POST', headers: { 'X-Network-AI-Lease': encodeLeaseHeader(lease2), 'Content-Type': 'application/json' }, body: JSON.stringify({ payment: { amountUsd: 0 } }) });
+    const seen = hostLike.status === 200 ? ((await hostLike.json()) as { path?: string }).path : undefined;
+    assert(hostLike.status === 400 || (hostLike.status === 200 && seen === '//evil.example/charge?x=1'), 'host-like path stays on the configured upstream (CodeQL js/request-forgery)', `status ${hostLike.status}, path ${seen}`);
   } finally {
     await new Promise<void>((r) => server.close(() => r()));
     await new Promise<void>((r) => upstream.close(() => r()));

@@ -6,8 +6,7 @@
 #   WRITES: <data_dir>/swarm-blackboard.md, <data_dir>/pending_changes/<id>.json,
 #           <data_dir>/pending_changes/archive/<id>.<committed|aborted>.json,
 #           <data_dir>/.blackboard.lock
-#   DELETES: <data_dir>/pending_changes/<id>.json (after archiving it),
-#            stale <data_dir>/.blackboard.lock markers
+#   DELETES: <data_dir>/pending_changes/<id>.json (after archiving it)
 #   where <data_dir> is "data/" by default, or "data/<env>/" when NETWORK_AI_ENV
 #   is set or --env is passed (env in: dev|st|sit|qa|sandbox|preprod|prod). This
 #   only changes WHICH data/ subdirectory is used — no path outside the project
@@ -18,7 +17,7 @@
 # data directory regardless of --path; only the main blackboard file path is
 # affected by --path.
 # Imports used: argparse, json, os, re, sys, time, hashlib, datetime, pathlib,
-#               typing, contextlib, fcntl (Unix file-lock only, no network use)
+#               typing, contextlib, fcntl (Unix) / msvcrt (Windows) for OS file locks only
 # Standard library only; no networking or process-spawning modules are imported.
 """
 Shared Blackboard - Agent Coordination State Manager (Atomic Commit Edition)
@@ -71,13 +70,18 @@ from pathlib import Path
 from typing import Any, Optional
 from contextlib import contextmanager
 
-# Try to import fcntl (Unix only), fall back to file-based locking on Windows
+# OS file locks: fcntl on Unix, msvcrt on Windows (both standard library)
 _fcntl: Any = None
+_msvcrt: Any = None
 try:
     import fcntl as _fcntl_import
     _fcntl = _fcntl_import
 except ImportError:
-    pass  # fcntl unavailable on Windows; file-based lock fallback is used instead
+    try:
+        import msvcrt as _msvcrt_import
+        _msvcrt = _msvcrt_import
+    except ImportError:
+        pass  # FileLock.acquire fails closed if neither is available
 
 # Default blackboard location — respects NETWORK_AI_ENV for multi-env isolation
 def _resolve_data_dir(env: str = "") -> Path:
@@ -103,15 +107,14 @@ LOCK_RETRY_INTERVAL = 0.1
 
 class FileLock:
     """
-    Cross-platform file lock for preventing race conditions.
-    Uses fcntl on Unix, fallback to lock file on Windows.
+    Cross-platform exclusive file lock (fcntl.flock on Unix, msvcrt.locking on Windows).
+    The OS releases it if the holding process dies, so there are no stale locks to guess about.
     """
     
     def __init__(self, lock_path: Path, timeout: float = LOCK_TIMEOUT_SECONDS):
         self.lock_path = lock_path
         self.timeout = timeout
         self.lock_file: Optional[Any] = None
-        self.lock_marker: Optional[Path] = None
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
     
     def acquire(self) -> bool:
@@ -120,29 +123,24 @@ class FileLock:
         
         while True:
             try:
-                self.lock_file = open(self.lock_path, 'w')
+                # 'a+' never truncates a file another process holds locked.
+                self.lock_file = open(self.lock_path, 'a+')
                 
                 if _fcntl is not None:
-                    # Unix/Linux/Mac - use fcntl
                     _fcntl.flock(self.lock_file.fileno(), _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+                elif _msvcrt is not None:
+                    self.lock_file.seek(0)
+                    _msvcrt.locking(self.lock_file.fileno(), _msvcrt.LK_NBLCK, 1)
                 else:
-                    # Windows fallback: use lock marker file
-                    self.lock_marker = self.lock_path.with_suffix('.locked')
-                    if self.lock_marker.exists():
-                        # Check if stale (older than timeout)
-                        age = time.time() - self.lock_marker.stat().st_mtime
-                        if age < self.timeout:
-                            self.lock_file.close()
-                            raise BlockingIOError("Lock held by another process")
-                        # Stale lock, remove it
-                        self.lock_marker.unlink()
-                    self.lock_marker.write_text(str(time.time()))
+                    raise RuntimeError("No OS file-locking primitive is available on this platform")
                 
-                # Write lock holder info
+                # Holder info is diagnostic only; we own the lock, so rewriting is safe.
+                self.lock_file.seek(0)
+                self.lock_file.truncate()
                 self.lock_file.write(json.dumps({
                     "pid": os.getpid(),
                     "acquired_at": datetime.now(timezone.utc).isoformat()
-                }))
+                }) + "\n")
                 self.lock_file.flush()
                 return True
                 
@@ -160,15 +158,14 @@ class FileLock:
             try:
                 if _fcntl is not None:
                     _fcntl.flock(self.lock_file.fileno(), _fcntl.LOCK_UN)
-                elif self.lock_marker and self.lock_marker.exists():
-                    self.lock_marker.unlink()
-                
-                self.lock_file.close()
-            except Exception:
-                pass  # best-effort unlock; fd and marker cleaned up in finally
+                elif _msvcrt is not None:
+                    self.lock_file.seek(0)
+                    _msvcrt.locking(self.lock_file.fileno(), _msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass  # closing the file below releases the lock anyway
             finally:
+                self.lock_file.close()
                 self.lock_file = None
-                self.lock_marker = None
 
 
 @contextmanager

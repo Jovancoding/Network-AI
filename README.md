@@ -5,9 +5,9 @@
 [![Website](https://img.shields.io/badge/website-network--ai.org-4b9df2?style=flat&logo=web&logoColor=white)](https://network-ai.org/)
 [![CI](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jovancoding/Network-AI/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/badge/release-v5.17.1-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
+[![Release](https://img.shields.io/badge/release-v5.17.2-blue.svg)](https://github.com/Jovancoding/Network-AI/releases)
 [![npm](https://img.shields.io/npm/dw/network-ai.svg?label=npm%20downloads)](https://www.npmjs.com/package/network-ai)
-[![Tests](https://img.shields.io/badge/tests-4180%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-4190%20passing-brightgreen.svg)](#testing)
 [![Adapters](https://img.shields.io/badge/frameworks-32%20supported-blueviolet.svg)](#adapter-system)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 [![Socket](https://socket.dev/api/badge/npm/package/network-ai)](https://socket.dev/npm/package/network-ai/overview)
@@ -695,7 +695,7 @@ npx ts-node test-perpetual.ts         # Perpetual Runtime: leases, egress proxy,
 npx ts-node test-perpetual-safety.ts  # Perpetual Runtime: guarded paths, sandbox, sentries, pipeline, self-healing, budget
 ```
 
-**4,180 passing assertions across 43 test suites** (`npm run test:all`):
+**4,190 passing assertions across 43 test suites** (`npm run test:all`):
 
 | Suite | Assertions | Covers |
 |---|---|---|
@@ -737,10 +737,10 @@ npx ts-node test-perpetual-safety.ts  # Perpetual Runtime: guarded paths, sandbo
 | `test-phase17.ts` | 15 | `ApprovalInbox` GHSA-m4jg-6w3q-gm86 fix: read-route auth gating, token validation, fail-closed default without a secret, CORS allowlist |
 | `test-phase18.ts` | 85 | `ClaudeHookBridge` observe/enforce gating, MCP elicitation channel + fail-closed approval callback, `A2AServer` agent card / tasks / auth / eviction |
 | `test-phase19.ts` | 78 | `ContextComposer` ranking/budget/pinning/staleness/layout, `estimateTokens`, `context_pack` + `blackboard_search` MCP tools (lexical + semantic modes) |
-| `test-phase20.ts` | 135 | Security regressions: `ClaudeHookBridge` full-target and all-field deny matching (GHSA-743h-jr5x-mpcr, GHSA-9p2w-prp8-5722), deny/allow regex validation + fail-closed hook exit code, `SandboxPolicy` canonicalized command matching (GHSA-9v4f-j8cv-fhxw), `DashboardServer` Origin/Host validation (GHSA-hr6v-mfxm-4438), MCP SSE loopback-only CORS (GHSA-4pvg-m42h-c3x2), per-instance orchestrator token + MCP server-held identity, `sanitizePath` segment-boundary containment (GHSA-5mm5-4mh4-6gm6), `FileJobStore` / `AgentVCR` name confinement (GHSA-v64j-mc7x-c7x7, GHSA-mfxv-jg44-xj48), `A2AServer` fail-closed auth (GHSA-qvf5-9prv-7r9c), `ApprovalInbox` / `SwarmTransportServer` fail-closed auth with replay protection, `ControlPlane` / `WorkTreeDashboard` Host/Origin checks |
+| `test-phase20.ts` | 142 | Security regressions: `ClaudeHookBridge` full-target and all-field deny matching (GHSA-743h-jr5x-mpcr, GHSA-9p2w-prp8-5722), deny/allow regex validation + fail-closed hook exit code, `SandboxPolicy` canonicalized command matching (GHSA-9v4f-j8cv-fhxw), `DashboardServer` Origin/Host validation (GHSA-hr6v-mfxm-4438), MCP SSE loopback-only CORS (GHSA-4pvg-m42h-c3x2), per-instance orchestrator token + MCP server-held identity, `sanitizePath` segment-boundary containment (GHSA-5mm5-4mh4-6gm6), `FileJobStore` / `AgentVCR` name confinement (GHSA-v64j-mc7x-c7x7, GHSA-mfxv-jg44-xj48), `A2AServer` fail-closed auth (GHSA-qvf5-9prv-7r9c), `ApprovalInbox` / `SwarmTransportServer` fail-closed auth with replay protection, `ControlPlane` / `WorkTreeDashboard` Host/Origin checks |
 | `test-asi.ts` | 148 | ASI Strict Mode: config parsing/tightening, `ProofGate`, `ConsensusEngine`, auditor receipts, `HaltCoordinator`, trust tiers, cognitive caps, canaries, hash-chained export |
-| `test-perpetual.ts` | 141 | Perpetual Runtime: signing, `LeaseAuthority` (renewal, stop conditions, revoke/pause/tighten, HTTP API), `LeaseGuard` dead-man switch, `EgressProxy`, integration hooks, key/route files, out-of-process CLI authority and operator controls |
-| `test-perpetual-safety.ts` | 151 | Perpetual Runtime: `GuardedPaths` (I2), sandbox runner, sentry detectors + quorum + authenticated identities, `ImprovementPipeline` tiers/receipts, verified snapshots + `SelfHealer`, `BudgetBalancer` (I3), egress financial limits |
+| `test-perpetual.ts` | 143 | Perpetual Runtime: signing, `LeaseAuthority` (renewal, stop conditions, revoke/pause/tighten, HTTP API), `LeaseGuard` dead-man switch, `EgressProxy`, integration hooks, key/route files, out-of-process CLI authority and operator controls |
+| `test-perpetual-safety.ts` | 152 | Perpetual Runtime: `GuardedPaths` (I2), sandbox runner, sentry detectors + quorum + authenticated identities, `ImprovementPipeline` tiers/receipts, verified snapshots + `SelfHealer`, `BudgetBalancer` (I3), egress financial limits |
 | `test.ts` | 39 | Core orchestrator smoke tests |
 
 ---

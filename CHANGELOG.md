@@ -5,6 +5,18 @@ All notable changes to Network-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.17.2] - 2026-11-02
+
+### Security
+- **GHSA-jw52-p54c-w7hj (Low) — `McpStreamableServer` CORS reflection on non-loopback binds** — the Streamable HTTP MCP transport (`lib/mcp-transport-http.ts`) reflected a `localhost` / `127.0.0.1` `Origin` into `Access-Control-Allow-Origin` whatever interface it was bound to, so on a supported `0.0.0.0` bind a local page could read the unauthenticated `GET /tools` and `GET /health` responses. It is the same defect fixed for `McpSseServer` in v5.15.2 (GHSA-4pvg-m42h-c3x2). The localhost Origin is now reflected only when the server is bound to loopback, using the shared `isLoopbackHost()` guard. Reported by @mgjxwmxhn.
+- **Egress proxy upstream URL** (CodeQL `js/request-forgery`) — `EgressProxy` now builds every upstream URL from the operator's route origin and only replaces its path and query, instead of resolving an agent-influenced path against the base; requests whose path would change the origin are refused.
+- **Key-file creation without check-then-write** (CodeQL `js/file-system-race`) — `perpetual keygen` claims both key paths with exclusive create (`wx`) before writing, so an existing file is never overwritten and a failed run leaves no partial private key; bounded JSON/key reads use one file descriptor for the size check and the read.
+- **ClawHub skill: Windows lock** (SkillSpector) — `blackboard.py` used a check-then-write lock marker on Windows, so two processes could both acquire the lock and a long operation's lock could be treated as stale. It now uses the OS byte-range lock (`msvcrt.locking`, standard library), which is exclusive across processes and released automatically if the holder dies; no lock markers are written or deleted.
+- **ClawHub skill: unsigned grants rejected** (ClawScan note) — `validate_token.py` accepted grant records without a signature (a pre-v5.5.2 compatibility path; such grants expired long ago) and grants it could not verify because the signing key was missing. Both are now rejected. A malformed grant record (non-string fields or signature) is rejected instead of crashing the verifier.
+
+### Changed
+- `scrubSecretEnv`'s variable-name pattern is grouped explicitly (CodeQL `js/regex/missing-regexp-anchor`); matching is unchanged.
+
 ## [5.17.1] - 2026-10-27
 
 ### Security

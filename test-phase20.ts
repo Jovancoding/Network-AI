@@ -29,7 +29,8 @@ import { spawnSync } from 'child_process';
 import { ClaudeHookBridge } from './lib/claude-hooks';
 import { DashboardServer } from './lib/dashboard-server';
 import { TopologyTracker } from './lib/topology';
-import { McpSseServer } from './lib/mcp-transport-sse';
+import { McpSseServer, McpCombinedBridge } from './lib/mcp-transport-sse';
+import { McpStreamableServer } from './lib/mcp-transport-http';
 import { createSwarmOrchestrator } from './index';
 import { McpBlackboardBridge, createServerIdentityBlackboard } from './lib/mcp-bridge';
 import type { IdentityRegisteringBlackboard } from './lib/mcp-bridge';
@@ -446,6 +447,40 @@ function testGhsa4pvgSseCorsLoopbackOnly() {
 }
 
 // ---------------------------------------------------------------------------
+// GHSA-jw52-p54c-w7hj — Streamable HTTP MCP transport had the same CORS defect
+// ---------------------------------------------------------------------------
+
+function streamableCorsHeaderFor(host: string, origin: string, url = '/tools'): string | undefined {
+  const bridge = new McpCombinedBridge('poc');
+  bridge.register({
+    getDefinitions: () => [{ name: 'internal_admin_export', description: 'INTERNAL ONLY', inputSchema: { type: 'object', properties: {} } }],
+    callTool: async () => ({ success: true, data: null }),
+  } as unknown as Parameters<McpCombinedBridge['register']>[0]);
+  const server = new McpStreamableServer(bridge, { host, secret: randomBytes(24).toString('hex'), heartbeatMs: 0 });
+  const headers: Record<string, string> = {};
+  const res = {
+    setHeader: (k: string, v: string) => { headers[k.toLowerCase()] = v; },
+    writeHead: () => res,
+    end: () => undefined,
+  };
+  const req = { method: 'OPTIONS', url, headers: { host: 'x', origin } };
+  (server as unknown as { _handleRequest(q: unknown, s: unknown): void })._handleRequest(req, res);
+  return headers['access-control-allow-origin'];
+}
+
+function testGhsaJw52StreamableCorsLoopbackOnly() {
+  header('GHSA-jw52-p54c-w7hj — McpStreamableServer reflects localhost Origin only on a loopback bind');
+
+  assert(streamableCorsHeaderFor('0.0.0.0', 'http://localhost:9999') === undefined, 'published PoC: 0.0.0.0 bind does not reflect http://localhost on /tools');
+  assert(streamableCorsHeaderFor('0.0.0.0', 'http://127.0.0.1:9999') === undefined, 'published PoC: 0.0.0.0 bind does not reflect http://127.0.0.1 on /tools');
+  assert(streamableCorsHeaderFor('0.0.0.0', 'http://localhost:9999', '/health') === undefined, 'published PoC: 0.0.0.0 bind does not reflect a localhost Origin on /health');
+  assert(streamableCorsHeaderFor('192.168.1.10', 'http://localhost:9999') === undefined, 'external-IP bind does not reflect a localhost Origin');
+  assert(streamableCorsHeaderFor('127.0.0.1', 'http://localhost:9999') === 'http://localhost:9999', 'loopback bind still reflects a localhost Origin');
+  assert(streamableCorsHeaderFor('::1', 'http://127.0.0.1:9999') === 'http://127.0.0.1:9999', 'IPv6 loopback bind still reflects a localhost Origin');
+  assert(streamableCorsHeaderFor('127.0.0.1', 'http://evil.example') === undefined, 'loopback bind never reflects a non-local Origin');
+}
+
+// ---------------------------------------------------------------------------
 // Hardcoded orchestrator token removed — MCP server-held identity
 // ---------------------------------------------------------------------------
 
@@ -777,6 +812,7 @@ async function main() {
   await testGhsa9p2wDenyInspectsAllFields();
   await testGhsaHr6vDashboardOriginAndHost();
   testGhsa4pvgSseCorsLoopbackOnly();
+  testGhsaJw52StreamableCorsLoopbackOnly();
   await testNoPublicOrchestratorToken();
 
   testGhsa5mm5SanitizePathSiblingPrefix();

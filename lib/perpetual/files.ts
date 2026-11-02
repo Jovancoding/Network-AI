@@ -37,20 +37,43 @@ export function writeKeyPair(dir: string, name: string): WrittenKeyPair {
   fs.mkdirSync(root, { recursive: true });
   const privateKeyPath = path.join(root, `${name}.key`);
   const publicKeyPath = path.join(root, `${name}.pub`);
-  if (fs.existsSync(privateKeyPath) || fs.existsSync(publicKeyPath)) {
-    throw new Error(`refusing to overwrite existing key files for "${name}" in ${root}`);
+  // Exclusive create claims both paths first, so nothing is ever overwritten (no check-then-write window).
+  let privFd: number;
+  try {
+    privFd = fs.openSync(privateKeyPath, 'wx', 0o600);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`refusing to overwrite existing key files for "${name}" in ${root}`);
+    throw err;
+  }
+  let pubFd: number;
+  try {
+    pubFd = fs.openSync(publicKeyPath, 'wx', 0o644);
+  } catch (err) {
+    fs.closeSync(privFd);
+    fs.unlinkSync(privateKeyPath);
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`refusing to overwrite existing key files for "${name}" in ${root}`);
+    throw err;
   }
   const pair = generateEd25519KeyPair();
-  fs.writeFileSync(privateKeyPath, pair.privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600, flag: 'wx' });
-  fs.writeFileSync(publicKeyPath, pair.publicKey.export({ type: 'spki', format: 'pem' }), { mode: 0o644, flag: 'wx' });
+  try {
+    fs.writeFileSync(privFd, pair.privateKey.export({ type: 'pkcs8', format: 'pem' }));
+    fs.writeFileSync(pubFd, pair.publicKey.export({ type: 'spki', format: 'pem' }));
+  } finally {
+    fs.closeSync(privFd);
+    fs.closeSync(pubFd);
+  }
   return { keyId: pair.keyId, privateKeyPath, publicKeyPath };
 }
 
 function readBounded(file: string): string {
   const resolved = path.resolve(file);
-  const size = fs.statSync(resolved).size;
-  if (size > MAX_FILE_BYTES) throw new Error(`${resolved} is larger than ${MAX_FILE_BYTES} bytes`);
-  return fs.readFileSync(resolved, 'utf8');
+  const fd = fs.openSync(resolved, 'r');
+  try {
+    if (fs.fstatSync(fd).size > MAX_FILE_BYTES) throw new Error(`${resolved} is larger than ${MAX_FILE_BYTES} bytes`);
+    return fs.readFileSync(fd, 'utf8');
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 /** Read an Ed25519 public key (SPKI PEM). */

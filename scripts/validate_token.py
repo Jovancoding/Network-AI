@@ -61,22 +61,21 @@ def _verify_grant_sig(grant: "dict[str, Any]") -> "Optional[bool]":
     Returns:
       True  — signature present and valid
       False — signature present but invalid (tampered)
-      None  — no signature (pre-v5.5.2 token) or key unavailable
+      None  — no signature, or the signing key is unavailable (cannot verify)
     """
     stored_sig = grant.get("_sig")
     if not stored_sig:
-        return None  # Backward-compatible: unsigned token from before v5.5.2
+        return None
+    if not isinstance(stored_sig, str):
+        return False
     key = _load_signing_key()
     if key is None:
-        return None  # Key not present — cannot verify; treat as unverified
-    payload = "|".join([
-        grant.get("token", ""),
-        grant.get("agent_id", ""),
-        grant.get("resource_type", ""),
-        grant.get("scope") or "",
-        grant.get("expires_at", ""),
-        grant.get("granted_at", ""),
-    ])
+        return None
+    fields = [grant.get("token", ""), grant.get("agent_id", ""), grant.get("resource_type", ""),
+              grant.get("scope") or "", grant.get("expires_at", ""), grant.get("granted_at", "")]
+    if not all(isinstance(f, str) for f in fields):
+        return False  # malformed record: cannot match what check_permission.py signed
+    payload = "|".join(fields)
     expected = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, stored_sig)
 
@@ -111,6 +110,12 @@ def validate_token(token: str) -> dict[str, Any]:
         return {
             "valid": False,
             "reason": "Token signature invalid — grant record may have been tampered with",
+        }
+    # Fail closed: a grant that cannot be verified (no signature, or no signing key) is never valid.
+    if sig_result is None:
+        return {
+            "valid": False,
+            "reason": "Token is unsigned or its signature cannot be verified (signing key unavailable)",
         }
 
     # Check expiration. A grant without a parseable expiry is rejected: a

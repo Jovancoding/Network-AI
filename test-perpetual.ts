@@ -498,6 +498,9 @@ function testFiles(): void {
     assert(fs.existsSync(op.privateKeyPath) && fs.existsSync(op.publicKeyPath), 'key pair written');
     if (process.platform !== 'win32') assert((fs.statSync(op.privateKeyPath).mode & 0o777) === 0o600, 'private key is 0600');
     throwsSync(() => writeKeyPair(dir, 'operator'), 'existing key files are never overwritten');
+    fs.writeFileSync(path.join(dir, 'half.pub'), 'keep-me');
+    throwsSync(() => writeKeyPair(dir, 'half'), 'existing public key blocks keygen');
+    assert(!fs.existsSync(path.join(dir, 'half.key')) && fs.readFileSync(path.join(dir, 'half.pub'), 'utf8') === 'keep-me', 'failed keygen leaves no private key and keeps the existing file');
     throwsSync(() => writeKeyPair(dir, '../escape'), 'key name with path separators rejected');
     const pair = readKeyPair(op.privateKeyPath);
     assert(pair.keyId === op.keyId && keyIdOf(readPublicKey(op.publicKeyPath)) === op.keyId, 'keys read back with the same key id');
