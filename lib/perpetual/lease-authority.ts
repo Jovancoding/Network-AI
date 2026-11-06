@@ -18,17 +18,29 @@ import { createHash, randomBytes, timingSafeEqual, type KeyObject } from 'crypto
 import type { IncomingMessage, ServerResponse, Server } from 'http';
 import { isLoopbackHost } from '../http-guards';
 import {
+  ensureEd25519,
+  isHighRiskPolicy,
   keyIdOf,
   policyHash,
   scopeWithin,
   signLease,
+  signWith,
+  verifyCanonical,
   verifySignedPolicy,
   type Ed25519KeyPair,
+  type Signer,
 } from './signing';
+import { verifyCheckpoint, type SignedCheckpoint } from './checkpoint';
+import { checkAttestation, type AttestationVerifier } from './attestation';
+import { verifyCapabilityEval, type SignedCapabilityEval } from './capability-eval';
+import { nextRunState, recordSpend, tightenError } from './core';
 import type {
+  AttestationEvidence,
   ControlRole,
   Heartbeat,
   LeaseBudget,
+  LeaseClaims,
+  LeaseCosignature,
   LeaseDecision,
   LeaseScope,
   RenewalPolicy,
@@ -53,10 +65,17 @@ export interface TightenDelta {
 /** One authority decision, for the audit trail. */
 export interface AuthorityEvent {
   at: number;
-  action: 'issue' | 'renew' | 'refuse' | 'revoke' | 'pause' | 'resume' | 'tighten' | 'alert' | 'policy' | 'stop';
+  action: 'issue' | 'renew' | 'refuse' | 'revoke' | 'pause' | 'resume' | 'tighten' | 'alert' | 'policy' | 'stop' | 'checkpoint' | 'cosign' | 'capability-eval';
   role: ControlRole;
   runId?: string;
   leaseId?: string;
+  reason?: string;
+}
+
+/** Result of a co-sign request (k-of-n). */
+export interface CosignDecision {
+  granted: boolean;
+  cosignature?: LeaseCosignature;
   reason?: string;
 }
 
@@ -64,15 +83,26 @@ export interface AuthorityEvent {
 export interface LeaseAuthorityOptions {
   /** Operator public key; only policies it signed are accepted */
   operatorPublicKey: KeyObject;
-  /** Authority signing key pair (keep the private key inside this process) */
-  authorityKey: Ed25519KeyPair;
+  /** Authority signing key pair, or a `Signer` (HSM/KMS/external program) so the private key stays out of this process */
+  authorityKey: Ed25519KeyPair | Signer;
   /** Initial operator-signed policy */
   policy: SignedPolicy;
   /** Clock override (tests) */
   now?: () => number;
   /** Audit callback (wire to `SecureAuditLogger` / `HashChainSink`) */
   onEvent?: (event: AuthorityEvent) => void;
+  /** Verifiers for `policy.attestation` (bring-your-own TPM / SEV-SNP / TDX / Nitro) */
+  attestationVerifiers?: readonly AttestationVerifier[];
+  /**
+   * Public keys of the other authorities in `policy.authorityQuorum`. A
+   * co-signature is only given for claims signed by their issuing peer, so
+   * every lease starts at some authority's full issue/renew checks.
+   */
+  peerAuthorityKeys?: readonly KeyObject[];
 }
+
+/** What one authority knows about a lease. `unknown`: it never granted or co-signed it. */
+export type LeaseStatusValue = 'active' | 'inactive' | 'unknown';
 
 /** Bearer secrets for the control API. */
 export interface AuthoritySecrets {
@@ -97,11 +127,16 @@ interface RunRecord {
   spentUsd: number;
   spentTokens: number;
   reason?: string;
+  /** Nonce the next renewal's attestation must bind */
+  attestationNonce?: string;
 }
 
 const ALERT_RANK: Record<AlertLevel, number> = { info: 0, warning: 1, critical: 2 };
+/** Authenticated identity of the egress proxy's sentry secret (`sentries.proxy`). */
+export const TRIPWIRE_SOURCE = 'sentry:proxy';
 const RUN_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 const MAX_RUNS = 10_000;
+const CHALLENGE_TTL_MS = 60_000;
 
 /** Issues, renews, and revokes leases under an operator-signed policy. */
 export class LeaseAuthority {
@@ -112,9 +147,23 @@ export class LeaseAuthority {
   private paused = false;
   private highestAlert: AlertLevel = 'info';
   private alerts: { source: string; at: number }[] = [];
+  /** Newest accepted checkpoint covering all runs (issuedAt) */
+  private checkpointAll = 0;
+  /** Newest accepted per-run checkpoint (issuedAt) */
+  private readonly checkpointRun = new Map<string, number>();
+  private readonly checkpointNonces = new Set<string>();
+  private readonly attestationVerifiers: readonly AttestationVerifier[];
+  /** Outstanding issue challenges: runId → nonce and when it was issued */
+  private readonly challenges = new Map<string, { nonce: string; at: number }>();
+  private capabilityEval: SignedCapabilityEval | null = null;
+  private readonly peers = new Map<string, KeyObject>();
+  /** Set by a trusted tripwire or a sentry stop that reached quorum; only an operator resume clears it */
+  private alertLatch: string | null = null;
+  /** Set by `revoke --all`; runs this authority never saw then read as inactive until an operator resume */
+  private revokedAll = false;
   private readonly now: () => number;
   private readonly operatorPublicKey: KeyObject;
-  private readonly authorityKey: Ed25519KeyPair;
+  private readonly authorityKey: Ed25519KeyPair | Signer;
   private readonly onEvent?: (event: AuthorityEvent) => void;
 
   constructor(options: LeaseAuthorityOptions) {
@@ -127,6 +176,14 @@ export class LeaseAuthority {
     }
     const reason = verifySignedPolicy(options.policy, this.operatorPublicKey);
     if (reason) throw new TypeError(`LeaseAuthority: ${reason}`);
+    assertInQuorum(options.policy, keyIdOf(this.authorityKey.publicKey));
+    this.attestationVerifiers = options.attestationVerifiers ?? [];
+    this.assertAttestationReady(options.policy);
+    for (const k of options.peerAuthorityKeys ?? []) {
+      ensureEd25519(k, 'public', 'peerAuthorityKeys[]');
+      const id = keyIdOf(k);
+      if (id !== keyIdOf(this.authorityKey.publicKey)) this.peers.set(id, k);
+    }
     this.signed = options.policy;
   }
 
@@ -152,11 +209,22 @@ export class LeaseAuthority {
   }
 
   /** Issue the first lease for a run (or a fresh one after an operator resume). */
-  issue(runId: string, role: ControlRole = 'runner'): LeaseDecision {
+  issue(runId: string, role: ControlRole = 'runner', attestation?: AttestationEvidence): LeaseDecision {
     if (role !== 'runner' && role !== 'operator') return this.refuse(role, runId, 'role may not issue leases');
     if (typeof runId !== 'string' || !RUN_ID.test(runId)) return this.refuse(role, undefined, 'invalid runId');
     const blocked = this.blockedReason();
     if (blocked) return this.refuse(role, runId, blocked);
+    if (this.checkpointOverdue(runId)) return this.refuse(role, runId, 'human checkpoint overdue');
+    const gate = this.capabilityGateReason();
+    if (gate) return this.refuse(role, runId, gate);
+    const req = this.signed.policy.attestation;
+    if (req) {
+      const challenge = this.challenges.get(runId);
+      this.challenges.delete(runId);
+      const fresh = challenge && this.now() - challenge.at <= CHALLENGE_TTL_MS ? challenge.nonce : undefined;
+      const bad = checkAttestation(req, this.attestationVerifiers, attestation, fresh);
+      if (bad) return this.refuse(role, runId, bad);
+    }
     let run = this.runs.get(runId);
     if (run && run.state !== 'active') return this.refuse(role, runId, `run is ${run.state}`);
     if (run?.currentLeaseId && !this.revoked.has(run.currentLeaseId) && (run.expiresAt ?? 0) > this.now()) {
@@ -181,6 +249,7 @@ export class LeaseAuthority {
       return this.refuse(role, heartbeat.runId, 'heartbeat is not for the current lease');
     }
     const now = this.now();
+    if (this.checkpointOverdue(heartbeat.runId)) return this.stop(run, heartbeat.runId, role, 'human checkpoint overdue');
     if ((run.expiresAt ?? 0) <= now) return this.stop(run, heartbeat.runId, role, 'lease already expired');
 
     const policy = this.effectivePolicy();
@@ -189,11 +258,16 @@ export class LeaseAuthority {
     }
     if (!(heartbeat.spentUsd >= 0) || !(heartbeat.spentTokens >= 0)) return this.refuse(role, heartbeat.runId, 'invalid spend report');
     // Spend can only grow; a lower report keeps the higher recorded value.
-    run.spentUsd = Math.max(run.spentUsd, heartbeat.spentUsd);
-    run.spentTokens = Math.max(run.spentTokens, heartbeat.spentTokens);
+    ({ usd: run.spentUsd, tokens: run.spentTokens } = recordSpend({ usd: run.spentUsd, tokens: run.spentTokens }, { usd: heartbeat.spentUsd, tokens: heartbeat.spentTokens }));
 
     const blocked = this.blockedReason();
     if (blocked) return this.stop(run, heartbeat.runId, role, blocked);
+    const gate = this.capabilityGateReason();
+    if (gate) return this.stop(run, heartbeat.runId, role, gate);
+    if (this.signed.policy.attestation) {
+      const bad = checkAttestation(this.signed.policy.attestation, this.attestationVerifiers, heartbeat.attestation, run.attestationNonce);
+      if (bad) return this.stop(run, heartbeat.runId, role, bad);
+    }
     if (!policy.autoRenew) return this.stop(run, heartbeat.runId, role, 'auto-renew is off');
     if (run.spentUsd >= policy.budget.runCeilingUsd || run.spentTokens >= policy.budget.runCeilingTokens) {
       return this.stop(run, heartbeat.runId, role, 'run budget ceiling reached');
@@ -206,23 +280,50 @@ export class LeaseAuthority {
 
   /** Whether a lease is currently honoured (signature checks happen in the verifier). */
   isLeaseActive(leaseId: string): boolean {
-    if (this.paused || this.revoked.has(leaseId)) return false;
-    for (const run of this.runs.values()) {
-      if (run.currentLeaseId === leaseId) return run.state === 'active' && (run.expiresAt ?? 0) > this.now();
-    }
-    return false;
+    return this.leaseStatus(leaseId) === 'active';
   }
 
-  /** Revoke one run, or every run. Takes effect immediately. */
+  /**
+   * Three-valued lease status for k-of-n verifiers: `inactive` when this
+   * authority is paused or latched, revoked the lease, or its run is no longer
+   * active (also when `runId` names a run this authority stopped); `unknown`
+   * when it never granted or co-signed the lease (e.g. it was unreachable).
+   */
+  leaseStatus(leaseId: string, runId?: string): LeaseStatusValue {
+    if (this.paused || this.alertLatch || this.revoked.has(leaseId)) return 'inactive';
+    for (const run of this.runs.values()) {
+      if (run.currentLeaseId === leaseId) return run.state === 'active' && (run.expiresAt ?? 0) > this.now() ? 'active' : 'inactive';
+    }
+    if (runId !== undefined) {
+      const run = this.runs.get(runId);
+      if (run && run.state !== 'active') return 'inactive';
+      // After `revoke --all`, a run this authority never saw may predate the revoke: treat it as revoked.
+      if (!run && this.revokedAll) return 'inactive';
+    }
+    return 'unknown';
+  }
+
+  /**
+   * Revoke one run, or every run. Takes effect immediately. A run this
+   * authority has never seen (it missed the co-sign) is recorded as revoked,
+   * so k-of-n verifiers see `inactive` here rather than `unknown`.
+   */
   revoke(target: { runId: string } | { all: true }, role: ControlRole, reason = 'revoked'): void {
     this.assertRole(role, ['operator', 'sentry'], 'revoke');
     this.assertSentryMayActAlone(role, 'revoke');
+    if ('all' in target) {
+      this.revokedAll = true;
+    } else {
+      if (typeof target.runId !== 'string' || !RUN_ID.test(target.runId)) throw new TypeError('invalid runId');
+      // Tombstone: a stop must never be a no-op, even past MAX_RUNS.
+      if (!this.runs.has(target.runId)) this.runs.set(target.runId, { state: 'revoked', sequence: Number.MAX_SAFE_INTEGER, spentUsd: 0, spentTokens: 0, reason });
+    }
     const ids = 'all' in target ? [...this.runs.keys()] : [target.runId];
     for (const id of ids) {
       const run = this.runs.get(id);
       if (!run) continue;
       if (run.currentLeaseId) this.revoked.add(run.currentLeaseId);
-      run.state = 'revoked';
+      run.state = nextRunState(run.state, 'revoke');
       run.reason = reason;
       this.emit({ action: 'revoke', role, runId: id, leaseId: run.currentLeaseId, reason });
     }
@@ -236,20 +337,22 @@ export class LeaseAuthority {
     for (const run of this.runs.values()) {
       if (run.state === 'active') {
         if (run.currentLeaseId) this.revoked.add(run.currentLeaseId);
-        run.state = 'paused';
+        run.state = nextRunState(run.state, 'pause');
         run.reason = reason;
       }
     }
     this.emit({ action: 'pause', role, reason });
   }
 
-  /** Resume after a pause. Operator only; runs must request a fresh lease. */
+  /** Resume after a pause or an alert latch. Operator only; runs must request a fresh lease. */
   resume(role: ControlRole): void {
     this.assertRole(role, ['operator'], 'resume');
     this.paused = false;
+    this.alertLatch = null;
+    this.revokedAll = false;
     for (const run of this.runs.values()) {
       if (run.state === 'paused') {
-        run.state = 'active';
+        run.state = nextRunState(run.state, 'resume');
         run.reason = undefined;
         run.currentLeaseId = undefined;
         run.expiresAt = undefined;
@@ -262,15 +365,8 @@ export class LeaseAuthority {
   tighten(delta: TightenDelta, role: ControlRole): RenewalPolicy {
     this.assertRole(role, ['operator', 'sentry'], 'tighten');
     const current = this.effectivePolicy();
-    if (delta.scope && !scopeWithin(delta.scope, current.scope)) throw new Error('tighten: scope would widen');
-    if (delta.leaseTtlMs !== undefined && !(delta.leaseTtlMs >= 10_000 && delta.leaseTtlMs <= current.leaseTtlMs)) {
-      throw new Error('tighten: leaseTtlMs may only shrink (minimum 10000)');
-    }
-    if (delta.autoRenew !== undefined && delta.autoRenew !== false) throw new Error('tighten: autoRenew may only be turned off');
-    for (const key of ['runCeilingUsd', 'runCeilingTokens'] as const) {
-      const v = delta.budget?.[key];
-      if (v !== undefined && !(v >= 0 && v <= current.budget[key])) throw new Error(`tighten: budget.${key} may only shrink`);
-    }
+    const loosens = tightenError(current, delta);
+    if (loosens) throw new Error(loosens);
     this.overlay = {
       scope: delta.scope ?? this.overlay.scope,
       leaseTtlMs: delta.leaseTtlMs ?? this.overlay.leaseTtlMs,
@@ -288,13 +384,27 @@ export class LeaseAuthority {
    *
    * @param source  Sentry identity; over HTTP this is the authenticated sentry id, never a client claim.
    */
-  reportAlert(level: AlertLevel, source: string, role: ControlRole): void {
+  reportAlert(level: AlertLevel, source: string, role: ControlRole, kind?: 'tripwire'): void {
     this.assertRole(role, ['operator', 'sentry'], 'alert');
     if (!(level in ALERT_RANK)) throw new TypeError('invalid alert level');
+    if (kind !== undefined && kind !== 'tripwire') throw new TypeError('invalid alert kind');
     if (ALERT_RANK[level] > ALERT_RANK[this.highestAlert]) this.highestAlert = level;
     const src = String(source).slice(0, 128);
-    this.emit({ action: 'alert', role, reason: `${level} from ${src}` });
+    this.emit({ action: 'alert', role, reason: `${level}${kind ? ` ${kind}` : ''} from ${src}` });
     const stopWhen = this.signed.policy.stopWhen;
+    // The egress proxy is a trusted process: its tripwire alone revokes every run (no quorum needed)
+    // and latches the authority, so a compromised agent cannot simply start a new run.
+    if (kind === 'tripwire' && stopWhen.tripwire === true && (role === 'operator' || src === TRIPWIRE_SOURCE)) {
+      this.alertLatch = `tripwire reported by ${src}`;
+      for (const [id, run] of this.runs) {
+        if (run.state !== 'active') continue;
+        if (run.currentLeaseId) this.revoked.add(run.currentLeaseId);
+        run.state = nextRunState(run.state, 'revoke');
+        run.reason = `tripwire reported by ${src}`;
+        this.emit({ action: 'revoke', role, runId: id, leaseId: run.currentLeaseId, reason: run.reason });
+      }
+      return;
+    }
     const threshold = stopWhen.sentryAlertAtOrAbove;
     if (!threshold || ALERT_RANK[level] < ALERT_RANK[threshold]) return;
     const now = this.now();
@@ -303,22 +413,189 @@ export class LeaseAuthority {
     this.alerts.push({ source: role === 'operator' ? '\0operator' : src, at: now });
     const distinct = new Set(this.alerts.map((a) => a.source)).size;
     if (role !== 'operator' && distinct < (stopWhen.sentryQuorum ?? 1)) return;
+    const reason = `sentry alert: ${level}${role === 'operator' ? ' (operator)' : ` (${distinct} sentries)`}`;
+    // Latch: no new runs or leases until an operator resumes.
+    this.alertLatch = reason;
     for (const [id, run] of this.runs) {
-      if (run.state === 'active') this.stop(run, id, role, `sentry alert: ${level}${role === 'operator' ? ' (operator)' : ` (${distinct} sentries)`}`);
+      if (run.state === 'active') this.stop(run, id, role, reason);
     }
   }
 
-  /** Install a newer operator-signed policy. Clears tightening and alert state. */
+  /** Install a newer operator-signed policy. Clears tightening, alert, and checkpoint state. */
   installPolicy(signed: SignedPolicy, role: ControlRole): void {
     this.assertRole(role, ['operator'], 'install a policy');
     const reason = verifySignedPolicy(signed, this.operatorPublicKey);
     if (reason) throw new Error(`installPolicy: ${reason}`);
     if (signed.policy.issuedAt <= this.signed.policy.issuedAt) throw new Error('installPolicy: policy is not newer than the active one');
+    assertInQuorum(signed, keyIdOf(this.authorityKey.publicKey));
+    this.assertAttestationReady(signed);
     this.signed = signed;
     this.overlay = {};
     this.highestAlert = 'info';
     this.alerts = [];
+    // Checkpoints are bound to the reviewed policy; the new policy's issuedAt is the new baseline.
+    this.checkpointAll = 0;
+    this.checkpointRun.clear();
     this.emit({ action: 'policy', role, reason: signed.policy.policyId });
+  }
+
+  /**
+   * Accept an operator-signed human checkpoint. Operator only. Rejects
+   * forged, expired, foreign-policy, replayed, and older checkpoints.
+   */
+  checkpoint(signed: SignedCheckpoint, role: ControlRole): { deadline: number | null } {
+    this.assertRole(role, ['operator'], 'checkpoint');
+    const now = this.now();
+    const reason = verifyCheckpoint(signed, this.operatorPublicKey, policyHash(this.signed), now);
+    if (reason) throw new Error(`checkpoint: ${reason}`);
+    const c = signed.checkpoint;
+    if (this.checkpointNonces.has(c.nonce)) throw new Error('checkpoint: replayed');
+    const runId = 'runId' in c.scope ? c.scope.runId : undefined;
+    const previous = runId !== undefined ? (this.checkpointRun.get(runId) ?? 0) : this.checkpointAll;
+    if (c.issuedAt <= previous) throw new Error('checkpoint: not newer than the last accepted checkpoint');
+    if (runId !== undefined && !this.checkpointRun.has(runId) && this.checkpointRun.size >= MAX_RUNS) throw new Error('checkpoint: run limit reached');
+    if (this.checkpointNonces.size >= 4 * MAX_RUNS) this.checkpointNonces.clear();
+    this.checkpointNonces.add(c.nonce);
+    if (runId !== undefined) this.checkpointRun.set(runId, c.issuedAt);
+    else this.checkpointAll = c.issuedAt;
+    this.emit({ action: 'checkpoint', role, runId, reason: runId === undefined ? 'all runs' : undefined });
+    return { deadline: this.checkpointDeadline(runId ?? '') };
+  }
+
+  /**
+   * Fresh nonce the first lease's attestation must bind (policy with
+   * `attestation` only). Single use, valid for 60 s. Runner only.
+   */
+  attestationChallenge(runId: string, role: ControlRole = 'runner'): { nonce: string } {
+    this.assertRole(role, ['runner', 'operator'], 'request an attestation challenge');
+    if (!this.signed.policy.attestation) throw new Error('attestation is not required by the policy');
+    if (typeof runId !== 'string' || !RUN_ID.test(runId)) throw new TypeError('invalid runId');
+    if (!this.challenges.has(runId) && this.challenges.size >= MAX_RUNS) throw new Error('too many outstanding challenges');
+    const nonce = randomBytes(16).toString('hex');
+    this.challenges.set(runId, { nonce, at: this.now() });
+    return { nonce };
+  }
+
+  /**
+   * Install a signed capability evaluation (operator). It must satisfy the
+   * policy's `requires.capabilityEval`; it is re-checked for age on every grant.
+   */
+  submitCapabilityEval(signed: SignedCapabilityEval, role: ControlRole): { accepted: true; evaluatedAt: number } {
+    this.assertRole(role, ['operator'], 'submit a capability evaluation');
+    const req = this.signed.policy.requires?.capabilityEval;
+    if (!req) throw new Error('capability evaluation is not required by the policy');
+    const reason = verifyCapabilityEval(signed, req, this.now());
+    if (reason) throw new Error(`capability evaluation rejected: ${reason}`);
+    if (this.capabilityEval && signed.eval.evaluatedAt < this.capabilityEval.eval.evaluatedAt) throw new Error('capability evaluation is older than the current one');
+    this.capabilityEval = signed;
+    this.emit({ action: 'capability-eval', role, reason: `${signed.eval.suite} ${signed.eval.evalId}` });
+    return { accepted: true, evaluatedAt: signed.eval.evaluatedAt };
+  }
+
+  /** When renewal stops without a new checkpoint (`null` when checkpoints are not required). */
+  checkpointDeadline(runId: string): number | null {
+    const every = this.signed.policy.humanCheckpointEveryMs;
+    if (every === undefined) return null;
+    const last = Math.max(this.signed.policy.issuedAt, this.checkpointAll, this.checkpointRun.get(runId) ?? 0);
+    return last + every;
+  }
+
+  /**
+   * Co-sign lease claims produced by another authority (k-of-n). The claims
+   * must carry a valid signature from their issuing peer (`claims.issuer`,
+   * one of `authorityQuorum.keyIds`, never this authority), so every lease
+   * starts at some authority's full issue/renew checks — the runner cannot
+   * assemble claims itself. The decision is then independent: this authority
+   * applies its own copy of the operator policy, its own run state,
+   * revocations, checkpoints, stop conditions, and attestation. Renewals
+   * (sequence > 1) need the heartbeat for the previous lease this authority
+   * co-signed. Runner only.
+   */
+  cosign(claims: LeaseClaims, heartbeat: Heartbeat | undefined, role: ControlRole = 'runner', issuerSignature?: LeaseCosignature): CosignDecision {
+    if (role !== 'runner') return this.refuseCosign(role, undefined, 'only the runner may request a co-signature');
+    if (!claims || typeof claims !== 'object' || claims.v !== 'nai-lease-v1') return this.refuseCosign(role, undefined, 'malformed claims');
+    const runId = claims.runId;
+    if (typeof runId !== 'string' || !RUN_ID.test(runId)) return this.refuseCosign(role, undefined, 'invalid runId');
+    if (typeof claims.leaseId !== 'string' || !/^lease_[0-9a-f]{24}$/.test(claims.leaseId)) return this.refuseCosign(role, runId, 'invalid leaseId');
+    if (!Number.isInteger(claims.sequence) || claims.sequence < 1) return this.refuseCosign(role, runId, 'invalid sequence');
+    if (claims.policyHash !== policyHash(this.signed)) return this.refuseCosign(role, runId, 'claims are for a different policy');
+    const quorum = this.signed.policy.authorityQuorum;
+    if (!quorum) return this.refuseCosign(role, runId, 'policy has no authority quorum');
+    const ownId = keyIdOf(this.authorityKey.publicKey);
+    const issuerKey = typeof claims.issuer === 'string' ? this.peers.get(claims.issuer) : undefined;
+    if (!issuerKey || claims.issuer === ownId || !quorum.keyIds.includes(claims.issuer as string)
+      || !issuerSignature || issuerSignature.keyId !== claims.issuer || !verifyCanonical(claims, issuerSignature.signature, issuerKey)) {
+      return this.refuseCosign(role, runId, 'claims are not signed by their issuing authority');
+    }
+    const blocked = this.blockedReason();
+    if (blocked) return this.refuseCosign(role, runId, blocked);
+    if (this.checkpointOverdue(runId)) return this.refuseCosign(role, runId, 'human checkpoint overdue');
+    const gate = this.capabilityGateReason();
+    if (gate) return this.refuseCosign(role, runId, gate);
+    const attReq = this.signed.policy.attestation;
+    if (attReq && (typeof claims.attestationNonce !== 'string' || !/^[0-9a-f]{32}$/.test(claims.attestationNonce))) {
+      return this.refuseCosign(role, runId, 'claims lack an attestation nonce');
+    }
+
+    const now = this.now();
+    const policy = this.effectivePolicy();
+    if (!Number.isFinite(claims.issuedAt) || Math.abs(claims.issuedAt - now) > 30_000) return this.refuseCosign(role, runId, 'claims issuedAt outside the allowed skew');
+    const maxExpiry = Math.min(now + policy.leaseTtlMs + 30_000, policy.renewUntil ?? Infinity, this.checkpointDeadline(runId) ?? Infinity);
+    if (!Number.isFinite(claims.expiresAt) || claims.expiresAt <= claims.issuedAt || claims.expiresAt > maxExpiry) {
+      return this.refuseCosign(role, runId, 'claims expiry exceeds this authority\'s policy');
+    }
+    let scopeOk = false;
+    try {
+      scopeOk = scopeWithin(claims.scope, policy.scope) && ['observe', 'standard', 'elevated'].includes(claims.scope.tier);
+    } catch {
+      scopeOk = false;
+    }
+    if (!scopeOk) return this.refuseCosign(role, runId, 'claims scope exceeds this authority\'s policy');
+    const b = claims.budget;
+    if (!b || !(b.runCeilingUsd <= policy.budget.runCeilingUsd) || !(b.runCeilingTokens <= policy.budget.runCeilingTokens) || !(b.runCeilingUsd >= 0) || !(b.runCeilingTokens >= 0)) {
+      return this.refuseCosign(role, runId, 'claims budget exceeds this authority\'s policy');
+    }
+
+    let run = this.runs.get(runId);
+    if (run && run.state !== 'active') return this.refuseCosign(role, runId, `run is ${run.state}`);
+    if (run && claims.sequence <= run.sequence) return this.refuseCosign(role, runId, 'sequence did not advance (replay or split-brain)');
+    if (claims.sequence === 1) {
+      if (run?.currentLeaseId && !this.revoked.has(run.currentLeaseId) && (run.expiresAt ?? 0) > now) {
+        return this.refuseCosign(role, runId, 'run already holds an active co-signed lease');
+      }
+    } else {
+      if (!run) return this.refuseCosign(role, runId, 'unknown run');
+      if (!heartbeat || heartbeat.runId !== runId || heartbeat.leaseId !== run.currentLeaseId || this.revoked.has(heartbeat.leaseId)) {
+        return this.refuseCosign(role, runId, 'renewal needs the heartbeat for the current co-signed lease');
+      }
+      if ((run.expiresAt ?? 0) <= now) return this.stopCosign(run, runId, role, 'lease already expired');
+      if (!Number.isFinite(heartbeat.at) || heartbeat.at > now + 5_000 || now - heartbeat.at > policy.heartbeatMaxAgeMs) {
+        return this.refuseCosign(role, runId, 'stale or future heartbeat');
+      }
+      if (!(heartbeat.spentUsd >= 0) || !(heartbeat.spentTokens >= 0)) return this.refuseCosign(role, runId, 'invalid spend report');
+      ({ usd: run.spentUsd, tokens: run.spentTokens } = recordSpend({ usd: run.spentUsd, tokens: run.spentTokens }, { usd: heartbeat.spentUsd, tokens: heartbeat.spentTokens }));
+      if (!policy.autoRenew) return this.stopCosign(run, runId, role, 'auto-renew is off');
+      if (run.spentUsd >= policy.budget.runCeilingUsd || run.spentTokens >= policy.budget.runCeilingTokens) return this.stopCosign(run, runId, role, 'run budget ceiling reached');
+      if (policy.stopWhen.onCanaryFailure && heartbeat.canaryFailed) return this.stopCosign(run, runId, role, 'canary failure reported');
+      if (policy.stopWhen.onHealthFailing && heartbeat.health === 'failing') return this.stopCosign(run, runId, role, 'run reported failing health');
+      if (attReq) {
+        const bad = checkAttestation(attReq, this.attestationVerifiers, heartbeat.attestation, run.attestationNonce);
+        if (bad) return this.stopCosign(run, runId, role, bad);
+      }
+    }
+    if (!run) {
+      if (this.runs.size >= MAX_RUNS) return this.refuseCosign(role, runId, 'run limit reached');
+      run = { state: 'active', sequence: 0, spentUsd: 0, spentTokens: 0 };
+      this.runs.set(runId, run);
+    }
+    if (run.currentLeaseId) this.revoked.add(run.currentLeaseId);
+    run.sequence = claims.sequence;
+    run.currentLeaseId = claims.leaseId;
+    run.expiresAt = claims.expiresAt;
+    run.attestationNonce = claims.attestationNonce;
+    const { keyId, signature } = signWith(claims, this.authorityKey, 'authority');
+    this.emit({ action: 'cosign', role, runId, leaseId: claims.leaseId });
+    return { granted: true, cosignature: { keyId, signature } };
   }
 
   /** Status of one run, or all runs. */
@@ -335,6 +612,7 @@ export class LeaseAuthority {
         spentUsd: r.spentUsd,
         spentTokens: r.spentTokens,
         reason: r.reason,
+        ...(this.signed.policy.humanCheckpointEveryMs !== undefined ? { checkpointDeadline: this.checkpointDeadline(id) ?? undefined } : {}),
       }));
   }
 
@@ -422,11 +700,23 @@ export class LeaseAuthority {
     try {
       const body = req.method === 'POST' ? await readJson(req, 64 * 1024) : {};
       const p = url.pathname;
-      if (req.method === 'POST' && p === '/v1/leases/issue') return void send(res, 200, this.issue(str(body, 'runId'), role));
+      if (req.method === 'POST' && p === '/v1/leases/issue') {
+        const att = (body as { attestation?: AttestationEvidence }).attestation;
+        return void send(res, 200, this.issue(str(body, 'runId'), role, att));
+      }
+      if (req.method === 'GET' && p === '/v1/attestation/nonce') {
+        return void send(res, 200, this.attestationChallenge(url.searchParams.get('runId') ?? '', role));
+      }
+      if (req.method === 'POST' && p === '/v1/capability-eval') return void send(res, 200, this.submitCapabilityEval(body as unknown as SignedCapabilityEval, role));
       if (req.method === 'POST' && p === '/v1/leases/renew') return void send(res, 200, this.renew(body as unknown as Heartbeat, role));
+      if (req.method === 'POST' && p === '/v1/leases/cosign') {
+        const b = body as { claims?: LeaseClaims; heartbeat?: Heartbeat; issuerSignature?: LeaseCosignature };
+        return void send(res, 200, this.cosign(b.claims as LeaseClaims, b.heartbeat, role, b.issuerSignature));
+      }
       if (req.method === 'GET' && p.startsWith('/v1/leases/') && p.endsWith('/status')) {
         const leaseId = decodeURIComponent(p.slice('/v1/leases/'.length, -'/status'.length));
-        return void send(res, 200, { leaseId, active: this.isLeaseActive(leaseId) });
+        const status = this.leaseStatus(leaseId, url.searchParams.get('runId') ?? undefined);
+        return void send(res, 200, { leaseId, active: status === 'active', status });
       }
       if (req.method === 'GET' && p === '/v1/runs') {
         const runId = url.searchParams.get('runId') ?? undefined;
@@ -442,10 +732,12 @@ export class LeaseAuthority {
       if (req.method === 'POST' && p === '/v1/control/resume') { this.resume(role); return void send(res, 200, { ok: true }); }
       if (req.method === 'POST' && p === '/v1/control/tighten') return void send(res, 200, { policy: this.tighten(body as TightenDelta, role) });
       if (req.method === 'POST' && p === '/v1/control/alert') {
-        this.reportAlert(str(body, 'level') as AlertLevel, caller.identity, role);
+        const kind = optStr(body, 'kind');
+        this.reportAlert(str(body, 'level') as AlertLevel, caller.identity, role, kind as 'tripwire' | undefined);
         return void send(res, 200, { ok: true });
       }
       if (req.method === 'POST' && p === '/v1/policy') { this.installPolicy(body as unknown as SignedPolicy, role); return void send(res, 200, { ok: true }); }
+      if (req.method === 'POST' && p === '/v1/checkpoint') return void send(res, 200, { ok: true, ...this.checkpoint(body as unknown as SignedCheckpoint, role) });
       send(res, 404, { error: 'not found' });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'bad request';
@@ -457,18 +749,41 @@ export class LeaseAuthority {
 
   private blockedReason(): string | null {
     if (this.paused) return 'authority is paused';
+    if (this.alertLatch) return `authority halted: ${this.alertLatch}`;
     const until = this.signed.policy.renewUntil;
     if (until !== undefined && this.now() >= until) return 'policy end date reached';
     return null;
+  }
+
+  private checkpointOverdue(runId: string): boolean {
+    const deadline = this.checkpointDeadline(runId);
+    return deadline !== null && this.now() >= deadline;
+  }
+
+  /** High-risk scopes need a valid, unexpired, passing evaluation when the policy requires one. */
+  private capabilityGateReason(): string | null {
+    const req = this.signed.policy.requires?.capabilityEval;
+    if (!req || !isHighRiskPolicy(this.effectivePolicy())) return null;
+    if (!this.capabilityEval) return 'capability evaluation required for this high-risk scope';
+    const reason = verifyCapabilityEval(this.capabilityEval, req, this.now());
+    return reason ? `capability evaluation required: ${reason}` : null;
+  }
+
+  private assertAttestationReady(signed: SignedPolicy): void {
+    const req = signed.policy.attestation;
+    if (req && !this.attestationVerifiers.some((v) => v.kind === req.kind)) {
+      throw new TypeError(`LeaseAuthority: policy requires ${req.kind} attestation but no verifier for it is configured`);
+    }
   }
 
   private grant(run: RunRecord, runId: string, role: ControlRole, action: 'issue' | 'renew'): LeaseDecision {
     const policy = this.effectivePolicy();
     const now = this.now();
     const until = policy.renewUntil;
-    const expiresAt = Math.min(now + policy.leaseTtlMs, until ?? Infinity);
+    const expiresAt = Math.min(now + policy.leaseTtlMs, until ?? Infinity, this.checkpointDeadline(runId) ?? Infinity);
     if (run.currentLeaseId) this.revoked.add(run.currentLeaseId);
     run.sequence += 1;
+    const attestationNonce = this.signed.policy.attestation ? randomBytes(16).toString('hex') : undefined;
     const lease: SignedLease = signLease(
       {
         v: 'nai-lease-v1',
@@ -481,9 +796,13 @@ export class LeaseAuthority {
         budget: policy.budget,
         policyHash: policyHash(this.signed),
         nonce: randomBytes(16).toString('hex'),
+        issuer: keyIdOf(this.authorityKey.publicKey),
+        ...(isHighRiskPolicy(policy) ? { highRisk: true as const } : {}),
+        ...(attestationNonce ? { attestationNonce } : {}),
       },
       this.authorityKey,
     );
+    run.attestationNonce = attestationNonce;
     run.currentLeaseId = lease.claims.leaseId;
     run.expiresAt = expiresAt;
     this.emit({ action, role, runId, leaseId: lease.claims.leaseId });
@@ -495,9 +814,19 @@ export class LeaseAuthority {
     return { granted: false, reason };
   }
 
+  private refuseCosign(role: ControlRole, runId: string | undefined, reason: string): CosignDecision {
+    this.emit({ action: 'refuse', role, runId, reason: `cosign: ${reason}` });
+    return { granted: false, reason };
+  }
+
+  private stopCosign(run: RunRecord, runId: string, role: ControlRole, reason: string): CosignDecision {
+    this.stop(run, runId, role, reason);
+    return { granted: false, reason };
+  }
+
   private stop(run: RunRecord, runId: string, role: ControlRole, reason: string): LeaseDecision {
     if (run.state === 'active') {
-      run.state = 'stopped';
+      run.state = nextRunState(run.state, 'stop');
       run.reason = reason;
       this.emit({ action: 'stop', role, runId, leaseId: run.currentLeaseId, reason });
     }
@@ -528,9 +857,17 @@ function sha256(value: string): Buffer {
   return createHash('sha256').update(value, 'utf8').digest();
 }
 
+/** With an authority quorum configured, this authority's key must be one of the listed keys. */
+function assertInQuorum(signed: SignedPolicy, ownKeyId: string): void {
+  const q = signed.policy.authorityQuorum;
+  if (q && !q.keyIds.includes(ownKeyId)) throw new TypeError(`LeaseAuthority: key ${ownKeyId} is not in the policy's authorityQuorum.keyIds`);
+}
+
 function send(res: ServerResponse, status: number, body: unknown): void {
   if (res.headersSent) return;
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify(body));
+  // Responding before the request body was read: close the connection so a keep-alive client cannot hit a reset.
+  const early = res.req !== undefined && !res.req.complete;
+  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...(early ? { Connection: 'close' } : {}) }).end(JSON.stringify(body));
 }
 
 function readJson(req: IncomingMessage, limit: number): Promise<Record<string, unknown>> {

@@ -42,12 +42,25 @@ import {
   readPublicKey,
   readRoleSecrets,
   signBudgetPolicy,
+  signCheckpoint,
   signGuardedApproval,
   signPolicy,
+  policyHash,
+  runPostureChecks,
+  postureVerdict,
+  formatPosture,
+  POSTURE_CHECK_IDS,
+  TripwireSet,
+  tripwireDetector,
+  CommandSigner,
+  SignedQuoteVerifier,
+  quorumActive,
+  signCapabilityEval,
+  isSigner,
   velocityDetector,
   writeKeyPair,
 } from '../lib/perpetual';
-import type { BudgetPolicy, RenewalPolicy, SignedPolicy } from '../lib/perpetual';
+import type { BudgetPolicy, CapabilityEval, PostureInput, RenewalPolicy, SignedPolicy, SigningKey } from '../lib/perpetual';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = (() => {
@@ -840,6 +853,157 @@ async function operatorCall(authorityUrl: string, method: 'GET' | 'POST', route:
 
 const AUTHORITY_URL_DEFAULT = process.env['NETWORK_AI_LEASE_AUTHORITY_URL'] ?? 'http://127.0.0.1:4710';
 
+/** Private key files next to `keyFile` (where an operator key must not sit). */
+function siblingKeyFiles(keyFile: string): string[] {
+  const dir = path.dirname(path.resolve(keyFile));
+  try {
+    return fs.readdirSync(dir).filter((f) => f.endsWith('.key')).slice(0, 256).map((f) => path.join(dir, f));
+  } catch {
+    return [path.resolve(keyFile)];
+  }
+}
+
+/**
+ * Signing key from `--key <file>` or `--signer-cmd` + `--signer-pub` (the
+ * private key then never enters this process).
+ */
+function signingKeyFrom(opts: { key?: string; signerCmd?: string; signerArg?: string[]; signerPub?: string }): SigningKey {
+  if (opts.signerCmd !== undefined) {
+    if (opts.key !== undefined) die('give --key or --signer-cmd, not both');
+    if (!opts.signerPub) die('--signer-cmd needs --signer-pub');
+    return new CommandSigner({ command: opts.signerCmd, args: opts.signerArg ?? [], publicKey: readPublicKey(opts.signerPub) });
+  }
+  if (!opts.key) die('give --key <file> or --signer-cmd <program> --signer-pub <file>');
+  return readKeyPair(opts.key);
+}
+
+/** Flatten role secrets for the posture checks. */
+function postureSecrets(): Record<string, string | undefined> {
+  const s = readRoleSecrets();
+  const out: Record<string, string | undefined> = { operator: s.operator, sentry: s.sentry, runner: s.runner };
+  for (const [id, v] of Object.entries(s.sentries ?? {})) out[`sentry:${id}`] = v;
+  return out;
+}
+
+/**
+ * Run the posture gate before a control-plane process starts. Blocking
+ * failures stop startup unless accepted with `--accept-risk`; acceptances are
+ * written to the audit log.
+ */
+function postureGate(label: string, input: PostureInput, acceptRisk: readonly string[], auditFile: string): void {
+  const report = runPostureChecks(input);
+  let verdict: ReturnType<typeof postureVerdict>;
+  try {
+    verdict = postureVerdict(report, acceptRisk);
+  } catch (err) {
+    die(`${err instanceof Error ? err.message : String(err)} (known ids: ${POSTURE_CHECK_IDS.join(', ')})`);
+  }
+  for (const c of report.checks) if (!c.ok) process.stderr.write(`${label} posture: ${formatPosture({ ok: false, checks: [c] })[0]}\n`);
+  for (const c of verdict.accepted) {
+    appendJsonl(auditFile, { source: label, at: Date.now(), action: 'accept-risk', check: c.id, detail: c.detail });
+  }
+  if (!verdict.ok) {
+    die(`${label}: refusing to start; failed posture checks: ${verdict.blocking.map((c) => c.id).join(', ')} (fix them, or pass --accept-risk <id> to accept and audit the risk)`);
+  }
+}
+
+perpetualCmd.command('doctor')
+  .description('Check the deployment posture of a control-plane or agent host (exit 1 on failure)')
+  .requiredOption('--role <role>', 'authority | proxy | sentry | agent')
+  .option('--operator-pub <file>', 'operator public key; any local private key matching it fails')
+  .option('--key <files...>', 'private key files this process loads')
+  .option('--agent-user <user>', 'OS user (name or uid) the agents run as')
+  .option('--host <host>', 'bind address to check')
+  .option('--allow-remote', 'remote bind is intended')
+  .option('--tls-terminated', 'a TLS terminator fronts the remote bind')
+  .option('--runtime <name>', 'sandbox OCI runtime (runsc, kata-*, firecracker)')
+  .option('--node-flags <flags>', 'agent Node flags to check (space separated; default: this process)')
+  .option('--authority-threshold <k>', 'lease-authority quorum threshold', (v) => parseInt(v, 10))
+  .action((opts: { role: string; operatorPub?: string; key?: string[]; agentUser?: string; host?: string; allowRemote?: boolean; tlsTerminated?: boolean; runtime?: string; nodeFlags?: string; authorityThreshold?: number }, cmd: Command) => {
+    const g = cmd.optsWithGlobals<{ json: boolean }>();
+    if (!['authority', 'proxy', 'sentry', 'agent'].includes(opts.role)) die('--role must be authority, proxy, sentry, or agent');
+    try {
+      const keyFiles = opts.key ? [...new Set(opts.key.flatMap((k) => [path.resolve(k), ...siblingKeyFiles(k)]))] : undefined;
+      const report = runPostureChecks({
+        role: opts.role as PostureInput['role'],
+        privateKeyFiles: keyFiles,
+        operatorPublicKey: opts.operatorPub ? readPublicKey(opts.operatorPub) : undefined,
+        agentUser: opts.agentUser,
+        secrets: opts.role === 'agent' ? undefined : postureSecrets(),
+        bind: opts.host ? { host: opts.host, allowRemote: opts.allowRemote === true, tlsTerminated: opts.tlsTerminated === true } : undefined,
+        sandboxRuntime: opts.runtime,
+        nodeExecArgv: opts.nodeFlags !== undefined ? opts.nodeFlags.split(/\s+/).filter(Boolean) : undefined,
+        authorityThreshold: opts.authorityThreshold,
+      });
+      if (g.json) print(report, true);
+      else process.stdout.write(`${formatPosture(report).join('\n')}\n${report.ok ? '✓ posture ok' : '✗ posture checks failed'}\n`);
+      if (!report.ok) process.exit(1);
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+perpetualCmd.command('checkpoint [runId]')
+  .description('Sign a human checkpoint with the operator key and submit it (keeps runs alive past humanCheckpointEveryMs)')
+  .option('--key <file>', 'operator private key (.key)')
+  .option('--signer-cmd <program>', 'sign with an external program (HSM/KMS/YubiKey bridge) instead of --key; reads the message on stdin, writes the signature on stdout')
+  .option('--signer-arg <args...>', 'arguments for --signer-cmd')
+  .option('--signer-pub <file>', 'public key the --signer-cmd signs for (.pub)')
+  .requiredOption('--policy <file>', 'the operator-signed policy you reviewed (binds the checkpoint to it)')
+  .option('--all', 'checkpoint every run')
+  .option('--valid-for <ms>', 'how long the checkpoint may take to reach the authority', (v) => parseInt(v, 10), 10 * 60 * 1000)
+  .option('--out <file>', 'write the signed checkpoint instead of submitting it')
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .action(async (runId: string | undefined, opts: { key: string; policy: string; all?: boolean; validFor: number; out?: string; authorityUrl: string }) => {
+    if ((runId === undefined) === (opts.all !== true)) die('give a runId or --all (not both)');
+    let signed: ReturnType<typeof signCheckpoint>;
+    try {
+      signed = signCheckpoint({
+        policyHash: policyHash(readJsonFile(opts.policy) as SignedPolicy),
+        scope: opts.all ? { all: true } : { runId: runId as string },
+        validForMs: opts.validFor,
+      }, signingKeyFrom(opts));
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+    if (opts.out) {
+      fs.writeFileSync(path.resolve(opts.out), JSON.stringify(signed, null, 2) + '\n', { encoding: 'utf8', flag: 'wx' });
+      process.stdout.write(`✓ checkpoint signed → ${path.resolve(opts.out)}\n`);
+      return;
+    }
+    print(await operatorCall(opts.authorityUrl, 'POST', '/v1/checkpoint', signed), true);
+  });
+
+perpetualCmd.command('tripwires')
+  .description('Plant decoy credentials and files in an agent workspace and write the manifest for the proxy/sentries')
+  .requiredOption('--workspace <dir>', 'agent workspace to plant decoys in')
+  .requiredOption('--manifest <file>', 'manifest output (0600; give it to the proxy and sentries, never to agents)')
+  .option('--file <specs...>', 'decoy files as <relPath>:<env|pem|config>', ['.env:env', 'keys/deploy.pem:pem', 'config/credentials.json:config'])
+  .action((opts: { workspace: string; manifest: string; file: string[] }) => {
+    try {
+      const set = new TripwireSet();
+      for (const spec of opts.file) {
+        const i = spec.lastIndexOf(':');
+        const kind = spec.slice(i + 1);
+        if (i <= 0 || !['env', 'pem', 'config'].includes(kind)) die(`invalid --file ${spec} (want <relPath>:<env|pem|config>)`);
+        set.createFile(spec.slice(0, i), kind as 'env' | 'pem' | 'config');
+      }
+      const manifest = path.resolve(opts.manifest);
+      const ws = path.resolve(opts.workspace);
+      const rel = path.relative(ws, manifest);
+      if (!rel.startsWith('..') && !path.isAbsolute(rel)) die('--manifest must be outside the agent workspace');
+      fs.writeFileSync(manifest, JSON.stringify(set.toJSON()) + '\n', { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+      const written = set.materialize(ws);
+      process.stdout.write(`✓ ${written.length} decoy file(s), ${set.size} decoy value(s); manifest → ${manifest}\n`);
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+function loadTripwires(file: string): TripwireSet {
+  return TripwireSet.fromJSON(readJsonFile(file));
+}
+
 perpetualCmd.command('keygen <name>')
   .description('Generate an Ed25519 key pair: <name>.key (0600) and <name>.pub. Never overwrites.')
   .option('--out <dir>', 'output directory (default: <data>/perpetual/keys)')
@@ -855,13 +1019,16 @@ perpetualCmd.command('keygen <name>')
 
 perpetualCmd.command('sign-policy <policyFile>')
   .description('Sign a renewal policy JSON with the operator private key')
-  .requiredOption('--key <file>', 'operator private key (.key)')
+  .option('--key <file>', 'operator private key (.key)')
+  .option('--signer-cmd <program>', 'sign with an external program (HSM/KMS/YubiKey bridge) instead of --key; reads the message on stdin, writes the signature on stdout')
+  .option('--signer-arg <args...>', 'arguments for --signer-cmd')
+  .option('--signer-pub <file>', 'public key the --signer-cmd signs for (.pub)')
   .option('--out <file>', 'write the signed policy here instead of stdout')
   .action((policyFile: string, opts: { key: string; out?: string }) => {
     try {
       const policy = readJsonFile(policyFile) as RenewalPolicy;
       if (policy && typeof policy === 'object' && policy.issuedAt === undefined) policy.issuedAt = Date.now();
-      const signed = signPolicy(policy, readKeyPair(opts.key));
+      const signed = signPolicy(policy, signingKeyFrom(opts));
       const text = JSON.stringify(signed, null, 2) + '\n';
       if (opts.out) {
         fs.writeFileSync(path.resolve(opts.out), text, 'utf8');
@@ -877,19 +1044,41 @@ perpetualCmd.command('sign-policy <policyFile>')
 perpetualCmd.command('authority')
   .description(`Run the lease authority (role secrets from ${Object.values(ROLE_SECRET_ENV).join(', ')})`)
   .requiredOption('--operator-pub <file>', 'operator public key (.pub)')
-  .requiredOption('--authority-key <file>', 'authority private key (.key)')
+  .option('--authority-key <file>', 'authority private key (.key)')
+  .option('--signer-cmd <program>', 'sign leases with an external program (HSM/KMS bridge) instead of --authority-key')
+  .option('--signer-arg <args...>', 'arguments for --signer-cmd')
+  .option('--signer-pub <file>', 'authority public key the --signer-cmd signs for (.pub)')
   .requiredOption('--policy <file>', 'operator-signed policy JSON')
   .option('--port <n>', 'port', parsePort, 4710)
   .option('--host <host>', 'bind address', '127.0.0.1')
   .option('--allow-remote', 'allow a non-loopback bind (put TLS in front)')
-  .action((opts: { operatorPub: string; authorityKey: string; policy: string; port: number; host: string; allowRemote?: boolean }, cmd: Command) => {
+  .option('--tls-terminated', 'acknowledge that a TLS terminator fronts the remote bind')
+  .option('--agent-user <user>', 'OS user (name or uid) the agents run as; the authority refuses to run as it')
+  .option('--attestation-pub <file>', 'public key of the measured-boot quoting key (reference "custom" attestation verifier)')
+  .option('--peer-pub <files...>', 'public keys of the other authorities in the policy\'s authorityQuorum (needed to co-sign)')
+  .option('--accept-risk <ids...>', 'start despite these failed posture checks (audited)')
+  .action((opts: { operatorPub: string; authorityKey?: string; signerCmd?: string; signerArg?: string[]; signerPub?: string; policy: string; port: number; host: string; allowRemote?: boolean; tlsTerminated?: boolean; agentUser?: string; attestationPub?: string; peerPub?: string[]; acceptRisk?: string[] }, cmd: Command) => {
     const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
     const auditFile = path.join(resolveData(g), 'perpetual_audit.jsonl');
     try {
+      const operatorPublicKey = readPublicKey(opts.operatorPub);
+      const signedPolicy = readJsonFile(opts.policy) as SignedPolicy;
+      postureGate('lease-authority', {
+        role: 'authority',
+        privateKeyFiles: opts.authorityKey ? siblingKeyFiles(opts.authorityKey) : [],
+        operatorPublicKey,
+        agentUser: opts.agentUser,
+        secrets: postureSecrets(),
+        bind: { host: opts.host, allowRemote: opts.allowRemote === true, tlsTerminated: opts.tlsTerminated === true },
+        authorityThreshold: signedPolicy?.policy?.authorityQuorum?.threshold ?? 1,
+      }, opts.acceptRisk ?? [], auditFile);
+      const key = signingKeyFrom({ key: opts.authorityKey, signerCmd: opts.signerCmd, signerArg: opts.signerArg, signerPub: opts.signerPub });
       const authority = new LeaseAuthority({
-        operatorPublicKey: readPublicKey(opts.operatorPub),
-        authorityKey: readKeyPair(opts.authorityKey),
-        policy: readJsonFile(opts.policy) as SignedPolicy,
+        operatorPublicKey,
+        authorityKey: isSigner(key) ? key : readKeyPair(opts.authorityKey as string),
+        policy: signedPolicy,
+        attestationVerifiers: opts.attestationPub ? [new SignedQuoteVerifier(readPublicKey(opts.attestationPub))] : [],
+        peerAuthorityKeys: (opts.peerPub ?? []).map((f) => readPublicKey(f)),
         onEvent: (event) => appendJsonl(auditFile, { source: 'lease-authority', ...event }),
       });
       const server = authority.startServer(opts.port, readRoleSecrets(), { host: opts.host, allowRemote: opts.allowRemote === true });
@@ -907,23 +1096,51 @@ perpetualCmd.command('authority')
 
 perpetualCmd.command('proxy')
   .description(`Run the lease-gated egress proxy (revocation checks use ${ROLE_SECRET_ENV.sentry})`)
-  .requiredOption('--authority-pub <file>', 'authority public key (.pub)')
+  .requiredOption('--authority-pub <files...>', 'authority public key(s) (.pub); several for k-of-n')
   .requiredOption('--routes <file>', 'routes JSON (credentials referenced by env var name)')
-  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .option('--authority-url <urls...>', 'lease authority URL(s); every one is asked for revocation, any "inactive" refuses', [AUTHORITY_URL_DEFAULT])
+  .option('--authority-threshold <k>', 'authority signatures required on each lease (k-of-n)', (v) => parseInt(v, 10), 1)
   .option('--port <n>', 'port', parsePort, 4711)
   .option('--host <host>', 'bind address', '127.0.0.1')
   .option('--allow-remote', 'allow a non-loopback bind (e.g. a sandbox bridge address)')
-  .action((opts: { authorityPub: string; routes: string; authorityUrl: string; port: number; host: string; allowRemote?: boolean }, cmd: Command) => {
+  .option('--tls-terminated', 'acknowledge that a TLS terminator fronts the remote bind')
+  .option('--agent-user <user>', 'OS user (name or uid) the agents run as; the proxy refuses to run as it')
+  .option('--tripwires <manifest>', `decoy manifest from \`perpetual tripwires\`; hits are refused and reported with ${SENTRY_SECRET_ENV_PREFIX}PROXY`)
+  .option('--accept-risk <ids...>', 'start despite these failed posture checks (audited)')
+  .action((opts: { authorityPub: string[]; routes: string; authorityUrl: string[]; authorityThreshold: number; port: number; host: string; allowRemote?: boolean; tlsTerminated?: boolean; agentUser?: string; tripwires?: string; acceptRisk?: string[] }, cmd: Command) => {
     const g = cmd.optsWithGlobals<{ data: string; json: boolean }>();
     const auditFile = path.join(resolveData(g), 'egress_audit.jsonl');
     const statusSecret = process.env[ROLE_SECRET_ENV.sentry];
     if (!statusSecret) die(`${ROLE_SECRET_ENV.sentry} is required for revocation checks`);
+    const proxySecret = process.env[`${SENTRY_SECRET_ENV_PREFIX}PROXY`];
+    if (opts.tripwires && !proxySecret) die(`--tripwires needs ${SENTRY_SECRET_ENV_PREFIX}PROXY (the proxy's own sentry identity) to report hits`);
     try {
-      const transport = new HttpLeaseTransport(opts.authorityUrl, statusSecret);
+      postureGate('egress-proxy', {
+        role: 'proxy',
+        agentUser: opts.agentUser,
+        secrets: { sentry: statusSecret, 'sentry:proxy': proxySecret },
+        bind: { host: opts.host, allowRemote: opts.allowRemote === true, tlsTerminated: opts.tlsTerminated === true },
+        authorityThreshold: opts.authorityThreshold,
+      }, opts.acceptRisk ?? [], auditFile);
+      const transports = opts.authorityUrl.map((u) => new HttpLeaseTransport(u, statusSecret));
+      const tripwires = opts.tripwires ? loadTripwires(opts.tripwires) : undefined;
+      const alerts = tripwires && proxySecret ? opts.authorityUrl.map((u) => new HttpSentryControl(u, proxySecret)) : undefined;
+      const keys = opts.authorityPub.map((f) => readPublicKey(f));
       const proxy = new EgressProxy({
-        authorityPublicKey: readPublicKey(opts.authorityPub),
-        isLeaseActive: (leaseId) => transport.isActive(leaseId),
+        ...(keys.length === 1 && opts.authorityThreshold === 1 ? { authorityPublicKey: keys[0] } : { authorityPublicKeys: keys, authorityThreshold: opts.authorityThreshold }),
+        // Stopping needs one authority: any "inactive" (or no answer at all) refuses.
+        isLeaseActive: async (leaseId, runId) => {
+          // Stop needs one (any "inactive" refuses); an authority that never saw the lease is "unknown"; at least one must vouch.
+          const results = await Promise.allSettled(transports.map((t) => t.leaseStatus(leaseId, runId)));
+          return quorumActive(results.map((r) => (r.status === 'fulfilled' ? r.value : 'unknown'))) === 'active';
+        },
         routes: loadRoutes(opts.routes),
+        tripwires,
+        onTripwire: alerts
+          ? () => {
+            for (const a of alerts) void a.reportTripwire().catch((err: unknown) => process.stderr.write(`egress proxy: tripwire alert failed: ${err instanceof Error ? err.message : String(err)}\n`));
+          }
+          : undefined,
         onEvent: (event) => appendJsonl(auditFile, { source: 'egress-proxy', ...event }),
       });
       const server = proxy.startServer(opts.port, { host: opts.host, allowRemote: opts.allowRemote === true });
@@ -931,7 +1148,7 @@ perpetualCmd.command('proxy')
       server.on('listening', () => {
         const addr = server.address();
         const port = typeof addr === 'object' && addr ? addr.port : opts.port;
-        process.stdout.write(`egress proxy listening on http://${opts.host}:${port} (authority ${opts.authorityUrl}, audit ${auditFile})\n`);
+        process.stdout.write(`egress proxy listening on http://${opts.host}:${port} (authorities ${opts.authorityUrl.join(', ')}, k=${opts.authorityThreshold}, audit ${auditFile})\n`);
       });
       process.on('SIGINT', () => { server.close(); process.exit(0); });
     } catch (err) {
@@ -997,7 +1214,10 @@ perpetualCmd.command('install-policy <signedPolicyFile>')
 
 perpetualCmd.command('sign-guarded')
   .description('Sign a single-use approval for one exact write to a guarded file or blackboard key (operator)')
-  .requiredOption('--key <file>', 'operator private key (.key)')
+  .option('--key <file>', 'operator private key (.key)')
+  .option('--signer-cmd <program>', 'sign with an external program (HSM/KMS/YubiKey bridge) instead of --key; reads the message on stdin, writes the signature on stdout')
+  .option('--signer-arg <args...>', 'arguments for --signer-cmd')
+  .option('--signer-pub <file>', 'public key the --signer-cmd signs for (.pub)')
   .requiredOption('--kind <kind>', "'path' or 'key'")
   .requiredOption('--name <name>', 'guarded file path or blackboard key')
   .option('--content-file <file>', 'file with the exact content being approved (path kind)')
@@ -1013,7 +1233,7 @@ perpetualCmd.command('sign-guarded')
       const content: unknown = opts.delete ? null
         : opts.contentFile ? fs.readFileSync(path.resolve(opts.contentFile), 'utf8')
           : readJsonFile(opts.jsonValue!);
-      const signed = signGuardedApproval({ kind: opts.kind, name: opts.name }, content, readKeyPair(opts.key), { ttlMs: opts.ttlMs });
+      const signed = signGuardedApproval({ kind: opts.kind, name: opts.name }, content, signingKeyFrom(opts), { ttlMs: opts.ttlMs });
       const text = JSON.stringify(signed, null, 2) + '\n';
       if (opts.out) {
         fs.writeFileSync(path.resolve(opts.out), text, 'utf8');
@@ -1026,15 +1246,47 @@ perpetualCmd.command('sign-guarded')
     }
   });
 
+perpetualCmd.command('sign-capability-eval <evalFile>')
+  .description('Sign a capability-evaluation record with an evaluator key (key listed in the policy\'s requires.capabilityEval)')
+  .option('--key <file>', 'evaluator private key (.key)')
+  .option('--signer-cmd <program>', 'sign with an external program instead of --key')
+  .option('--signer-arg <args...>', 'arguments for --signer-cmd')
+  .option('--signer-pub <file>', 'public key the --signer-cmd signs for (.pub)')
+  .option('--out <file>', 'write here instead of stdout')
+  .action((evalFile: string, opts: { key?: string; signerCmd?: string; signerArg?: string[]; signerPub?: string; out?: string }) => {
+    try {
+      const ev = readJsonFile(evalFile) as CapabilityEval;
+      if (ev && typeof ev === 'object' && ev.evaluatedAt === undefined) ev.evaluatedAt = Date.now();
+      const signed = signCapabilityEval(ev, signingKeyFrom(opts));
+      const text = JSON.stringify(signed, null, 2) + '\n';
+      if (opts.out) fs.writeFileSync(path.resolve(opts.out), text, { encoding: 'utf8', flag: 'wx' });
+      process.stdout.write(opts.out ? `✓ signed capability evaluation ${signed.eval.evalId} → ${path.resolve(opts.out)}\n` : text);
+    } catch (err) {
+      die(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+perpetualCmd.command('capability-eval <signedEvalFile>')
+  .description('Install a signed capability evaluation at the authority (operator); required for gated high-risk scopes')
+  .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
+  .action(async (signedEvalFile: string, opts: { authorityUrl: string }) => {
+    let body: unknown;
+    try { body = readJsonFile(signedEvalFile); } catch (err) { die(err instanceof Error ? err.message : String(err)); }
+    print(await operatorCall(opts.authorityUrl, 'POST', '/v1/capability-eval', body), true);
+  });
+
 perpetualCmd.command('sign-budget <policyFile>')
   .description('Sign a budget policy (ceilings, approved funding sources) with the operator key')
-  .requiredOption('--key <file>', 'operator private key (.key)')
+  .option('--key <file>', 'operator private key (.key)')
+  .option('--signer-cmd <program>', 'sign with an external program (HSM/KMS/YubiKey bridge) instead of --key; reads the message on stdin, writes the signature on stdout')
+  .option('--signer-arg <args...>', 'arguments for --signer-cmd')
+  .option('--signer-pub <file>', 'public key the --signer-cmd signs for (.pub)')
   .option('--out <file>', 'write the signed policy here instead of stdout')
   .action((policyFile: string, opts: { key: string; out?: string }) => {
     try {
       const policy = readJsonFile(policyFile) as BudgetPolicy;
       if (policy && typeof policy === 'object' && policy.issuedAt === undefined) policy.issuedAt = Date.now();
-      const signed = signBudgetPolicy(policy, readKeyPair(opts.key));
+      const signed = signBudgetPolicy(policy, signingKeyFrom(opts));
       const text = JSON.stringify(signed, null, 2) + '\n';
       if (opts.out) fs.writeFileSync(path.resolve(opts.out), text, 'utf8');
       process.stdout.write(opts.out ? `✓ signed budget policy ${signed.policy.policyId} → ${path.resolve(opts.out)}\n` : text);
@@ -1051,7 +1303,8 @@ perpetualCmd.command('sentry')
   .option('--project-root <dir>', 'project root for guarded-path matching (default: cwd)')
   .option('--poll-ms <n>', 'poll interval', (v) => parseInt(v, 10), 1000)
   .option('--authority-url <url>', 'lease authority URL', AUTHORITY_URL_DEFAULT)
-  .action((opts: { id: string; auditLog: string[]; goal?: string; projectRoot?: string; pollMs: number; authorityUrl: string }) => {
+  .option('--tripwires <manifest>', 'decoy manifest; touching a decoy file or leaking a decoy value is critical')
+  .action((opts: { id: string; auditLog: string[]; goal?: string; projectRoot?: string; pollMs: number; authorityUrl: string; tripwires?: string }) => {
     if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(opts.id)) die('invalid --id');
     const secret = process.env[`${SENTRY_SECRET_ENV_PREFIX}${opts.id.toUpperCase()}`] ?? process.env[ROLE_SECRET_ENV.sentry];
     if (!secret) die(`set ${SENTRY_SECRET_ENV_PREFIX}${opts.id.toUpperCase()} (or ${ROLE_SECRET_ENV.sentry})`);
@@ -1064,6 +1317,7 @@ perpetualCmd.command('sentry')
       blackboardPoisoningDetector({ maxOverwrites: 100, windowMs: 60_000 }),
       guardedTouchDetector(guardedNames),
       ...(opts.goal ? [goalDriftDetector({ goal: opts.goal, minSimilarity: 0.02, consecutive: 5 })] : []),
+      ...(opts.tripwires ? [tripwireDetector(loadTripwires(opts.tripwires))] : []),
     ];
     const findingsFile = path.join(resolveData(program.opts<{ data: string }>()), `sentry_${opts.id}.jsonl`);
     const sentry = new Sentry({

@@ -1,6 +1,6 @@
 # Network-AI Threat Model
 
-Version: 5.17.2 — updated with each release that changes a trust boundary or auth mechanism.
+Version: 6.0.0 — updated with each release that changes a trust boundary or auth mechanism.
 
 ---
 
@@ -26,6 +26,10 @@ Network-AI is an in-process multi-agent orchestrator. There is no SaaS or cloud-
 | Lease role secrets (operator / sentry / runner) | High | Authenticate control-API callers; the operator secret can resume and install policies |
 | Egress credentials | High | Upstream API and payment credentials held only by the egress proxy |
 | Snapshot secret, pipeline key | High | Sign blackboard snapshots and self-improvement receipts |
+| Additional authority keys (k-of-n) | Critical | Each co-signs leases; k of them together can issue leases within the signed policy |
+| Merkle log key | High | Signs audit tree heads; compromise lets an attacker sign a forked head (witnesses still refuse inconsistent heads) |
+| Evaluator keys, attestation keys | High | Sign capability evaluations and measurement quotes that gate high-risk leases |
+| Decoy manifest | Medium | Lists honeytoken values; leaking it to agents lets them avoid the tripwires |
 
 ---
 
@@ -111,7 +115,24 @@ or hijack another agent's goal.
 - Sentries watch the audit stream read-only and can only alert or tighten; each has its own secret, and `sentryQuorum` keeps a single compromised sentry from stopping or steering runs.
 - Canary failures stop renewal, roll state back to the last verified (HMAC-signed, hash-chained) snapshot, and purge the session.
 
-**Residual risk**: all of the above assumes the operator key, role secrets, and credentials stay outside the agents' reach, and that agents run in the sandbox with network access only through the proxy. An agent with unrestricted code execution on the host running the authority or proxy defeats these controls.
+**Residual risk**: all of the above assumes the operator key, role secrets, and credentials stay outside the agents' reach, and that agents run in the sandbox with network access only through the proxy. An agent with unrestricted code execution on the host running the authority or proxy defeats these controls. Section 3.7 covers agents that may break out of the sandbox.
+
+### 3.7 Zero-Day-Capable Agent (Perpetual Runtime Phase 5, v6.0.0+)
+
+**Who**: An agent that obtains arbitrary code execution on its own machine and may find zero-days in the Node runtime, the guest kernel, or the hypervisor.
+
+**Goal**: Escape the VM, reach the control plane, forge or extend leases, hide its traces.
+
+**Mitigations** (see [docs/hardened-deployment.md](docs/hardened-deployment.md)):
+- **I4 — the agent host cannot extend its run.** Granting a lease needs signatures from k off-host authorities (`authorityQuorum`, `QuorumLeaseTransport`, `verifyLeaseQuorum`). Every lease names its issuing authority; co-signers sign only claims carrying the issuer's valid signature, and verifiers require it, so the runner cannot assemble a lease from co-signatures. Each co-signer decides independently under the same signed policy, with its own run state, sequence numbers, stop conditions, and attestation checks. Stopping needs only one: any authority reporting a lease inactive makes guards and the proxy refuse it. High-risk policies require k ≥ 2 unless the operator signs an `acceptRisk` entry. Trusted tripwires and quorum sentry stops latch the authority until an operator resumes.
+- **Off-host control (Z1)**: the posture gate (`perpetual doctor`) refuses to start an authority or proxy that runs as the agent user or as root, has the operator key on its host, uses weak or shared secrets, or binds remotely without TLS. Authority keys can live in an HSM/KMS via `--signer-cmd`.
+- **Minimal doors (Z2)**: microVM agents get no network interface; `VsockRelay` accepts four fixed, schema-checked, size-capped, rate-limited message types (plus egress) and never exposes admin routes. A one-way spool mode supports hardware data diodes. All doors are fuzzed (`test-perpetual-fuzz.ts`).
+- **Tamper ⇒ stop (Z3)**: with `attestation`, every renewal needs fresh evidence bound to a per-lease nonce with a listed measurement; a modified image cannot renew.
+- **Bounded window (Z4)**: short leases, periodic operator-signed human checkpoints (`humanCheckpointEveryMs`), honeytokens that revoke every run on use, and the hardened Node profile (no addons, no code generation, permission model) limit how long and how far an exploit chain can run.
+- **Evidence before autonomy (Z5)**: gated high-risk scopes need a signed, passing, unexpired capability evaluation.
+- **Verifiable evidence**: an RFC 9162 Merkle audit log with signed tree heads and a witness that refuses rollback and forks; claims carry inclusion proofs and are classified `proven | unproven | failed`.
+
+**Residual risk**: containment raises the cost of an attack and bounds its time; it does not make compromise impossible. Hypervisor, kernel, and hardware zero-days exist, and an attacker who controls k authority hosts can issue leases within the signed policy. The formal model in `references/formal/` proves properties of the decision core's model only. Do not grant these modes to systems suspected of exceeding the containment's assurance.
 
 ---
 

@@ -24,8 +24,8 @@ export interface SandboxLimits {
   timeoutMs: number;
 }
 
-/** Network policy: nothing, or only the egress proxy. */
-export type SandboxNetwork = 'none' | 'egress-proxy-only';
+/** Network policy: nothing, only the egress proxy, or only the framed relay socket (no IP network at all). */
+export type SandboxNetwork = 'none' | 'egress-proxy-only' | 'relay-only';
 
 /** One command to run in a sandbox. */
 export interface SandboxRequest {
@@ -107,13 +107,16 @@ export function normalizeSandboxRequest(req: SandboxRequest): NormalizedSandboxR
     if (!ENV_KEY.test(k) || typeof v !== 'string' || v.includes('\0')) throw new TypeError(`sandbox: invalid env entry ${k}`);
     env[k] = v;
   }
-  const limits = { ...DEFAULT_SANDBOX_LIMITS, ...req.limits };
+  if (req.limits !== undefined && (req.limits === null || typeof req.limits !== 'object' || Array.isArray(req.limits))) throw new TypeError('sandbox: limits must be an object');
+  // Only known limit keys are copied, so nothing unvalidated reaches the engine or the receipt.
+  const limits: SandboxLimits = { ...DEFAULT_SANDBOX_LIMITS };
   for (const key of Object.keys(MAX_LIMITS) as (keyof SandboxLimits)[]) {
+    if (req.limits?.[key] !== undefined) limits[key] = req.limits[key] as number;
     const v = limits[key];
     if (!(typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MAX_LIMITS[key])) throw new TypeError(`sandbox: limits.${key} out of range`);
   }
   const network = req.network ?? 'none';
-  if (network !== 'none' && network !== 'egress-proxy-only') throw new TypeError('sandbox: network must be "none" or "egress-proxy-only"');
+  if (network !== 'none' && network !== 'egress-proxy-only' && network !== 'relay-only') throw new TypeError('sandbox: network must be "none", "egress-proxy-only", or "relay-only"');
   const maxOutputBytes = req.maxOutputBytes ?? 1024 * 1024;
   if (!(Number.isInteger(maxOutputBytes) && maxOutputBytes > 0 && maxOutputBytes <= 64 * 1024 * 1024)) throw new TypeError('sandbox: maxOutputBytes out of range');
   return { argv: [...req.argv], workspace, env, limits, network, maxOutputBytes };
@@ -139,13 +142,97 @@ export interface ContainerSandboxOptions {
   egressNetwork?: string;
   /** Proxy URL exposed to the workload as `NETWORK_AI_EGRESS_PROXY` */
   egressProxyUrl?: string;
-  /** User inside the container (default `65534:65534`, i.e. nobody) */
+  /** Host path of the `VsockRelay` socket; required for `relay-only` (mounted at `/run/network-ai/relay.sock`) */
+  relaySocket?: string;
+  /** User inside the container (default `65534:65534`, i.e. nobody). uid 0 (root) is refused. */
   user?: string;
+  /**
+   * `'hardened'`: the workload must be `node`; the runner inserts
+   * `--no-addons --disallow-code-generation-from-strings --permission`
+   * with file-system access limited to `/workspace` (see {@link hardenedNodeArgs}).
+   */
+  nodeProfile?: 'hardened';
+  /** Options for the hardened profile */
+  nodeHardening?: HardenedNodeOptions;
+}
+
+/** Options for {@link hardenedNodeArgs}. */
+export interface HardenedNodeOptions {
+  /** Directory the process may read and write (default `/workspace`) */
+  workspace?: string;
+  /** Extra read-only directories (e.g. a mounted `node_modules`) */
+  readOnly?: readonly string[];
+  allowChildProcess?: boolean;
+  allowWorker?: boolean;
+  /** `--permission` (Node ≥ 22.13 / 23.5) or `--experimental-permission` (Node 20–22). Default `--permission`. */
+  permissionFlag?: '--permission' | '--experimental-permission';
+  /** Absolute path of the image's node binary, if workloads name it explicitly (outside the workspace) */
+  nodePath?: string;
+}
+
+const SAFE_DIR = /^\/[A-Za-z0-9_./-]{0,511}$/;
+
+/**
+ * Node flags for agent processes: no native addons, no `eval`-style code
+ * generation, and the permission model with file-system access limited to the
+ * workspace. Pass them in argv (not `NODE_OPTIONS`, which does not accept
+ * every flag on every Node line). Child processes and workers stay disabled
+ * unless explicitly allowed.
+ */
+export function hardenedNodeArgs(opts: HardenedNodeOptions = {}): string[] {
+  const ws = opts.workspace ?? '/workspace';
+  const dirs = [ws, ...(opts.readOnly ?? [])];
+  for (const d of dirs) {
+    if (typeof d !== 'string' || !SAFE_DIR.test(d) || d.split('/').includes('..') || d === '/') throw new TypeError('hardenedNodeArgs: directories must be absolute, specific, and free of ".."');
+  }
+  const flag = opts.permissionFlag ?? '--permission';
+  if (flag !== '--permission' && flag !== '--experimental-permission') throw new TypeError('hardenedNodeArgs: invalid permissionFlag');
+  if (opts.nodePath !== undefined && (!SAFE_DIR.test(opts.nodePath) || opts.nodePath.split('/').includes('..') || opts.nodePath === ws || opts.nodePath.startsWith(`${ws}/`))) {
+    throw new TypeError('hardenedNodeArgs: nodePath must be an absolute path outside the workspace');
+  }
+  return [
+    '--no-addons',
+    '--disallow-code-generation-from-strings',
+    flag,
+    ...dirs.map((d) => `--allow-fs-read=${d}`),
+    `--allow-fs-write=${ws}`,
+    ...(opts.allowChildProcess ? ['--allow-child-process'] : []),
+    ...(opts.allowWorker ? ['--allow-worker'] : []),
+  ];
+}
+
+/** Node options a caller may put before the script under the hardened profile (no separate values, no widening). */
+const SAFE_NODE_OPTION = /^(--enable-source-maps|--no-warnings|--trace-warnings|--trace-uncaught|--no-deprecation|--throw-deprecation|--max-old-space-size=\d{1,6}|--stack-trace-limit=\d{1,4})$/;
+/** Environment the hardened profile refuses: loader injection, Node configuration, and executable lookup. */
+const HARDENED_FORBIDDEN_ENV = /^(LD_|DYLD_|NODE_|NODE$|PATH$|PRELOAD|GCONV_PATH$|HOSTALIASES$|LOCPATH$|MALLOC_|UV_|OPENSSL_CONF$|SSL_CERT_)/i;
+
+/**
+ * Check that a Node process runs with the hardened profile. Pass
+ * `process.execArgv` (default). Returns the problems found (empty when hardened).
+ */
+export function checkHardenedNode(
+  execArgv: readonly string[] = process.execArgv,
+  opts: { allowChildProcess?: boolean; allowWorker?: boolean } = {},
+): { ok: boolean; problems: string[] } {
+  const problems: string[] = [];
+  const has = (f: string) => execArgv.includes(f);
+  if (!has('--no-addons')) problems.push('missing --no-addons');
+  if (!has('--disallow-code-generation-from-strings')) problems.push('missing --disallow-code-generation-from-strings');
+  if (!has('--permission') && !has('--experimental-permission')) problems.push('permission model not enabled (--permission)');
+  for (const a of execArgv) {
+    if (/^--allow-fs-(read|write)=(\*|\/)$/.test(a)) problems.push(`file-system permission too broad: ${a}`);
+    if (a === '--allow-child-process' && !opts.allowChildProcess) problems.push('child processes allowed (--allow-child-process)');
+    if (a === '--allow-worker' && !opts.allowWorker) problems.push('workers allowed (--allow-worker)');
+    if (a === '--allow-addons') problems.push('native addons allowed (--allow-addons)');
+  }
+  return { ok: problems.length === 0, problems };
 }
 
 const IMAGE = /^[A-Za-z0-9][A-Za-z0-9._\-/:@]{0,254}$/;
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 const USER = /^[0-9]{1,10}(:[0-9]{1,10})?$/;
+/** Where `relay-only` sandboxes find the relay socket. */
+export const RELAY_SOCKET_IN_SANDBOX = '/run/network-ai/relay.sock';
 
 /** Docker/Podman sandbox with gVisor by default. One disposable container per run. */
 export class ContainerSandboxRunner implements ISandboxRunner {
@@ -163,7 +250,11 @@ export class ContainerSandboxRunner implements ISandboxRunner {
     }
     if (options.egressNetwork !== undefined && !NAME.test(options.egressNetwork)) throw new TypeError('ContainerSandboxRunner: invalid egressNetwork');
     if (options.egressProxyUrl !== undefined && !/^https?:\/\/[^\s]+$/.test(options.egressProxyUrl)) throw new TypeError('ContainerSandboxRunner: invalid egressProxyUrl');
+    if (options.relaySocket !== undefined && (!isAbsolute(options.relaySocket) || /[,\0]/.test(options.relaySocket))) throw new TypeError('ContainerSandboxRunner: relaySocket must be an absolute path without ","');
     if (options.user !== undefined && !USER.test(options.user)) throw new TypeError('ContainerSandboxRunner: user must be numeric uid[:gid]');
+    if (options.user !== undefined && /^0+(:|$)/.test(options.user)) throw new TypeError('ContainerSandboxRunner: refusing to run the agent as root (uid 0)');
+    if (options.nodeProfile !== undefined && options.nodeProfile !== 'hardened') throw new TypeError('ContainerSandboxRunner: nodeProfile must be "hardened"');
+    if (options.nodeProfile === 'hardened') hardenedNodeArgs(options.nodeHardening);
     this.name = `container:${this.runtime}`;
   }
 
@@ -172,10 +263,15 @@ export class ContainerSandboxRunner implements ISandboxRunner {
     const o = this.options;
     let network = 'none';
     const env = { ...req.env };
+    const extraMounts: string[] = [];
     if (req.network === 'egress-proxy-only') {
       if (!o.egressNetwork) throw new TypeError('sandbox: egress-proxy-only needs egressNetwork configured');
       network = o.egressNetwork;
       if (o.egressProxyUrl) env['NETWORK_AI_EGRESS_PROXY'] = o.egressProxyUrl;
+    } else if (req.network === 'relay-only') {
+      if (!o.relaySocket) throw new TypeError('sandbox: relay-only needs relaySocket configured');
+      extraMounts.push('--mount', `type=bind,source=${o.relaySocket},target=${RELAY_SOCKET_IN_SANDBOX}`);
+      env['NETWORK_AI_RELAY_SOCKET'] = RELAY_SOCKET_IN_SANDBOX;
     }
     const args = [
       ...(o.engineArgs ?? []),
@@ -192,11 +288,31 @@ export class ContainerSandboxRunner implements ISandboxRunner {
       '--user', o.user ?? '65534:65534',
       '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m',
       '--mount', `type=bind,source=${req.workspace},target=/workspace`,
+      ...extraMounts,
       '--workdir', '/workspace',
     ];
     for (const [k, v] of Object.entries(env)) args.push('--env', `${k}=${v}`);
-    args.push(o.image, ...req.argv);
+    args.push(o.image, ...this.workloadArgv(req));
     return args;
+  }
+
+  private workloadArgv(req: NormalizedSandboxRequest): string[] {
+    if (this.options.nodeProfile !== 'hardened') return req.argv;
+    const [program, ...rest] = req.argv;
+    const fixedPath = this.options.nodeHardening?.nodePath;
+    // Exactly `node` (resolved by the image's fixed PATH) or the operator's absolute path; never a workspace binary.
+    if (program !== 'node' && !(fixedPath !== undefined && program === fixedPath)) throw new TypeError('sandbox: the hardened node profile only runs `node` (or the configured nodePath)');
+    for (const key of Object.keys(req.env)) {
+      if (HARDENED_FORBIDDEN_ENV.test(key)) throw new TypeError(`sandbox: ${key} is not allowed under the hardened node profile`);
+    }
+    // Allowlist: only options that take no separate value and cannot widen permissions may precede the script.
+    // Anything else (including options whose value is a separate argument) is refused.
+    let i = 0;
+    for (; i < rest.length && rest[i].startsWith('-'); i++) {
+      if (!SAFE_NODE_OPTION.test(rest[i])) throw new TypeError(`sandbox: node option ${rest[i].split('=')[0]} is not allowed under the hardened node profile`);
+    }
+    if (i >= rest.length) throw new TypeError('sandbox: the hardened node profile needs a script to run');
+    return [program, ...hardenedNodeArgs(this.options.nodeHardening), ...rest];
   }
 
   /** Run one command in a fresh container; the container is removed afterwards (and killed on timeout). */

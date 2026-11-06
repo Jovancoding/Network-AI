@@ -549,7 +549,7 @@ Run these before declaring the integration production-ready:
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
 - [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
 - [ ] `npx ts-node test-phase7.ts` — 94 Phase 7 tests pass (hooks, flow control, composer, semantic search)
-- [ ] `npm run test:all` — all 4,190 tests pass across 43 suites
+- [ ] `npm run test:all` — all 4,561 tests pass across 45 suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety
@@ -592,6 +592,7 @@ Run these before declaring the integration production-ready:
 - [ ] Requests outside the lease scope, or above a financial limit, get 403 from the proxy
 - [ ] Two sentries are needed to stop renewal when `sentryQuorum` is 2
 - [ ] `npx ts-node test-perpetual.ts` and `npx ts-node test-perpetual-safety.ts` pass
+- [ ] (v6.0.0, autonomous or high-risk runs) `network-ai perpetual doctor` passes on every control-plane host; revoking at one of k authorities halts the run; a lapsed human checkpoint stops renewal; a decoy credential revokes every run; a modified agent image cannot renew; `test-perpetual-phase5.ts` and `test-perpetual-fuzz.ts` pass. Follow [docs/hardened-deployment.md](docs/hardened-deployment.md)
 
 ---
 
@@ -627,4 +628,4 @@ Run these before declaring the integration production-ready:
 
 ---
 
-*Network-AI v5.17.2 · MIT License · https://github.com/Jovancoding/Network-AI*
+*Network-AI v6.0.0 · MIT License · https://github.com/Jovancoding/Network-AI*

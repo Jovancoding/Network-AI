@@ -89,9 +89,14 @@ Nothing in `lib/perpetual/` opens a socket on import. When the operator starts t
 
 | Component | Inbound | Outbound |
 |---|---|---|
-| `LeaseAuthority` (`network-ai perpetual authority`) | Control API, default `127.0.0.1:4710`; non-loopback only with `--allow-remote` | None |
-| `EgressProxy` (`network-ai perpetual proxy`) | Agent requests, default `127.0.0.1:4711` | Only to the upstream URLs in the operator's routes file, plus the authority's lease-status endpoint |
-| `LeaseGuard` / `HttpLeaseTransport`, `HttpSentryControl` | None | Only to the configured authority URL |
+| `LeaseAuthority` (`network-ai perpetual authority`) | Control API, default `127.0.0.1:4710`; non-loopback only with `--allow-remote` | None (an optional `--signer-cmd` runs a local signer program over stdin/stdout, no shell) |
+| `EgressProxy` (`network-ai perpetual proxy`) | Agent requests, default `127.0.0.1:4711` | Only to the upstream URLs in the operator's routes file, plus the lease-status endpoint of every configured authority (and tripwire alerts to them) |
+| `LeaseGuard` / `HttpLeaseTransport`, `QuorumLeaseTransport`, `HttpSentryControl` | None | Only to the configured authority URL(s) |
+| `VsockRelay` (v6.0.0) | A Unix socket / named pipe (Firecracker vsock `<uds>_<port>`), fixed frame types only | Only to the configured lease transport and a loopback egress proxy |
+| `SpoolLeaseTransport` / `SpoolPuller` (v6.0.0) | None — append-only files in a spool directory | None (the puller calls the configured lease transport) |
+| `FirecrackerSandboxRunner` / `KataSandboxRunner` (v6.0.0) | None | None — bring-your-own `firecracker`/`jailer` or Kata runtime; no network interface is configured |
+| `LeanCertificateVerifier` (v6.0.0) | None | None — runs a bring-your-own `lean` inside an `ISandboxRunner` with no network |
+| Attestation verifiers, capability evaluators (v6.0.0) | None | None in the library — verifiers are bring-your-own |
 
 ### Adapters: outbound calls only to operator-configured endpoints
 
@@ -237,6 +242,6 @@ Notably **excluded** from the published package:
 ## 10. Dependency Update Policy
 
 - Dependabot is enabled for npm (weekly PRs for patch/minor updates).
-- All dependency update PRs run the full test suite (4,190 tests) before merge.
+- All dependency update PRs run the full test suite (4,561 tests) before merge.
 - Major version bumps require manual review and a CHANGELOG entry.
 - New **runtime** dependencies require explicit approval and an update to this file.

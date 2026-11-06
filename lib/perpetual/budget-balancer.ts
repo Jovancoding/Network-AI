@@ -13,7 +13,7 @@
  */
 
 import type { KeyObject } from 'crypto';
-import { ensureEd25519, keyIdOf, signCanonical, verifyCanonical, type Ed25519KeyPair } from './signing';
+import { ensureEd25519, keyIdOf, signWith, verifyCanonical, type SigningKey } from './signing';
 
 /** An operator-approved place to spend. */
 export interface FundingSource {
@@ -81,11 +81,11 @@ export function validateBudgetPolicy(p: BudgetPolicy): void {
   if (!(reduced >= 0 && reduced <= 1 && minimal >= 0 && minimal <= reduced)) throw new TypeError('budget policy throttle must satisfy 0 <= minimalBelow <= reducedBelow <= 1');
 }
 
-/** Sign a budget policy with the operator key. */
-export function signBudgetPolicy(policy: BudgetPolicy, operator: Pick<Ed25519KeyPair, 'privateKey'>): SignedBudgetPolicy {
+/** Sign a budget policy with the operator key (or an operator `Signer`). */
+export function signBudgetPolicy(policy: BudgetPolicy, operator: SigningKey): SignedBudgetPolicy {
   validateBudgetPolicy(policy);
-  ensureEd25519(operator.privateKey, 'private', 'operator.privateKey');
-  return { policy, alg: 'ed25519', keyId: keyIdOf(operator.privateKey), signature: signCanonical(policy, operator.privateKey) };
+  const { keyId, signature } = signWith(policy, operator, 'operator');
+  return { policy, alg: 'ed25519', keyId, signature };
 }
 
 function verifyBudgetPolicy(signed: SignedBudgetPolicy, operatorPublicKey: KeyObject): string | null {

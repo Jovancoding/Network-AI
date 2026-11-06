@@ -14,14 +14,102 @@
 import { performance } from 'perf_hooks';
 import { resolve as resolvePath, relative, isAbsolute, sep } from 'path';
 import type { KeyObject } from 'crypto';
-import { LeaseError, verifyLease } from './signing';
-import type { Heartbeat, LeaseAction, LeaseCheck, LeaseDecision, SignedLease } from './types';
+import { LeaseError, verifyLease, verifyLeaseQuorum } from './signing';
+import { quorumActive } from './core';
+import type { AttestationEvidence, Heartbeat, LeaseAction, LeaseCheck, LeaseClaims, LeaseCosignature, LeaseDecision, SignedLease } from './types';
 
 /** How the guard reaches the authority (HTTP in production). */
 export interface LeaseTransport {
-  issue(runId: string): Promise<LeaseDecision>;
+  issue(runId: string, attestation?: AttestationEvidence): Promise<LeaseDecision>;
   renew(heartbeat: Heartbeat): Promise<LeaseDecision>;
-  isActive(leaseId: string): Promise<boolean>;
+  isActive(leaseId: string, runId?: string): Promise<boolean>;
+  /** Three-valued status (`unknown`: this authority never saw the lease); used by k-of-n verifiers */
+  leaseStatus?(leaseId: string, runId?: string): Promise<'active' | 'inactive' | 'unknown'>;
+  /** Fresh attestation nonce for the first lease (policies with `attestation`) */
+  attestationNonce?(runId: string): Promise<string>;
+}
+
+/** A co-signing authority (k-of-n). */
+export interface CosignTransport {
+  cosign(claims: LeaseClaims, heartbeat: Heartbeat | undefined, issuerSignature: LeaseCosignature): Promise<{ granted: boolean; cosignature?: LeaseCosignature; reason?: string }>;
+  isActive(leaseId: string, runId?: string): Promise<boolean>;
+  leaseStatus?(leaseId: string, runId?: string): Promise<'active' | 'inactive' | 'unknown'>;
+}
+
+/** Status of a lease at one authority, using the three-valued call when available. */
+async function statusAt(t: LeaseTransport | CosignTransport, leaseId: string, runId?: string): Promise<'active' | 'inactive' | 'unknown'> {
+  if (t.leaseStatus) return t.leaseStatus(leaseId, runId);
+  return (await t.isActive(leaseId, runId)) ? 'active' : 'inactive';
+}
+
+/**
+ * Lease transport over k-of-n authorities. The primary issues or renews; every
+ * co-signer then decides independently. A lease is returned only with at
+ * least `threshold` signatures in total. Stopping is an OR: if any reachable
+ * authority reports the lease inactive, `isActive` is `false`.
+ */
+export class QuorumLeaseTransport implements LeaseTransport {
+  constructor(
+    private readonly primary: LeaseTransport,
+    private readonly cosigners: readonly CosignTransport[],
+    private readonly threshold: number,
+  ) {
+    if (!Number.isInteger(threshold) || threshold < 1 || threshold > cosigners.length + 1) {
+      throw new TypeError('QuorumLeaseTransport: threshold must be between 1 and the number of authorities');
+    }
+  }
+
+  async issue(runId: string, attestation?: AttestationEvidence): Promise<LeaseDecision> {
+    return this.collect(await this.primary.issue(runId, attestation));
+  }
+
+  attestationNonce(runId: string): Promise<string> {
+    if (!this.primary.attestationNonce) return Promise.reject(new Error('primary transport does not support attestation'));
+    return this.primary.attestationNonce(runId);
+  }
+
+  async renew(heartbeat: Heartbeat): Promise<LeaseDecision> {
+    return this.collect(await this.primary.renew(heartbeat), heartbeat);
+  }
+
+  async isActive(leaseId: string, runId?: string): Promise<boolean> {
+    const all: (LeaseTransport | CosignTransport)[] = [this.primary, ...this.cosigners];
+    const results = await Promise.allSettled(all.map((a) => statusAt(a, leaseId, runId)));
+    const verdict = quorumActive(results.map((r) => (r.status === 'fulfilled' ? r.value : 'unknown')));
+    // No authority knows the lease or none is reachable: unknown, let the guard fail closed at expiry.
+    if (verdict === 'unknown') throw new Error('no authority vouches for the lease');
+    return verdict === 'active';
+  }
+
+  async leaseStatus(leaseId: string, runId?: string): Promise<'active' | 'inactive' | 'unknown'> {
+    try {
+      return (await this.isActive(leaseId, runId)) ? 'active' : 'inactive';
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  private async collect(decision: LeaseDecision, heartbeat?: Heartbeat): Promise<LeaseDecision> {
+    if (!decision?.granted || !decision.lease) return decision;
+    let lease = decision.lease;
+    const issuerSignature = { keyId: lease.keyId, signature: lease.signature };
+    const results = await Promise.allSettled(this.cosigners.map((c) => c.cosign(lease.claims, heartbeat, issuerSignature)));
+    const reasons: string[] = [];
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value?.granted && r.value.cosignature) {
+        const cos = r.value.cosignature;
+        if (cos.keyId !== lease.keyId && !(lease.cosignatures ?? []).some((c) => c.keyId === cos.keyId)) {
+          lease = { ...lease, cosignatures: [...(lease.cosignatures ?? []), { keyId: cos.keyId, signature: cos.signature }] };
+        }
+      } else {
+        reasons.push(r.status === 'fulfilled' ? (r.value?.reason ?? 'refused') : 'unreachable');
+      }
+    }
+    if (1 + (lease.cosignatures ?? []).length < this.threshold) {
+      return { granted: false, reason: `authority quorum not reached (${1 + (lease.cosignatures ?? []).length}/${this.threshold}): ${reasons.join('; ')}` };
+    }
+    return { granted: true, lease };
+  }
 }
 
 /** Something the guard can stop when the lease is lost (`HaltCoordinator` satisfies this). */
@@ -32,8 +120,12 @@ export interface HaltTrigger {
 /** Constructor options for {@link LeaseGuard}. */
 export interface LeaseGuardOptions {
   runId: string;
-  /** Public key of the lease authority */
-  authorityPublicKey: KeyObject;
+  /** Public key of the lease authority (single-authority mode) */
+  authorityPublicKey?: KeyObject;
+  /** Public keys of the k-of-n authorities; use with `authorityThreshold` */
+  authorityPublicKeys?: readonly KeyObject[];
+  /** Signatures required on every lease (k). Default 1. */
+  authorityThreshold?: number;
   transport: LeaseTransport;
   /** Kill switch fired when the lease is lost */
   halt?: HaltTrigger;
@@ -41,6 +133,12 @@ export interface LeaseGuardOptions {
   spend?: () => { usd: number; tokens: number };
   /** Reports health and canary state for heartbeats */
   health?: () => { health: Heartbeat['health']; canaryFailed?: boolean };
+  /**
+   * Produce attestation evidence bound to `nonce` (policies with
+   * `attestation`). Wire to the TPM/TEE quoting service, never to code the
+   * agent controls.
+   */
+  attest?: (nonce: string) => AttestationEvidence | Promise<AttestationEvidence>;
   /** Renew this long before expiry (default: a third of the lease TTL, max 60 s) */
   renewMarginMs?: number;
   /** How often to poll the authority for revocation (default 5 s) */
@@ -68,9 +166,12 @@ export class LeaseGuard implements LeaseCheck {
   private readonly root: string;
 
   constructor(private readonly options: LeaseGuardOptions) {
-    if (!options.runId || !options.transport || !options.authorityPublicKey) {
-      throw new TypeError('LeaseGuard: runId, transport, and authorityPublicKey are required');
+    if (!options.runId || !options.transport || (!options.authorityPublicKey && !(options.authorityPublicKeys?.length))) {
+      throw new TypeError('LeaseGuard: runId, transport, and authorityPublicKey(s) are required');
     }
+    const k = options.authorityThreshold ?? 1;
+    if (!Number.isInteger(k) || k < 1 || k > 16) throw new TypeError('LeaseGuard: authorityThreshold must be between 1 and 16');
+    if (k > 1 && (options.authorityPublicKeys?.length ?? 0) < k) throw new TypeError('LeaseGuard: authorityThreshold exceeds the number of authority keys');
     this.now = options.now ?? Date.now;
     this.mono = options.monotonic ?? (() => performance.now());
     this.root = resolvePath(options.projectRoot ?? process.cwd());
@@ -88,7 +189,13 @@ export class LeaseGuard implements LeaseCheck {
 
   /** Obtain the first lease and start the renewal / revocation loop. */
   async start(): Promise<void> {
-    const decision = await this.safeCall(() => this.options.transport.issue(this.options.runId));
+    const decision = await this.safeCall(async () => {
+      const attest = this.options.attest;
+      if (!attest) return this.options.transport.issue(this.options.runId);
+      if (!this.options.transport.attestationNonce) throw new Error('transport cannot fetch an attestation challenge');
+      const nonce = await this.options.transport.attestationNonce(this.options.runId);
+      return this.options.transport.issue(this.options.runId, await attest(nonce));
+    });
     if (!decision?.granted || !decision.lease) {
       this.lose(`lease not issued: ${decision?.reason ?? 'authority unreachable'}`);
       throw new LeaseError(`LeaseGuard: ${this.lostReason}`, 'LEASE_NOT_ISSUED');
@@ -146,7 +253,7 @@ export class LeaseGuard implements LeaseCheck {
       const now = this.now();
       if (now - this.lastPoll >= (this.options.statusPollMs ?? 5_000)) {
         this.lastPoll = now;
-        const active = await this.safeCall(() => this.options.transport.isActive(lease.claims.leaseId));
+        const active = await this.safeCall(() => this.options.transport.isActive(lease.claims.leaseId, this.options.runId));
         if (active === false) return this.lose('lease revoked or paused by the authority');
         // An unreachable authority is tolerated until expiry; renewal below then fails closed.
       }
@@ -157,6 +264,8 @@ export class LeaseGuard implements LeaseCheck {
 
       const spend = this.options.spend?.() ?? { usd: 0, tokens: 0 };
       const health = this.options.health?.() ?? { health: 'ok' as const };
+      const attNonce = lease.claims.attestationNonce;
+      const attestation = attNonce && this.options.attest ? await this.safeCall(async () => this.options.attest!(attNonce)) : undefined;
       const decision = await this.safeCall(() => this.options.transport.renew({
         leaseId: lease.claims.leaseId,
         runId: this.options.runId,
@@ -165,6 +274,7 @@ export class LeaseGuard implements LeaseCheck {
         spentTokens: spend.tokens,
         health: health.health,
         canaryFailed: health.canaryFailed,
+        ...(attestation ? { attestation } : {}),
       }));
       if (decision?.granted && decision.lease) {
         this.accept(decision.lease);
@@ -178,7 +288,7 @@ export class LeaseGuard implements LeaseCheck {
   }
 
   private accept(lease: SignedLease): void {
-    const reason = verifyLease(lease, this.options.authorityPublicKey, this.now());
+    const reason = verifyLeaseWith(lease, this.options, this.now());
     if (reason) return this.lose(`authority returned an invalid lease: ${reason}`);
     if (lease.claims.runId !== this.options.runId) return this.lose('authority returned a lease for another run');
     if (this.lease && lease.claims.sequence <= this.lease.claims.sequence) return this.lose('lease sequence did not advance');
@@ -223,24 +333,57 @@ export class LeaseGuard implements LeaseCheck {
   }
 }
 
-/** HTTP transport to a remote `LeaseAuthority` using the `runner` role secret. */
-export class HttpLeaseTransport implements LeaseTransport {
+/**
+ * Verify a lease against a single authority key or a k-of-n key set.
+ * Used by `LeaseGuard` and `EgressProxy`.
+ */
+export function verifyLeaseWith(
+  lease: SignedLease,
+  keys: { authorityPublicKey?: KeyObject; authorityPublicKeys?: readonly KeyObject[]; authorityThreshold?: number },
+  now: number,
+): string | null {
+  const k = keys.authorityThreshold ?? 1;
+  if (keys.authorityPublicKeys && keys.authorityPublicKeys.length > 0) {
+    return verifyLeaseQuorum(lease, keys.authorityPublicKeys, k, now);
+  }
+  if (!keys.authorityPublicKey) return 'no authority key configured';
+  return verifyLease(lease, keys.authorityPublicKey, now);
+}
+
+/** HTTP transport to a remote `LeaseAuthority` using the `runner` role secret. Also a {@link CosignTransport}. */
+export class HttpLeaseTransport implements LeaseTransport, CosignTransport {
   constructor(private readonly baseUrl: string, private readonly runnerSecret: string, private readonly timeoutMs = 5_000) {
     if (!/^https?:\/\//.test(baseUrl)) throw new TypeError('HttpLeaseTransport: baseUrl must be http(s)');
     if (!runnerSecret || runnerSecret.length < 32) throw new TypeError('HttpLeaseTransport: runner secret must be at least 32 characters');
   }
 
-  issue(runId: string): Promise<LeaseDecision> {
-    return this.call<LeaseDecision>('POST', '/v1/leases/issue', { runId });
+  issue(runId: string, attestation?: AttestationEvidence): Promise<LeaseDecision> {
+    return this.call<LeaseDecision>('POST', '/v1/leases/issue', { runId, ...(attestation ? { attestation } : {}) });
+  }
+
+  async attestationNonce(runId: string): Promise<string> {
+    const r = await this.call<{ nonce?: unknown }>('GET', `/v1/attestation/nonce?runId=${encodeURIComponent(runId)}`);
+    if (typeof r.nonce !== 'string') throw new Error('authority returned no nonce');
+    return r.nonce;
   }
 
   renew(heartbeat: Heartbeat): Promise<LeaseDecision> {
     return this.call<LeaseDecision>('POST', '/v1/leases/renew', heartbeat);
   }
 
-  async isActive(leaseId: string): Promise<boolean> {
-    const r = await this.call<{ active?: unknown }>('GET', `/v1/leases/${encodeURIComponent(leaseId)}/status`);
-    return r.active === true;
+  cosign(claims: LeaseClaims, heartbeat: Heartbeat | undefined, issuerSignature: LeaseCosignature): Promise<{ granted: boolean; cosignature?: LeaseCosignature; reason?: string }> {
+    return this.call('POST', '/v1/leases/cosign', { claims, heartbeat, issuerSignature });
+  }
+
+  async isActive(leaseId: string, runId?: string): Promise<boolean> {
+    return (await this.leaseStatus(leaseId, runId)) === 'active';
+  }
+
+  async leaseStatus(leaseId: string, runId?: string): Promise<'active' | 'inactive' | 'unknown'> {
+    const q = runId !== undefined ? `?runId=${encodeURIComponent(runId)}` : '';
+    const r = await this.call<{ active?: unknown; status?: unknown }>('GET', `/v1/leases/${encodeURIComponent(leaseId)}/status${q}`);
+    if (r.status === 'active' || r.status === 'inactive' || r.status === 'unknown') return r.status;
+    return r.active === true ? 'active' : 'inactive';
   }
 
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {

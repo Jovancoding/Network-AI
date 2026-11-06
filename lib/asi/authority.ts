@@ -17,13 +17,22 @@ export type ChainedAsiEvent = AsiEvent & { prevHash: string; hash: string };
 
 const GENESIS = '0'.repeat(64);
 
+/** Anything that appends entries to a Merkle log (`MerkleAuditLog` satisfies this). */
+export interface MerkleAppender {
+  append(entry: unknown): unknown;
+}
+
 /** Hash-chains events and forwards them to an external authority (and optional local sink). */
 export class HashChainSink implements AsiEventSink {
   private prevHash = GENESIS;
   private queue: Promise<void> = Promise.resolve();
   private failures = 0;
 
-  constructor(private readonly authority: ExternalAuthority, private readonly local?: AsiEventSink) {
+  /**
+   * @param opts.merkle  Also append every chained event to a Merkle log, so
+   *                     inclusion and consistency proofs can be given to witnesses.
+   */
+  constructor(private readonly authority: ExternalAuthority, private readonly local?: AsiEventSink, private readonly opts: { merkle?: MerkleAppender } = {}) {
     if (typeof authority.appendAudit !== 'function') {
       throw new TypeError('HashChainSink: authority.appendAudit is required');
     }
@@ -39,6 +48,11 @@ export class HashChainSink implements AsiEventSink {
     chained.hash = canonicalHash({ ...event, prevHash: this.prevHash });
     this.prevHash = chained.hash;
     void this.local?.record(event);
+    try {
+      this.opts.merkle?.append(chained);
+    } catch {
+      this.failures++;
+    }
     // Deliver in order; a failed delivery is counted, not retried silently out of order.
     this.queue = this.queue.then(() => this.authority.appendAudit!(chained)).catch(() => { this.failures++; });
     return this.queue;

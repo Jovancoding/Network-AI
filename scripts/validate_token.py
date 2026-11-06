@@ -3,7 +3,8 @@
 # All I/O is local file operations only:
 #   READS:  data[/<env>]/active_grants.json, data[/<env>]/.signing_key
 #   WRITES: none
-# Imports used: argparse, json, sys, hmac, hashlib, datetime, pathlib, typing
+#   <env> must be one of dev|st|sit|qa|sandbox|preprod|prod (anything else is rejected).
+# Imports used: argparse, json, os, sys, hmac, hashlib, datetime, pathlib, typing
 # Standard library only; no networking or process-spawning modules are imported.
 """
 Validate Grant Token
@@ -21,21 +22,29 @@ import argparse
 import hashlib
 import hmac
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+_DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
+
+# The only environments a data/<env>/ directory is used for.
+_ENVIRONMENTS = ("dev", "st", "sit", "qa", "sandbox", "preprod", "prod")
+
+
 def _resolve_data_dir(env: str = "") -> Path:
-    """Return the active data directory, scoped to <env> when set."""
-    import re as _re, os as _os
-    _env = env or _os.environ.get("NETWORK_AI_ENV", "")
-    base = Path(__file__).parent.parent / "data"
-    if _env:
-        if not _re.match(r'^[a-zA-Z0-9_-]+$', _env):
-            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
-        return base / _env
-    return base
+    """Return data/, or data/<env>/ for one of the documented environments."""
+    requested = env or os.environ.get("NETWORK_AI_ENV", "")
+    if not requested:
+        return _DATA_ROOT
+    for name in _ENVIRONMENTS:
+        if requested == name:
+            return _DATA_ROOT / name  # built from the fixed list, not the input
+    raise ValueError(
+        f"Unknown environment {requested!r}; expected one of: {', '.join(_ENVIRONMENTS)}"
+    )
 
 GRANTS_FILE = _resolve_data_dir() / "active_grants.json"
 

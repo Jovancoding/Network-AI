@@ -8,9 +8,13 @@
 #           <data_dir>/.blackboard.lock
 #   DELETES: <data_dir>/pending_changes/<id>.json (after archiving it)
 #   where <data_dir> is "data/" by default, or "data/<env>/" when NETWORK_AI_ENV
-#   is set or --env is passed (env in: dev|st|sit|qa|sandbox|preprod|prod). This
-#   only changes WHICH data/ subdirectory is used — no path outside the project
-#   root is ever read or written (see the --path check below).
+#   is set or --env is passed. <env> must be one of dev|st|sit|qa|sandbox|preprod|prod
+#   (anything else is rejected); the directory name comes from that fixed list,
+#   never from the caller's input.
+# Every write goes through _open_confined(): the file's real parent directory must
+# sit inside data/ (or the project root, for --path), and a symlink at the file
+# itself is refused (O_NOFOLLOW where the OS provides it). A planted symlink can
+# therefore never redirect the lock, pending, archive, or blackboard writes.
 # --path controls the blackboard file path only and is validated against the project
 # root directory; paths outside the project directory are rejected (CWE-22).
 # Lock files and pending-change files always resolve from the active env-scoped
@@ -83,17 +87,59 @@ except ImportError:
     except ImportError:
         pass  # FileLock.acquire fails closed if neither is available
 
-# Default blackboard location — respects NETWORK_AI_ENV for multi-env isolation
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_DATA_ROOT = _PROJECT_ROOT / "data"
+
+# The only environments a data/<env>/ directory is used for.
+_ENVIRONMENTS = ("dev", "st", "sit", "qa", "sandbox", "preprod", "prod")
+
+
 def _resolve_data_dir(env: str = "") -> Path:
-    """Return the active data directory, scoped to <env> when set."""
-    _env = env or os.environ.get("NETWORK_AI_ENV", "")
-    base = Path(__file__).parent.parent / "data"
-    if _env:
-        # Validate to prevent path traversal (CWE-22)
-        if not re.match(r'^[a-zA-Z0-9_-]+$', _env):
-            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
-        return base / _env
-    return base
+    """Return data/, or data/<env>/ for one of the documented environments."""
+    requested = env or os.environ.get("NETWORK_AI_ENV", "")
+    if not requested:
+        return _DATA_ROOT
+    for name in _ENVIRONMENTS:
+        if requested == name:
+            return _DATA_ROOT / name  # built from the fixed list, not the input
+    raise ValueError(
+        f"Unknown environment {requested!r}; expected one of: {', '.join(_ENVIRONMENTS)}"
+    )
+
+
+_O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_O_BINARY = getattr(os, "O_BINARY", 0)
+
+
+def _require_inside(directory: Path, root: Path) -> None:
+    """Refuse `directory` unless, with symlinks resolved, it is `root` or beneath it."""
+    real_root = root.resolve()
+    real_dir = directory.resolve()
+    if real_dir != real_root and real_root not in real_dir.parents:
+        raise PermissionError(f"Refusing to write outside {real_root}: {directory}")
+
+
+def _check_confined(path: Path, root: Path) -> None:
+    """Refuse `path` unless its real parent is inside `root` and it is not a symlink."""
+    _require_inside(path.parent, root)
+    if path.is_symlink():
+        raise PermissionError(f"Refusing to write through a symlink: {path}")
+
+
+def _open_confined(path: Path, flags: int, root: Path = _DATA_ROOT) -> int:
+    """Open `path` for writing without leaving `root` or following a symlink."""
+    _check_confined(path, root)
+    return os.open(path, flags | _O_NOFOLLOW | _O_BINARY, 0o600)
+
+
+def _write_confined(path: Path, text: str, root: Path = _DATA_ROOT,
+                    exclusive: bool = False) -> None:
+    """Write `text` to `path` (truncating, or create-only when `exclusive`)."""
+    mode = os.O_EXCL if exclusive else os.O_TRUNC
+    fd = _open_confined(path, os.O_WRONLY | os.O_CREAT | mode, root)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
 
 _DATA_DIR = _resolve_data_dir()
 BLACKBOARD_PATH = _DATA_DIR / "swarm-blackboard.md"
@@ -115,16 +161,19 @@ class FileLock:
         self.lock_path = lock_path
         self.timeout = timeout
         self.lock_file: Optional[Any] = None
+        _check_confined(self.lock_path, _DATA_ROOT)
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
     
     def acquire(self) -> bool:
         """Acquire the lock with timeout."""
+        _check_confined(self.lock_path, _DATA_ROOT)
         start_time = time.time()
         
         while True:
             try:
-                # 'a+' never truncates a file another process holds locked.
-                self.lock_file = open(self.lock_path, 'a+')
+                # No O_TRUNC: opening never truncates a file another process holds locked.
+                fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT | _O_NOFOLLOW | _O_BINARY, 0o600)
+                self.lock_file = os.fdopen(fd, "r+", encoding="utf-8")
                 
                 if _fcntl is not None:
                     _fcntl.flock(self.lock_file.fileno(), _fcntl.LOCK_EX | _fcntl.LOCK_NB)
@@ -193,6 +242,9 @@ class SharedBlackboard:
         self.lock_path = self.data_dir / ".blackboard.lock"
         self.cache: dict[str, dict[str, Any]] = {}
         self.pending_dir = self.data_dir / "pending_changes"
+        # Check before mkdir so a symlinked directory cannot create folders elsewhere.
+        _require_inside(self.pending_dir / "archive", _DATA_ROOT)
+        _check_confined(self.path, _PROJECT_ROOT)
         self.pending_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
         self._load_from_disk()
@@ -217,7 +269,10 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
 ## Execution History
 <!-- Chronological log of completed tasks -->
 """
-            self.path.write_text(initial_content, encoding="utf-8")
+            try:
+                _write_confined(self.path, initial_content, _PROJECT_ROOT, exclusive=True)
+            except FileExistsError:
+                pass  # another process created it first
     
     def _load_from_disk(self, strict: bool = False):
         """Replace the in-memory cache with the entries on disk.
@@ -287,8 +342,10 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         
         # Readers never see a half-written file: write a temp file, then rename over.
         tmp = self.path.with_name(f"{self.path.name}.{os.getpid()}.tmp")
-        tmp.write_text("\n".join(sections), encoding="utf-8")
-        os.replace(tmp, self.path)
+        tmp.unlink(missing_ok=True)  # a stale tmp (or a planted link) is removed, never followed
+        _write_confined(tmp, "\n".join(sections), _PROJECT_ROOT, exclusive=True)
+        _check_confined(self.path, _PROJECT_ROOT)
+        os.replace(tmp, self.path)  # replaces the directory entry; never writes through a link
     
     def _is_expired(self, entry: dict[str, Any]) -> bool:
         """Check if an entry has expired based on TTL."""
@@ -390,8 +447,9 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         """Move a finished change into pending_changes/archive/. Call with the lock held."""
         safe_id = self._sanitize_change_id(change_set["change_id"])
         archive_dir = self.pending_dir / "archive"
+        _require_inside(archive_dir, _DATA_ROOT)
         archive_dir.mkdir(exist_ok=True)
-        (archive_dir / f"{safe_id}.{outcome}.json").write_text(json.dumps(change_set, indent=2))
+        _write_confined(archive_dir / f"{safe_id}.{outcome}.json", json.dumps(change_set, indent=2))
         pending_file.unlink()
 
     def propose_change(self, change_id: str, key: str, value: Any, 
@@ -429,7 +487,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
                 "base_hash": current_hash,  # For conflict detection
             }
             
-            pending_file.write_text(json.dumps(change_set, indent=2))
+            _write_confined(pending_file, json.dumps(change_set, indent=2), exclusive=True)
         
         return {
             "success": True,
@@ -503,7 +561,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
             # Mark as validated
             change_set["status"] = "validated"
             change_set["validated_at"] = datetime.now(timezone.utc).isoformat()
-            pending_file.write_text(json.dumps(change_set, indent=2))
+            _write_confined(pending_file, json.dumps(change_set, indent=2))
         
         return {
             "valid": True,
@@ -728,9 +786,9 @@ Examples:
         )
         sys.exit(1)
 
-    bb = SharedBlackboard(args.path, data_dir=_data)
-    
     try:
+        bb = SharedBlackboard(args.path, data_dir=_data)
+
         if args.command == "write":
             if not args.key or not args.value:
                 print("Error: write requires KEY and VALUE", file=sys.stderr)
@@ -911,6 +969,9 @@ Examples:
     
     except TimeoutError as e:
         print(f"🔒 LOCK TIMEOUT: {e}", file=sys.stderr)
+        sys.exit(1)
+    except PermissionError as e:
+        print(f"Refused: {e}", file=sys.stderr)
         sys.exit(1)
 
 

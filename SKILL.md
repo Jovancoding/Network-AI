@@ -14,7 +14,7 @@ metadata:
     capabilities:
       filesystem: "read/write — project root `swarm-blackboard.md` (blackboard state), `data/pending_changes/<id>.json` (WAL entries), `data/pending_changes/archive/<id>.<status>.json` (committed/aborted change records), `data/audit_log.jsonl`, `data/active_grants.json`, `data/.signing_key`, `data/project-context.json`, `data/task_tracking.json`, `data/agent_health.json`, `data/budget_tracking.json`, `data/swarm_budgets.json`, `data/heartbeats.json`, `data/.blackboard.lock`. All paths are local; no data leaves the local filesystem. When NETWORK_AI_ENV is set, data paths are rooted at `data/<env>/` instead of `data/`. The `--path` argument in blackboard.py is validated against the project root at runtime — paths outside the project directory are rejected (CWE-22)."
       env_vars: "read — NETWORK_AI_ENV only (environment routing for data paths). No other env vars are read and none are written."
-      filesystem_operations: "Local persistent state, all under the project root and data/ (or data/<env>/): create directories; create and overwrite the state files listed above; append to audit_log.jsonl; blackboard.py archives each committed or aborted change to pending_changes/archive/ and then deletes the pending file; revoke_token.py removes revoked or expired entries from active_grants.json. Nothing outside these paths is read, written, or deleted."
+      filesystem_operations: "Local persistent state, all under the project root and data/ (or data/<env>/): create directories; create and overwrite the state files listed above; append to audit_log.jsonl; blackboard.py archives each committed or aborted change to pending_changes/archive/ and then deletes the pending file; revoke_token.py removes revoked or expired entries from active_grants.json. Nothing outside these paths is read, written, or deleted: writes are refused when a directory resolves outside data/ or the target file is a symlink."
       tools: "Only the six bundled scripts, run via python3 (see allowed-tools), plus reading local state files. No other commands, binaries, or tools are required or invoked."
       shell_exec: "none — the bundled scripts spawn no subprocesses and execute no shell commands."
       tcp_port: "none — the bundled scripts open no sockets and bind no ports."
@@ -80,7 +80,9 @@ File locking is built in: `blackboard.py` uses the operating system's exclusive 
 
 The `data/` directory is created automatically on first run. No configuration files, environment variables, or credentials are required.
 
-> **Multi-environment support (v5.4.0):** All six Python scripts read the `NETWORK_AI_ENV` environment variable at startup and accept a `--env <name>` CLI argument. When set, all data paths are routed to `data/<env>/` instead of the root `data/` directory. Use this to isolate dev, staging, and production state.
+> **Multi-environment support (v5.4.0):** All six Python scripts read the `NETWORK_AI_ENV` environment variable at startup and accept a `--env <name>` CLI argument. When set, all data paths are routed to `data/<env>/` instead of the root `data/` directory. Use this to isolate dev, staging, and production state. `<name>` must be one of `dev`, `st`, `sit`, `qa`, `sandbox`, `preprod`, `prod`; any other value is rejected.
+>
+> Every write stays inside `data/` (the blackboard file: inside the project root). A directory that resolves outside it, or a symlink at the file being written, is refused instead of followed.
 >
 > ```bash
 > # Run against the dev environment
@@ -772,7 +774,7 @@ The following findings are drawn from the **MAESTRO Agent Security Threat** fram
 
 | Control | How Network-AI addresses it |
 |---|---|
-| **Exact version pinning** | npm `package.json` uses exact `"version": "5.17.2"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
+| **Exact version pinning** | npm `package.json` uses exact `"version": "6.0.0"` — no semver range specifiers; `clawhub install network-ai` pins to a specific published version |
 | **Zero transitive dependency drift** | All bundled Python scripts use Python stdlib only — `pip install` is never required; there are no third-party packages to drift, be compromised upstream, or introduce CVEs |
 | **Signed, tagged releases** | Every release is committed with a signed Git tag (`v5.7.x`); commit hash is verifiable against CHANGELOG.md; GitHub releases link tag → diff → changelog entry |
 | **Supply chain monitoring** | npm package continuously scored by Socket.dev (score A); any new dependency or permission change triggers an alert |
@@ -785,7 +787,7 @@ The per-finding scan history and documented mitigations for this skill are kept 
 
 ## Bundled Script Inventory
 
-Complete I/O surface of every file in this skill. No script makes network calls, opens sockets, spawns subprocesses, or reads environment variables other than `NETWORK_AI_ENV`. Paths below are under `data/` (or `data/<env>/` when `NETWORK_AI_ENV` / `--env` is set).
+Complete I/O surface of every file in this skill. No script makes network calls, opens sockets, spawns subprocesses, or reads environment variables other than `NETWORK_AI_ENV`. Paths below are under `data/` (or `data/<env>/` when `NETWORK_AI_ENV` / `--env` is one of `dev|st|sit|qa|sandbox|preprod|prod`). Writes that would land outside `data/`, or go through a symlink, are refused.
 
 | Script | Purpose | Reads | Writes |
 |---|---|---|---|

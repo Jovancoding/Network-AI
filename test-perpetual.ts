@@ -575,7 +575,7 @@ async function testCli(): Promise<void> {
 
     child = spawn(process.execPath, ['-r', 'ts-node/register', CLI, '--data', dir, 'perpetual', 'authority',
       '--operator-pub', path.join(keys, 'operator.pub'), '--authority-key', path.join(keys, 'authority.key'),
-      '--policy', signedFile, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+      '--policy', signedFile, '--port', '0', '--accept-risk', 'operator-key-present'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
     const url = await new Promise<string>((resolve, reject) => {
       let out = '';
       const timer = setTimeout(() => reject(new Error(`authority did not start: ${childErr}`)), 60_000);
@@ -612,6 +612,7 @@ async function testCli(): Promise<void> {
 
     const audit = fs.readFileSync(path.join(dir, 'perpetual_audit.jsonl'), 'utf8');
     assert(audit.includes('"action":"pause"') && audit.includes('"action":"revoke"') && !audit.includes(roles.operator), 'authority decisions audited without secrets');
+    assert(audit.includes('"action":"accept-risk"') && audit.includes('"check":"operator-key-present"'), 'accepted posture risk (operator key on the authority host) is audited');
 
     const contentFile = path.join(dir, 'new-config.ts');
     fs.writeFileSync(contentFile, 'export const mode = "enforce";\n');

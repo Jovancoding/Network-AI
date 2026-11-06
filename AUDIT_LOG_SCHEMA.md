@@ -1,4 +1,4 @@
-# Audit Log Schema — Network-AI v5.17.2
+# Audit Log Schema — Network-AI v6.0.0
 
 Network-AI writes a JSONL audit trail during permission management and swarm execution. This document describes every field and event type.
 
@@ -284,8 +284,14 @@ Opt-in. These go to separate JSONL files written by the CLI processes (or to you
 | `stop` | Renewal stopped by the policy (`reason`: budget ceiling, canary failure, failing health, sentry alert, end date, auto-renew off) |
 | `revoke` / `pause` / `resume` | Human or sentry control (`role` records who) |
 | `tighten` | Policy narrowed (stricter only) |
-| `alert` | Sentry or operator alert (`reason`: `<level> from <authenticated identity>`) |
+| `alert` | Sentry or operator alert (`reason`: `<level> from <authenticated identity>`; `<level> tripwire from sentry:proxy` for decoy hits) |
 | `policy` | Newer operator-signed policy installed (`reason`: policy id) |
+| `checkpoint` | Operator-signed human checkpoint accepted (`runId`, or `reason: "all runs"`) — v6.0.0 |
+| `cosign` | This authority co-signed a lease issued by another authority (k-of-n) — v6.0.0 |
+| `capability-eval` | Signed capability evaluation installed (`reason`: `<suite> <evalId>`) — v6.0.0 |
+| `accept-risk` | A failed posture check was accepted at startup with `--accept-risk` (`check`, `detail`) — v6.0.0 |
+
+Since v6.0.0, `refuse` and `stop` reasons also include `human checkpoint overdue`, `capability evaluation required…`, `authority halted: <tripwire or sentry quorum>` (latched until an operator resume), attestation failures (`attestation evidence missing`, `attestation nonce is stale or replayed`, `attested measurement is not on the policy list`, …), and `cosign: …` for co-sign refusals (for example `cosign: claims are not signed by their issuing authority`). A tripwire `revoke` carries `reason: "tripwire reported by sentry:proxy"`.
 
 **`data/egress_audit.jsonl`** — one line per `EgressProxy` decision:
 
@@ -293,9 +299,13 @@ Opt-in. These go to separate JSONL files written by the CLI processes (or to you
 { "source": "egress-proxy", "at": 1800000000000, "outcome": "denied", "route": "pay", "leaseId": "lease_3f…", "runId": "research-swarm", "status": 403, "reason": "amount would exceed the per-run limit" }
 ```
 
-`outcome` is `forwarded`, `denied`, or `error`; `status` is the HTTP status returned to the agent.
+`outcome` is `forwarded`, `denied`, or `error`; `status` is the HTTP status returned to the agent. Since v6.0.0 a request carrying a decoy credential is logged as `denied` with `reason: "tripwire: <decoy label>"` (the agent only sees a generic `403 forbidden`), and an `accept-risk` line is written when the proxy starts despite a failed posture check.
 
-**`data/sentry_<id>.jsonl`** — one line per finding: `{ "sentry", "detector", "level" (info|warning|critical), "reason", "agentId", "runId", "at" }`. Detectors: `velocity`, `denied-access`, `prompt-injection`, `blackboard-poisoning`, `guarded-touch`, `canary-leak`, `goal-drift`.
+**`VsockRelay` / `SpoolPuller`** (v6.0.0, via `onEvent`): `{ "at", "kind": "request" | "drop" | "close", "type"?, "reason"? }` — `drop` for frames that fail the fixed schemas, rate limits, or the in-flight cap; `close` for oversize or malformed frames.
+
+**Merkle audit** (v6.0.0, optional): `HashChainSink` with `{ merkle }` appends every chained event to a `MerkleAuditLog`; signed tree heads (`nai-sth-v1`: `size`, `root`, `timestamp`, `logId`) and consistency proofs go to an external witness.
+
+**`data/sentry_<id>.jsonl`** — one line per finding: `{ "sentry", "detector", "level" (info|warning|critical), "reason", "agentId", "runId", "at" }`. Detectors: `velocity`, `denied-access`, `prompt-injection`, `blackboard-poisoning`, `guarded-touch`, `canary-leak`, `goal-drift`, `tripwire` (v6.0.0: decoy file touched or decoy credential used).
 
 **Runtime / blackboard entries** gain one field when the Perpetual Runtime refuses a write: `AgentRuntime` `file_write` entries with `result: "blocked"` carry `details.lease` or `details.guarded`; `LockedBlackboard` logs `BLACKBOARD_WRITE` with action `guarded` and outcome `denied` (`details.key`, `details.reason`).
 

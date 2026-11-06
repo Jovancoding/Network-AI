@@ -272,6 +272,11 @@ export class HttpSentryControl implements SentryControl {
     return this.post('/v1/control/alert', { level });
   }
 
+  /** Report a tripwire hit (critical). Revokes every run when sent with the proxy's sentry secret and `stopWhen.tripwire`. */
+  reportTripwire(): Promise<void> {
+    return this.post('/v1/control/alert', { level: 'critical', kind: 'tripwire' });
+  }
+
   tighten(delta: TightenDelta): Promise<void> {
     return this.post('/v1/control/tighten', delta);
   }

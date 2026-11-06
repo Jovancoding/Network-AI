@@ -5,7 +5,9 @@
 #           data[/<env>]/.signing_key (HMAC key; auto-created on first run)
 #   WRITES: data[/<env>]/active_grants.json, data[/<env>]/audit_log.jsonl,
 #           data[/<env>]/.signing_key (on first run only; created owner-only, mode 0o600)
-# Imports used: argparse, json, re, sys, uuid, hmac, hashlib, datetime, pathlib, typing
+#   <env> must be one of dev|st|sit|qa|sandbox|preprod|prod (anything else is
+#   rejected). Writes must stay inside data/ and never follow a symlink.
+# Imports used: argparse, json, os, re, sys, uuid, hmac, hashlib, datetime, pathlib, typing
 # Standard library only; no networking or process-spawning modules are imported.
 #
 # SECURITY: Justification strings supplied via --justification are truncated to
@@ -63,17 +65,45 @@ import os
 # Configuration
 GRANT_TOKEN_TTL_MINUTES = 5
 
-def _resolve_data_dir(env: str = "") -> "Path":
-    """Return the active data directory, scoped to <env> when set."""
-    import re as _re
-    # NETWORK_AI_ENV only selects which data/<env>/ folder holds the local state files.
-    _env = env or os.environ.get("NETWORK_AI_ENV", "")
-    base = Path(__file__).parent.parent / "data"
-    if _env:
-        if not _re.match(r'^[a-zA-Z0-9_-]+$', _env):
-            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
-        return base / _env
-    return base
+_DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
+
+# The only environments a data/<env>/ directory is used for.
+_ENVIRONMENTS = ("dev", "st", "sit", "qa", "sandbox", "preprod", "prod")
+
+
+def _resolve_data_dir(env: str = "") -> Path:
+    """Return data/, or data/<env>/ for one of the documented environments."""
+    requested = env or os.environ.get("NETWORK_AI_ENV", "")
+    if not requested:
+        return _DATA_ROOT
+    for name in _ENVIRONMENTS:
+        if requested == name:
+            return _DATA_ROOT / name  # built from the fixed list, not the input
+    raise ValueError(
+        f"Unknown environment {requested!r}; expected one of: {', '.join(_ENVIRONMENTS)}"
+    )
+
+
+_O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_O_BINARY = getattr(os, "O_BINARY", 0)
+
+
+def _write_confined(path: Path, text: str, append: bool = False,
+                    exclusive: bool = False) -> None:
+    """Write or append `text` inside data/ only, never through a symlink."""
+    real_root = _DATA_ROOT.resolve()
+    real_dir = path.parent.resolve()
+    if real_dir != real_root and real_root not in real_dir.parents:
+        raise PermissionError(f"Refusing to write outside {real_root}: {path}")
+    if path.is_symlink():
+        raise PermissionError(f"Refusing to write through a symlink: {path}")
+    if exclusive:
+        mode = os.O_EXCL
+    else:
+        mode = os.O_APPEND if append else os.O_TRUNC
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | mode | _O_NOFOLLOW | _O_BINARY, 0o600)
+    with os.fdopen(fd, "a" if append else "w", encoding="utf-8") as fh:
+        fh.write(text)
 
 _DATA_DIR = _resolve_data_dir()
 GRANTS_FILE = _DATA_DIR / "active_grants.json"
@@ -310,12 +340,9 @@ def _load_signing_key() -> bytes:
             pass  # Corrupt key file — regenerate below
     key = os.urandom(32)
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    # Remove any corrupt file first: the mode argument applies only on creation.
-    if key_file.exists():
-        key_file.unlink()
-    fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "w") as fh:
-        fh.write(key.hex())
+    # Remove any corrupt file or stray link first: the mode argument applies only on creation.
+    key_file.unlink(missing_ok=True)
+    _write_confined(key_file, key.hex(), exclusive=True)
     return key
 
 
@@ -347,8 +374,7 @@ def log_audit(action: str, details: dict[str, Any]) -> None:
         "action": action,
         "details": details
     }
-    with open(AUDIT_LOG, "a") as f:
-        f.write(json.dumps(entry) + "\n")
+    _write_confined(AUDIT_LOG, json.dumps(entry) + "\n", append=True)
 
 
 def save_grant(grant: dict[str, Any]) -> None:
@@ -362,7 +388,7 @@ def save_grant(grant: dict[str, Any]) -> None:
             grants = {}
     
     grants[grant["token"]] = grant
-    GRANTS_FILE.write_text(json.dumps(grants, indent=2))
+    _write_confined(GRANTS_FILE, json.dumps(grants, indent=2))
 
 
 def evaluate_permission(

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # SECURITY: Local-only. No network access and no child processes.
 # All I/O is local file operations only:
-#   READS:  data/project-context.json, data/audit_log.jsonl
-#   WRITES: data/project-context.json, data/audit_log.jsonl
-# Imports used: argparse, json, re, sys, datetime, pathlib, typing
+#   READS:  data[/<env>]/project-context.json, data[/<env>]/audit_log.jsonl
+#   WRITES: data[/<env>]/project-context.json, data[/<env>]/audit_log.jsonl
+#   <env> must be one of dev|st|sit|qa|sandbox|preprod|prod (anything else is
+#   rejected). Writes must stay inside data/ and never follow a symlink.
+# Imports used: argparse, json, os, re, sys, datetime, pathlib, typing
 # Standard library only; no networking or process-spawning modules are imported.
 """
 Project Context Manager - Persistent Layer-3 Memory for Agent Swarms
@@ -39,22 +41,46 @@ Examples:
 
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
+_DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
+
+# The only environments a data/<env>/ directory is used for.
+_ENVIRONMENTS = ("dev", "st", "sit", "qa", "sandbox", "preprod", "prod")
+
+
 def _resolve_data_dir(env: str = "") -> Path:
-    """Return the active data directory, scoped to <env> when set."""
-    import re as _re, os as _os
-    _env = env or _os.environ.get("NETWORK_AI_ENV", "")
-    base = Path(__file__).parent.parent / "data"
-    if _env:
-        if not _re.match(r'^[a-zA-Z0-9_-]+$', _env):
-            raise ValueError(f"Invalid NETWORK_AI_ENV value: {_env!r}")
-        return base / _env
-    return base
+    """Return data/, or data/<env>/ for one of the documented environments."""
+    requested = env or os.environ.get("NETWORK_AI_ENV", "")
+    if not requested:
+        return _DATA_ROOT
+    for name in _ENVIRONMENTS:
+        if requested == name:
+            return _DATA_ROOT / name  # built from the fixed list, not the input
+    raise ValueError(
+        f"Unknown environment {requested!r}; expected one of: {', '.join(_ENVIRONMENTS)}"
+    )
+
+
+_O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_O_BINARY = getattr(os, "O_BINARY", 0)
+
+
+def _open_confined(path: Path, flags: int) -> int:
+    """Open `path` for writing only inside data/, never through a symlink."""
+    real_root = _DATA_ROOT.resolve()
+    real_dir = path.parent.resolve()
+    if real_dir != real_root and real_root not in real_dir.parents:
+        raise PermissionError(f"Refusing to write outside {real_root}: {path}")
+    if path.is_symlink():
+        raise PermissionError(f"Refusing to write through a symlink: {path}")
+    return os.open(path, flags | _O_NOFOLLOW | _O_BINARY, 0o600)
+
 
 _DATA_DIR = _resolve_data_dir()
 CONTEXT_PATH = _DATA_DIR / "project-context.json"
@@ -252,7 +278,8 @@ def _load() -> dict[str, Any]:
 def _save(ctx: dict[str, Any]) -> None:
     ctx["updated_at"] = _now_iso()
     CONTEXT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with CONTEXT_PATH.open("w", encoding="utf-8") as fh:
+    fd = _open_confined(CONTEXT_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(ctx, fh, indent=2)
         fh.write("\n")
 
@@ -264,7 +291,8 @@ def _audit(action: str, detail: dict[str, Any]) -> None:
         "details": {"source": "context_manager", **detail}
     }
     AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with AUDIT_LOG_PATH.open("a", encoding="utf-8") as fh:
+    fd = _open_confined(AUDIT_LOG_PATH, os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+    with os.fdopen(fd, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(entry) + "\n")
 
 

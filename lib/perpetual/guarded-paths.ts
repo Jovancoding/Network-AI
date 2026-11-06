@@ -14,7 +14,7 @@
 import { randomBytes, type KeyObject } from 'crypto';
 import { isAbsolute, relative, resolve, sep } from 'path';
 import { canonicalHash } from '../asi/canonical';
-import { ensureEd25519, keyIdOf, signCanonical, verifyCanonical, type Ed25519KeyPair } from './signing';
+import { ensureEd25519, keyIdOf, signWith, toSigner, verifyCanonical, type SigningKey } from './signing';
 import type { GuardedCheck } from './types';
 
 /** A file path or blackboard key a write targets. */
@@ -72,10 +72,10 @@ export function guardedContentHash(content: unknown): string {
 export function signGuardedApproval(
   target: GuardedTarget,
   content: unknown,
-  operator: Pick<Ed25519KeyPair, 'privateKey'>,
+  operator: SigningKey,
   opts: { ttlMs?: number; now?: number } = {},
 ): SignedGuardedApproval {
-  ensureEd25519(operator.privateKey, 'private', 'operator.privateKey');
+  const signer = toSigner(operator, 'operator');
   validateTarget(target);
   const ttl = opts.ttlMs ?? 10 * 60 * 1000;
   if (!(ttl > 0 && ttl <= MAX_TTL_MS)) throw new TypeError('ttlMs must be between 1 ms and 24 h');
@@ -88,7 +88,8 @@ export function signGuardedApproval(
     expiresAt: issuedAt + ttl,
     nonce: randomBytes(16).toString('hex'),
   };
-  return { approval, alg: 'ed25519', keyId: keyIdOf(operator.privateKey), signature: signCanonical(approval, operator.privateKey) };
+  const { keyId, signature } = signWith(approval, signer, 'operator');
+  return { approval, alg: 'ed25519', keyId, signature };
 }
 
 function validateTarget(target: GuardedTarget): void {

@@ -53,6 +53,8 @@ const SUITES = [
   'test-asi.ts',
   'test-perpetual.ts',
   'test-perpetual-safety.ts',
+  'test-perpetual-phase5.ts',
+  'test-perpetual-fuzz.ts',
 ];
 
 const WIDTH = 60;

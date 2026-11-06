@@ -26,6 +26,7 @@ import type { ConsensusEvaluator } from '../asi/types';
 import { keyIdOf, signCanonical, verifyCanonical, type Ed25519KeyPair } from './signing';
 import type { GuardedTarget } from './guarded-paths';
 import type { ISandboxRunner, SandboxLimits, SandboxReceipt } from './sandbox';
+import { SELF_IMPROVE_TOOL, type LeaseCheck } from './types';
 
 /** One file in a patch; `content: null` deletes it. */
 export interface PatchFile {
@@ -114,6 +115,8 @@ export interface ImprovementPipelineOptions {
   autoPaths: readonly string[];
   /** Signs receipts; keep it outside the agent's reach */
   pipelineKey: Ed25519KeyPair;
+  /** When set, every evaluate/apply needs a lease that grants the `self_improve` tool */
+  lease?: LeaseCheck;
   sandbox?: {
     runner: ISandboxRunner;
     /** Test command run in the patched copy, e.g. `['npm', 'test']` */
@@ -166,6 +169,16 @@ export class ImprovementPipeline {
     return canonicalHash([...files].map((f) => ({ path: f.path.replace(/\\/g, '/'), content: f.content })).sort((a, b) => (a.path < b.path ? -1 : 1)));
   }
 
+  private leaseError(): string | null {
+    if (!this.options.lease) return null;
+    try {
+      this.options.lease.assertActive({ tool: SELF_IMPROVE_TOOL });
+      return null;
+    } catch (err) {
+      return `no lease for self-improvement: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
   /** Run every stage and decide. Never writes to the project. */
   async evaluate(proposal: ImprovementProposal): Promise<ImprovementDecision> {
     const evidence: ImprovementEvidence = { static: [], guarded: [] };
@@ -176,6 +189,8 @@ export class ImprovementPipeline {
       return { proposalId: proposal?.id ?? '', patchHash, tier, approved, reason, evidence, receipt: approved ? this.sign(proposal, patchHash, tier, evidence) : undefined };
     };
     if (shapeError) return decide('human', false, shapeError);
+    const leaseError = this.leaseError();
+    if (leaseError) return decide('human', false, leaseError);
 
     // 1. Static checks.
     for (const file of proposal.files) {
@@ -249,6 +264,8 @@ export class ImprovementPipeline {
    * operator approvals for guarded files, and writes each file atomically.
    */
   apply(proposal: ImprovementProposal, signed: SignedImprovementReceipt): { written: string[]; deleted: string[] } {
+    const leaseError = this.leaseError();
+    if (leaseError) throw new Error(`apply: ${leaseError}`);
     const invalid = this.verifyReceipt(proposal, signed);
     if (invalid) throw new Error(`apply: ${invalid}`);
     const shape = this.validateShape(proposal);

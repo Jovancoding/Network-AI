@@ -18,7 +18,7 @@
 import type { IncomingMessage, ServerResponse, Server } from 'http';
 import type { KeyObject } from 'crypto';
 import { isLoopbackHost } from '../http-guards';
-import { verifyLease } from './signing';
+import { verifyLeaseWith } from './lease-guard';
 import type { SignedLease } from './types';
 
 /** One upstream an agent may reach by name. */
@@ -54,9 +54,13 @@ export interface EgressEvent {
 
 /** Constructor options for {@link EgressProxy}. */
 export interface EgressProxyOptions {
-  authorityPublicKey: KeyObject;
-  /** Revocation check against the authority (e.g. `HttpLeaseTransport.isActive`) */
-  isLeaseActive: (leaseId: string) => Promise<boolean>;
+  /** Single-authority mode */
+  authorityPublicKey?: KeyObject;
+  /** k-of-n mode: every forwarded request needs a lease signed by `authorityThreshold` of these keys */
+  authorityPublicKeys?: readonly KeyObject[];
+  authorityThreshold?: number;
+  /** Revocation check against the authority (e.g. `HttpLeaseTransport.isActive`); receives the lease's run id */
+  isLeaseActive: (leaseId: string, runId?: string) => Promise<boolean>;
   routes: readonly EgressRoute[];
   /** How long a positive status check is cached (default 2 s) */
   statusCacheMs?: number;
@@ -68,6 +72,10 @@ export interface EgressProxyOptions {
   maxResponseBytes?: number;
   /** Upstream timeout (default 30 s) */
   timeoutMs?: number;
+  /** Decoy credentials (`TripwireSet`); any request carrying one is refused and never forwarded */
+  tripwires?: { scan(value: unknown): readonly { label: string }[] };
+  /** Called on every tripwire hit (wire to the authority as the proxy's own sentry identity) */
+  onTripwire?: (hit: { label: string; route?: string; runId?: string; leaseId?: string }) => void;
   onEvent?: (event: EgressEvent) => void;
   now?: () => number;
 }
@@ -90,6 +98,11 @@ export class EgressProxy {
 
   constructor(private readonly options: EgressProxyOptions) {
     this.now = options.now ?? Date.now;
+    if (!options.authorityPublicKey && !(options.authorityPublicKeys?.length)) throw new TypeError('EgressProxy: authorityPublicKey(s) required');
+    const k = options.authorityThreshold ?? 1;
+    if (!Number.isInteger(k) || k < 1 || k > 16 || (k > 1 && (options.authorityPublicKeys?.length ?? 0) < k)) {
+      throw new TypeError('EgressProxy: authorityThreshold must be between 1 and the number of authority keys');
+    }
     for (const route of options.routes) {
       if (!ROUTE_NAME.test(route.name)) throw new TypeError(`EgressProxy: invalid route name "${route.name}"`);
       const base = new URL(route.upstream);
@@ -129,16 +142,18 @@ export class EgressProxy {
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://proxy.local');
     const [, routeName = '', ...rest] = url.pathname.split('/');
+    const early = this.tripwireIn([req.url ?? '', headerText(req)]);
+    if (early) return this.tripped(res, early, { route: routeName || undefined, ...leaseContext(req.headers[LEASE_HEADER]) });
     const route = this.routes.get(routeName);
     if (!route) return this.deny(res, 404, 'unknown route', {});
 
     const lease = decodeLease(req.headers[LEASE_HEADER]);
     if (!lease) return this.deny(res, 401, 'lease required', { route: routeName });
     const ctx = { route: routeName, leaseId: lease.claims.leaseId, runId: lease.claims.runId };
-    const invalid = verifyLease(lease, this.options.authorityPublicKey, this.now());
+    const invalid = verifyLeaseWith(lease, this.options, this.now());
     if (invalid) return this.deny(res, 403, invalid, ctx);
     if (!(lease.claims.scope.destinations ?? []).includes(routeName)) return this.deny(res, 403, 'route outside lease scope', ctx);
-    if (!(await this.leaseActive(lease.claims.leaseId))) return this.deny(res, 403, 'lease revoked or paused', ctx);
+    if (!(await this.leaseActive(lease.claims.leaseId, lease.claims.runId))) return this.deny(res, 403, 'lease revoked or paused', ctx);
     if (!this.allowRate(lease.claims.leaseId)) return this.deny(res, 429, 'rate limit', ctx);
 
     const method = (req.method ?? 'GET').toUpperCase();
@@ -154,6 +169,8 @@ export class EgressProxy {
 
     const body = await readBody(req, this.options.maxRequestBytes ?? 1024 * 1024);
     if (body === null) return this.deny(res, 413, 'request body too large', ctx);
+    const inBody = this.tripwireIn([body]);
+    if (inBody) return this.tripped(res, inBody, ctx);
 
     let amount = 0;
     if (route.financial) {
@@ -206,12 +223,39 @@ export class EgressProxy {
     this.emit({ outcome: 'forwarded', ...ctx, status: upstream.status });
   }
 
-  private async leaseActive(leaseId: string): Promise<boolean> {
+  private tripwireIn(parts: readonly (string | Buffer)[]): string | null {
+    const set = this.options.tripwires;
+    if (!set) return null;
+    for (const part of parts) {
+      let hits: readonly { label: string }[];
+      try {
+        hits = set.scan(part);
+      } catch {
+        // A broken detector must not let traffic through silently.
+        return 'tripwire scan failed';
+      }
+      if (hits.length > 0) return hits[0].label;
+    }
+    return null;
+  }
+
+  private tripped(res: ServerResponse, label: string, ctx: Partial<EgressEvent>): void {
+    // Generic response: the agent must not learn which value was a decoy.
+    this.deny(res, 403, 'forbidden', ctx, false);
+    this.emit({ outcome: 'denied', ...ctx, status: 403, reason: `tripwire: ${label.slice(0, 128)}` });
+    try {
+      this.options.onTripwire?.({ label, route: ctx.route, runId: ctx.runId, leaseId: ctx.leaseId });
+    } catch {
+      // The request is already refused; alert delivery failures must not change that.
+    }
+  }
+
+  private async leaseActive(leaseId: string, runId: string): Promise<boolean> {
     const cachedAt = this.statusCache.get(leaseId);
     if (cachedAt !== undefined && this.now() - cachedAt < (this.options.statusCacheMs ?? 2_000)) return true;
     let active = false;
     try {
-      active = await this.options.isLeaseActive(leaseId);
+      active = await this.options.isLeaseActive(leaseId, runId);
     } catch {
       active = false;
     }
@@ -232,7 +276,9 @@ export class EgressProxy {
   private deny(res: ServerResponse, status: number, reason: string, ctx: Partial<EgressEvent>, audit = true): void {
     if (audit) this.emit({ outcome: 'denied', ...ctx, status, reason });
     if (res.headersSent) return;
-    res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: reason }));
+    // Denied before the request body was read: close the connection so a keep-alive client cannot hit a reset.
+    const early = res.req !== undefined && !res.req.complete;
+    res.writeHead(status, { 'Content-Type': 'application/json', ...(early ? { Connection: 'close' } : {}) }).end(JSON.stringify({ error: reason }));
   }
 
   private emit(event: Omit<EgressEvent, 'at'>): void {
@@ -242,6 +288,29 @@ export class EgressProxy {
       // Audit delivery must never break the proxy decision.
     }
   }
+}
+
+/** Header names and values as one string, with HTTP Basic credentials decoded. */
+function headerText(req: IncomingMessage): string {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value === undefined) continue;
+    for (const v of Array.isArray(value) ? value : [value]) {
+      parts.push(`${key}: ${v}`);
+      const basic = /^\s*basic\s+([A-Za-z0-9+/=_-]{1,4096})\s*$/i.exec(v);
+      if (basic) parts.push(Buffer.from(basic[1], 'base64').toString('utf8'));
+    }
+  }
+  return parts.join('\n');
+}
+
+/** Lease/run ids from an (unverified) lease header, for alert context only. */
+function leaseContext(header: string | string[] | undefined): { leaseId?: string; runId?: string } {
+  const lease = decodeLease(header);
+  const c = lease?.claims;
+  if (!c || typeof c !== 'object') return {};
+  const id = (v: unknown) => (typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v) ? v : undefined);
+  return { leaseId: id(c.leaseId), runId: id(c.runId) };
 }
 
 function decodeLease(header: string | string[] | undefined): SignedLease | null {
