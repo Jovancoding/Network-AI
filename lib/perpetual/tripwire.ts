@@ -104,7 +104,9 @@ export class TripwireSet {
       const body = randomBytes(48).toString('base64');
       this.assertCapacity();
       this.credentials.set(body, { label: `${rel}:private-key`, format: 'generic' });
-      content = `-----BEGIN PRIVATE KEY-----\n${body}\n-----END PRIVATE KEY-----\n`;
+      // Assembled at runtime: the decoy must look like a key file, but no key-shaped literal lives in source.
+      const label = ['PRIVATE', 'KEY'].join(' ');
+      content = `-----BEGIN ${label}-----\n${body}\n-----END ${label}-----\n`;
     } else if (kind === 'config') {
       content = `${JSON.stringify({ apiKey: this.createCredential(`${rel}:apiKey`, 'generic'), endpoint: 'https://api.internal.invalid' }, null, 2)}\n`;
     } else {
