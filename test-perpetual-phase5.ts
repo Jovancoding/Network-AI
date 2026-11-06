@@ -602,7 +602,13 @@ function testHardenedNode(): void {
       "try { require('child_process').execFileSync(process.execPath, ['-v']); out.child = 'allowed'; } catch { out.child = 'blocked'; }",
       "process.stdout.write(JSON.stringify(out));",
     ].join('\n'));
-    const flags = ['--no-addons', '--disallow-code-generation-from-strings', '--permission', `--allow-fs-read=${sandboxDir}`, `--allow-fs-write=${sandboxDir}`];
+    // Node ≥ 22.13 / 23.5 use --permission; Node 20–22.12 use --experimental-permission.
+    const permissionFlag = ['--permission', '--experimental-permission'].find((f) => spawnSync(process.execPath, [f, '-e', '0'], { timeout: 30_000 }).status === 0);
+    if (!permissionFlag) {
+      pass(`Node ${process.version} has no permission model; the hardened profile needs Node 20+ (argv construction is covered above)`);
+      return;
+    }
+    const flags = ['--no-addons', '--disallow-code-generation-from-strings', permissionFlag, `--allow-fs-read=${sandboxDir}`, `--allow-fs-write=${sandboxDir}`];
     const r = spawnSync(process.execPath, [...flags, script, __filename], { encoding: 'utf8', timeout: 30_000 });
     const out = JSON.parse(r.stdout || '{}') as Record<string, string>;
     assert(out.eval === 'blocked' && out.read === 'blocked' && out.child === 'blocked', 'real Node run: eval, outside reads, and child processes are blocked', r.stdout + r.stderr);
