@@ -15,7 +15,7 @@ CLI extension, and an OpenClaw skill.
 
 ```bash
 npm install                   # Install dependencies
-npx tsc --noEmit              # Type-check (zero errors expected)
+npm run typecheck              # Type-check (zero errors expected)
 npm run test:all              # Run the full test suite (all suites)
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
@@ -37,7 +37,7 @@ npm run test:cli              # CLI layer tests
 - `lib/asi/` — ASI Strict Mode (opt-in `ASI_STRICT_MODE=audit|enforce`): proof-gated actions, BFT consensus, auditor receipts, kill switch
 - `lib/perpetual/` — Perpetual Runtime (opt-in): operator-signed leases + dead-man switch, egress proxy, guarded paths, sandbox runner, sentry swarm, self-improvement pipeline, verified snapshots, budget balancer (`network-ai perpetual` CLI)
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Gemini, OpenAI Responses, Claude Agent SDK, etc.)
-- `bin/cli.ts` — CLI entry point (`npx network-ai`)
+- `bin/cli.ts` — CLI entry point (`npx -y network-ai@6.0.1`)
 - `bin/mcp-server.ts` — MCP server (stdio + SSE transports)
 - `types/` — TypeScript declaration files
 - `data/` — Runtime data (gitignored): audit log, pending changes
@@ -75,8 +75,8 @@ npm run test:cli              # CLI layer tests
 The repo exposes its tool suite over MCP (stdio and SSE):
 
 ```bash
-npx network-ai-server --stdio        # stdio (Claude Code, Codex, Gemini CLI, Cursor)
-npx network-ai-server --port 3001    # SSE/HTTP
+npx -y -p network-ai@6.0.1 network-ai-server --stdio        # stdio (Claude Code, Codex, Gemini CLI, Cursor)
+npx -y -p network-ai@6.0.1 network-ai-server --port 3001    # SSE/HTTP
 ```
 
 Tools: `blackboard_read`, `blackboard_write`, `blackboard_list`, `budget_status`,

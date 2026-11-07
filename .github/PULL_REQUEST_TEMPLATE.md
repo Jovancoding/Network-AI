@@ -16,7 +16,7 @@ Brief description of what this PR does.
 
 - [ ] I have an **approved issue** linked above
 - [ ] All **251+ tests pass** (`npm test`)
-- [ ] **Zero compile errors** (`npx tsc --noEmit`)
+- [ ] **Zero compile errors** (`npm run typecheck`)
 - [ ] I added **new tests** for my changes
 - [ ] I updated **JSDoc** on any new/changed exports
 - [ ] I updated **README.md** (if user-facing)

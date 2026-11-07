@@ -354,11 +354,11 @@
       },
       {
         "path": "examples/05-code-review-swarm.ts",
-        "reason": "Intentional — example script uses execSync('npx tsc --noEmit') to demonstrate automated TypeScript type-checking in a code review pipeline. Not part of the core library."
+        "reason": "Intentional — example script runs the project's own TypeScript compiler (execFileSync on typescript/bin/tsc, no shell) to demonstrate automated type-checking in a code review pipeline. Not part of the core library."
       },
       {
         "path": "examples/demo-runner.ts",
-        "reason": "Intentional — demo runner uses spawn('npx', ['ts-node', file]) to execute example scripts. This is a developer convenience script, not part of the core library."
+        "reason": "Intentional — demo runner spawns the project's own ts-node (process.execPath + ts-node/dist/bin.js, no shell) to execute example scripts. This is a developer convenience script, not part of the core library."
       },
       {
         "path": "lib/agent-runtime.ts",

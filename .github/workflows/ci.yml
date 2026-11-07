@@ -33,7 +33,7 @@ jobs:
         run: npm ci
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Build
         run: npm run build
@@ -55,6 +55,12 @@ jobs:
 
       - name: Test - CLI
         run: npx ts-node test-cli.ts
+
+      - name: Test - ClawHub skill scripts (Python, real symlinks on Linux)
+        run: npx ts-node test-skill-scripts.ts
+
+      - name: Test - Release pins (launchers name the exact package version)
+        run: npx ts-node test-plugin-pins.ts
 
       - name: Smoke - compiled CLI loads on this Node version
         run: node dist/bin/cli.js --help

@@ -66,6 +66,7 @@ import argparse
 import json
 import os
 import re
+import stat
 import sys
 import time
 import hashlib
@@ -429,12 +430,47 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         return sanitized
 
     def _safe_pending_path(self, change_id: str, suffix: str = ".pending.json") -> Path:
-        """Build a pending-file path and verify it stays inside pending_dir."""
+        """
+        Build a pending-file path inside pending_dir without resolving it.
+
+        Symlinks are never followed: the directory's real path must be inside
+        data/ (checked by path components, so a sibling such as
+        pending_changes_extra/ cannot pass), and the file itself must not be a
+        symlink or anything other than a regular file. Every later open uses
+        O_NOFOLLOW, so a link planted after this check is refused, not followed.
+        """
         safe_id = self._sanitize_change_id(change_id)
-        target = (self.pending_dir / f"{safe_id}{suffix}").resolve()
-        if not str(target).startswith(str(self.pending_dir.resolve())):
+        _require_inside(self.pending_dir, _DATA_ROOT)
+        target = self.pending_dir / f"{safe_id}{suffix}"
+        if target.parent != self.pending_dir or target.name != f"{safe_id}{suffix}":
             raise ValueError(f"Path traversal blocked for change_id '{change_id}'")
+        self._pending_exists(target)  # raises on a symlink or non-regular entry
         return target
+
+    @staticmethod
+    def _pending_exists(path: Path) -> bool:
+        """Whether a pending file exists, without following links. Refuses links and non-files."""
+        try:
+            st = os.lstat(path)
+        except FileNotFoundError:
+            return False
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+            raise PermissionError(f"Refusing pending entry that is not a regular file: {path}")
+        return True
+
+    @staticmethod
+    def _read_pending(path: Path) -> dict[str, Any]:
+        """Read a pending file without following a symlink."""
+        fd = os.open(path, os.O_RDONLY | _O_NOFOLLOW | _O_BINARY)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise PermissionError(f"Refusing pending entry that is not a regular file: {path}")
+            with os.fdopen(fd, "r", encoding="utf-8") as fh:
+                fd = -1
+                return json.load(fh)
+        finally:
+            if fd >= 0:
+                os.close(fd)
 
     @staticmethod
     def _entry_hash(entry: Optional[dict[str, Any]]) -> Optional[str]:
@@ -450,6 +486,9 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         _require_inside(archive_dir, _DATA_ROOT)
         archive_dir.mkdir(exist_ok=True)
         _write_confined(archive_dir / f"{safe_id}.{outcome}.json", json.dumps(change_set, indent=2))
+        # Re-check without following links; unlinking then removes the entry itself, never a link target.
+        self._pending_exists(pending_file)
+        _require_inside(pending_file.parent, _DATA_ROOT)
         pending_file.unlink()
 
     def propose_change(self, change_id: str, key: str, value: Any, 
@@ -465,7 +504,7 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         
         with blackboard_lock(self.lock_path):
             # Check for duplicate change_id
-            if pending_file.exists():
+            if self._pending_exists(pending_file):
                 return {
                     "success": False,
                     "error": f"Change ID '{change_id}' already exists. Use a unique ID."
@@ -509,13 +548,13 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         pending_file = self._safe_pending_path(change_id)
         
         with blackboard_lock(self.lock_path):
-            if not pending_file.exists():
+            if not self._pending_exists(pending_file):
                 return {
                     "valid": False,
                     "error": f"Change '{change_id}' not found. Was it proposed?"
                 }
             
-            change_set = json.loads(pending_file.read_text())
+            change_set = self._read_pending(pending_file)
             
             if change_set["status"] != "pending":
                 return {
@@ -546,7 +585,12 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
             for other_file in self.pending_dir.glob("*.pending.json"):
                 if other_file.name == pending_file.name:
                     continue
-                other_change = json.loads(other_file.read_text())
+                try:
+                    if not self._pending_exists(other_file):
+                        continue
+                    other_change = self._read_pending(other_file)
+                except (PermissionError, OSError, ValueError):
+                    continue  # links and non-regular entries are never followed
                 if other_change["key"] == key and other_change["status"] in ("pending", "validated"):
                     conflicts.append(other_change["change_id"])
             
@@ -582,13 +626,13 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         pending_file = self._safe_pending_path(change_id)
         
         with blackboard_lock(self.lock_path):
-            if not pending_file.exists():
+            if not self._pending_exists(pending_file):
                 return {
                     "committed": False,
                     "error": f"Change '{change_id}' not found."
                 }
             
-            change_set = json.loads(pending_file.read_text())
+            change_set = self._read_pending(pending_file)
             
             if change_set["status"] != "validated":
                 return {
@@ -640,13 +684,13 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
         pending_file = self._safe_pending_path(change_id)
         
         with blackboard_lock(self.lock_path):
-            if not pending_file.exists():
+            if not self._pending_exists(pending_file):
                 return {
                     "aborted": False,
                     "error": f"Change '{change_id}' not found."
                 }
             
-            change_set = json.loads(pending_file.read_text())
+            change_set = self._read_pending(pending_file)
             change_set["status"] = "aborted"
             change_set["aborted_at"] = datetime.now(timezone.utc).isoformat()
             self._archive(change_set, pending_file, "aborted")
@@ -660,8 +704,14 @@ Last Updated: {datetime.now(timezone.utc).isoformat()}
     def list_pending_changes(self) -> list[dict[str, Any]]:
         """List all pending changes awaiting commit."""
         pending: list[dict[str, Any]] = []
+        _require_inside(self.pending_dir, _DATA_ROOT)
         for pending_file in self.pending_dir.glob("*.pending.json"):
-            change_set = json.loads(pending_file.read_text())
+            try:
+                if not self._pending_exists(pending_file):
+                    continue
+                change_set = self._read_pending(pending_file)
+            except (PermissionError, OSError, ValueError):
+                continue  # links and non-regular entries are skipped, never followed
             pending.append({
                 "change_id": change_set["change_id"],
                 "key": change_set["key"],

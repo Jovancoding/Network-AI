@@ -1101,7 +1101,7 @@ async function main() {
       const slug    = codeLabel.replace(/[^a-z0-9]/gi, '-').toLowerCase().replace(/-+/g, '-').slice(0, 30);
       const path    = require('path') as typeof import('path');
       const fs      = require('fs')   as typeof import('fs');
-      const { execSync } = require('child_process') as typeof import('child_process');
+      const { execFileSync } = require('child_process') as typeof import('child_process');
       const outDir  = path.join(__dirname, 'output');
       if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
       const outFile = path.join(outDir, `fixed-${slug}-${Date.now()}.${ext}`);
@@ -1118,9 +1118,11 @@ async function main() {
         if (!path.resolve(tmpFile).startsWith(path.resolve(outDir) + path.sep)) throw new Error('Temp path outside output directory');
         fs.writeFileSync(tmpFile, code, 'utf8');
         try {
-          execSync(
-            'npx tsc --noEmit --skipLibCheck --noResolve --allowSyntheticDefaultImports ' +
-            '--target ES2020 --module commonjs --strict false "' + tmpFile + '"',
+          // Run the project's own TypeScript compiler (no npx fetch, no shell).
+          execFileSync(
+            process.execPath,
+            [require.resolve('typescript/bin/tsc'), '--noEmit', '--skipLibCheck', '--noResolve', '--allowSyntheticDefaultImports',
+              '--target', 'ES2020', '--module', 'commonjs', '--strict', 'false', tmpFile],
             { stdio: 'pipe', cwd: process.cwd() }
           );
           return [];

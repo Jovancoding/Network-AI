@@ -3,8 +3,8 @@
  * network-ai console — Interactive terminal dashboard for the agent runtime.
  *
  * Usage:
- *   npx network-ai-console [options]
- *   npx network-ai console             (via CLI sub-command)
+ *   npx -y -p network-ai@6.0.1 network-ai-console [options]
+ *   npx -y network-ai@6.0.1 console             (via CLI sub-command)
  *
  * Options:
  *   --base-path <dir>    Base directory for agent sandbox (default: cwd)

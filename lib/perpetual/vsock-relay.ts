@@ -271,10 +271,16 @@ export class VsockRelay {
 
   private async egress(req: Extract<RelayRequest, { t: 'egress' }>): Promise<RelayEgressResult> {
     if (!this.options.egressProxyUrl) throw new Error('egress not available');
-    const url = new URL(`/${req.route}${req.path}`, this.options.egressProxyUrl);
+    // Scheme, host, and port always come from the operator-configured proxy; the guest supplies only path and query.
+    const base = new URL(this.options.egressProxyUrl);
+    const parsed = new URL(`/${req.route}${req.path}`, 'http://relay.invalid');
     // URL parsing normalizes dot segments (including %2e%2e): the result must stay under the route.
-    if (!url.pathname.startsWith(`/${req.route}/`) && url.pathname !== `/${req.route}`) throw new Error('invalid path');
-    const res = await fetch(url, {
+    if (!parsed.pathname.startsWith(`/${req.route}/`) && parsed.pathname !== `/${req.route}`) throw new Error('invalid path');
+    const target = new URL(base.origin);
+    target.pathname = parsed.pathname;
+    target.search = parsed.search;
+    if (target.origin !== base.origin) throw new Error('invalid path');
+    const res = await fetch(target, {
       method: req.method,
       headers: { 'X-Network-AI-Lease': req.lease, ...(req.contentType ? { 'Content-Type': req.contentType } : {}) },
       body: req.method === 'POST' && req.body ? Buffer.from(req.body, 'base64') : undefined,

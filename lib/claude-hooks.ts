@@ -23,7 +23,7 @@
  *     "PreToolUse": [{
  *       "matcher": "Bash|Write|Edit|WebFetch",
  *       "hooks": [{ "type": "command",
- *                   "command": "npx -y -p network-ai network-ai hook pre-tool-use --mode enforce" }]
+ *                   "command": "npx -y -p network-ai@6.0.1 network-ai hook pre-tool-use --mode enforce" }]
  *     }]
  *   }
  * }

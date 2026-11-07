@@ -3,7 +3,7 @@
  * Dashboard CLI entry point
  *
  * Launches the live agent topology dashboard on localhost.
- * Usage: npx network-ai-dashboard [--port 4820]
+ * Usage: npx -y -p network-ai@6.0.1 network-ai-dashboard [--port 4820]
  *
  * @module DashboardCLI
  */

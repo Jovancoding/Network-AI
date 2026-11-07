@@ -28,7 +28,7 @@ coordination tools (`blackboard_read`, `blackboard_write`, `budget_status`,
 
 ```bash
 npm install                   # Install dependencies
-npx tsc --noEmit              # Type-check (zero errors expected)
+npm run typecheck              # Type-check (zero errors expected)
 npm run test:all              # Run the full test suite
 npm test                      # Core orchestrator tests only
 npm run test:adapters         # All framework adapter tests

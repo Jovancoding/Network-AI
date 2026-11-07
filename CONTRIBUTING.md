@@ -16,8 +16,8 @@ Unsolicited PRs without a linked, approved issue will be closed.
 
 ### Code Quality
 
-- All 4,561 existing tests must pass (`npm run test:all`)
-- Zero TypeScript compile errors (`npx tsc --noEmit`)
+- All 4,588 existing tests must pass (`npm run test:all`)
+- Zero TypeScript compile errors (`npm run typecheck`)
 - New features must include tests with >90% branch coverage
 - Follow existing code style and patterns
 - No new runtime dependencies without prior approval
@@ -43,8 +43,8 @@ Unsolicited PRs without a linked, approved issue will be closed.
 2. Implement your change with tests
 3. Run the full test suite:
    ```bash
-   npm run test:all   # 4,561 tests across 45 suites
-   npx tsc --noEmit
+   npm run test:all   # 4,588 tests across 47 suites
+   npm run typecheck
    ```
 4. Open a PR referencing the approved issue
 5. Fill out the PR template completely
@@ -81,11 +81,11 @@ Unsolicited PRs without a linked, approved issue will be closed.
 git clone https://github.com/Jovancoding/Network-AI.git
 cd Network-AI
 npm install
-npm run test:all  # Run all 4,561 tests (45 suites)
+npm run test:all  # Run all 4,588 tests (47 suites)
 npm run test:phase4  # Phase 4 behavioral control plane tests only
 npx ts-node test-perpetual.ts         # Perpetual Runtime: leases, egress, CLI
 npx ts-node test-perpetual-safety.ts  # Perpetual Runtime: guarded paths, sandbox, sentries, pipeline, budget
-npx tsc --noEmit  # Type-check
+npm run typecheck  # Type-check
 ```
 
 ## License

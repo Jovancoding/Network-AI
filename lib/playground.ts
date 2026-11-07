@@ -18,7 +18,7 @@
  *   await startPlayground();
  *
  * CLI:
- *   npx network-ai playground
+ *   npx -y network-ai@6.0.1 playground
  *
  * @module Playground
  * @version 1.0.0

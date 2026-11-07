@@ -4,14 +4,14 @@ This file is read automatically by OpenAI Codex CLI when working in this reposit
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 6.0.0.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 6.0.1.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
-npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 4,561 tests across 45 suites
+npm run typecheck              # Type-check (zero errors expected)
+npm run test:all              # Run all 4,588 tests across 47 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 32 adapter tests
@@ -41,9 +41,9 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/env-manager.ts` — EnvironmentManager: promotion chain dev→st→sit→qa→preprod→prod, backup/restore, env diff, NETWORK_AI_ENV routing
 - `lib/perpetual/` — Perpetual Runtime (opt-in): operator-signed leases + dead-man switch, egress proxy, guarded paths, sandbox runner, sentry swarm, self-improvement pipeline, verified snapshots, budget balancer (`network-ai perpetual` CLI)
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, Gemini, OpenAI Responses, Claude Agent SDK, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
-- `bin/cli.ts` — CLI entry point (`npx network-ai`)
+- `bin/cli.ts` — CLI entry point (`npx -y network-ai@6.0.1`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)
-- `bin/console.ts` — Interactive console with pipe mode (`npx network-ai-console`)
+- `bin/console.ts` — Interactive console with pipe mode (`npx -y -p network-ai@6.0.1 network-ai-console`)
 - `scripts/` — Python helper scripts (blackboard, permissions, token management)
 - `types/` — TypeScript declaration files
 - `data/` — Runtime data (gitignored): audit log, pending changes

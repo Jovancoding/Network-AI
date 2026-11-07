@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v6.0.0). 4,561 tests across 45 suites.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v6.0.1). 4,588 tests across 47 suites.
 
 ## Architecture
 
@@ -53,8 +53,8 @@ Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, gu
 ## Build & Test
 
 ```bash
-npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # All 4,561 tests across 45 suites
+npm run typecheck              # Type-check (zero errors expected)
+npm run test:all              # All 4,588 tests across 47 suites
 npm test                      # Core orchestrator tests
 npm run test:adapters         # All 32 adapters
 ```

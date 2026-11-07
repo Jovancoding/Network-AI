@@ -300,7 +300,7 @@ monitor.start(1_000); // poll every second
 Start the MCP server (exposes 20+ tools via SSE/JSON-RPC):
 
 ```bash
-npx network-ai-server --port 3001 --audit-log data/audit_log.jsonl --ceiling 500000
+npx -y -p network-ai@6.0.1 network-ai-server --port 3001 --audit-log data/audit_log.jsonl --ceiling 500000
 ```
 
 Connect your AI model to `http://localhost:3001/sse` — it can now:
@@ -318,33 +318,33 @@ Connect your AI model to `http://localhost:3001/sse` — it can now:
 
 ```bash
 # Initialise the full environment chain in one command
-npx network-ai env init --all
+npx -y network-ai@6.0.1 env init --all
 
 # After validating in dev, promote config to st (auto-gate — no approval needed)
-npx network-ai env promote --from dev --to st
+npx -y network-ai@6.0.1 env promote --from dev --to st
 
 # Review differences before promoting further
-npx network-ai env diff --from st --to sit
+npx -y network-ai@6.0.1 env diff --from st --to sit
 
 # preprod requires a human confirmation
-npx network-ai env promote --from sit --to qa
-npx network-ai env promote --from qa --to preprod --confirmed-by "jane.doe"
+npx -y network-ai@6.0.1 env promote --from sit --to qa
+npx -y network-ai@6.0.1 env promote --from qa --to preprod --confirmed-by "jane.doe"
 
 # prod requires an approval token
-npx network-ai env promote --from preprod --to prod --approved-by "security-board"
+npx -y network-ai@6.0.1 env promote --from preprod --to prod --approved-by "security-board"
 ```
 
 **Backup and rollback:**
 
 ```bash
 # Create a named backup before a risky change
-npx network-ai env backup create --env prod
+npx -y network-ai@6.0.1 env backup create --env prod
 
 # List available backups
-npx network-ai env backup list --env prod
+npx -y network-ai@6.0.1 env backup list --env prod
 
 # Roll back to the latest backup
-npx network-ai env backup restore --env prod --latest
+npx -y network-ai@6.0.1 env backup restore --env prod --latest
 ```
 
 **From TypeScript:**
@@ -549,7 +549,7 @@ Run these before declaring the integration production-ready:
 - [ ] `npx ts-node test-phase4.ts` — 147 behavioral tests pass
 - [ ] `npx ts-node test-qa.ts` — 67 QA orchestrator tests pass
 - [ ] `npx ts-node test-phase7.ts` — 94 Phase 7 tests pass (hooks, flow control, composer, semantic search)
-- [ ] `npm run test:all` — all 4,561 tests pass across 45 suites
+- [ ] `npm run test:all` — all 4,588 tests pass across 47 suites
 - [ ] `npm run demo -- --08` runs to completion in < 10 seconds
 
 ### Race Condition Safety
@@ -628,4 +628,4 @@ Run these before declaring the integration production-ready:
 
 ---
 
-*Network-AI v6.0.0 · MIT License · https://github.com/Jovancoding/Network-AI*
+*Network-AI v6.0.1 · MIT License · https://github.com/Jovancoding/Network-AI*

@@ -504,7 +504,7 @@ async function fuzzPhase5Doors(): Promise<void> {
   let problem: string | null = null;
   const iterations = Math.min(N, 300);
   try {
-    for (let i = 0; i < iterations && !problem; i++) {
+    for (let i = 0; i < iterations; i++) {
       const payload = fz.chance(0.4) ? fz.bytes() : encodeFrame(fz.mutateMany(fz.pick(valid)));
       await new Promise<void>((done) => {
         const s = net.connect(sock);

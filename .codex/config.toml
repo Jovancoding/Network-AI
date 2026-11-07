@@ -6,12 +6,12 @@
 #
 # To register globally instead, copy the [mcp_servers.network-ai] block into
 # ~/.codex/config.toml. Or run:
-#   codex mcp add network-ai -- npx -y -p network-ai network-ai-server --stdio
+#   codex mcp add network-ai -- npx -y -p network-ai@6.0.1 network-ai-server --stdio
 #
 # startup_timeout_sec is raised from the default (10s) because the first run
 # may download the package via npx.
 
 [mcp_servers.network-ai]
 command = "npx"
-args = ["-y", "-p", "network-ai", "network-ai-server", "--stdio"]
+args = ["-y", "-p", "network-ai@6.0.1", "network-ai-server", "--stdio"]
 startup_timeout_sec = 30

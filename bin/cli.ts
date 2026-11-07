@@ -4,7 +4,7 @@
  * Imports core classes directly (Option B: no server required).
  *
  * Usage:
- *   npx network-ai <command> [options]
+ *   npx -y network-ai@6.0.1 <command> [options]
  *   network-ai <command> [options]      (after npm install -g network-ai)
  */
 

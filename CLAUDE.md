@@ -4,14 +4,14 @@ This file is read automatically by Claude Code when working in this repository.
 
 ## Project Overview
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 6.0.0.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination. Version 6.0.1.
 
 ## Build & Test Commands
 
 ```bash
 npm install                   # Install dependencies
-npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # Run all 4,561 tests across 45 suites
+npm run typecheck              # Type-check (zero errors expected)
+npm run test:all              # Run all 4,588 tests across 47 suites
 npm test                      # Core orchestrator tests only
 npm run test:security         # Security module tests
 npm run test:adapters         # All 32 adapter tests
@@ -49,9 +49,9 @@ All tests must pass before any commit. No test should be skipped or marked `.onl
 - `lib/asi/` — ASI Strict Mode (opt-in `ASI_STRICT_MODE=audit|enforce`): ProofGate, ConsensusEngine, auditor receipts, HaltCoordinator kill switch, trust-tiered context, cognitive caps, canaries, HashChainSink
 - `lib/perpetual/` — Perpetual Runtime (opt-in): LeaseAuthority + LeaseGuard (operator-signed leases, dead-man switch), EgressProxy (credentials, financial limits), GuardedPaths, ContainerSandboxRunner, Sentry swarm (authenticated identities, quorum), ImprovementPipeline, StateSnapshotter/SelfHealer, BudgetBalancer; CLI `network-ai perpetual`. Invariants I1–I3: external stop works without agent cooperation; agents never modify their limits; spend stays inside signed ceilings
 - `adapters/` — 32 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, Gemini, OpenAI Responses, Claude Agent SDK, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
-- `bin/cli.ts` — CLI entry point (`npx network-ai`)
+- `bin/cli.ts` — CLI entry point (`npx -y network-ai@6.0.1`)
 - `bin/mcp-server.ts` — MCP server (SSE + stdio transport)
-- `bin/console.ts` — Interactive console with pipe mode (`npx network-ai-console`)
+- `bin/console.ts` — Interactive console with pipe mode (`npx -y -p network-ai@6.0.1 network-ai-console`)
 - `scripts/` — Python helper scripts (blackboard, permissions, token management)
 - `types/` — TypeScript declaration files
 - `data/` — Runtime data (gitignored): audit log, pending changes
@@ -78,10 +78,10 @@ Network-AI exposes 24 tools over MCP (stdio and SSE transports):
 
 ```bash
 # Stdio (for Claude Code / Cursor / Glama):
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | npx network-ai
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | npx -y network-ai@6.0.1
 
 # SSE:
-npx network-ai-server --port 3001
+npx -y -p network-ai@6.0.1 network-ai-server --port 3001
 ```
 
 Tools: `blackboard_read`, `blackboard_write`, `blackboard_list`, `blackboard_delete`, `blackboard_exists`, `budget_status`, `budget_spend`, `budget_reset`, `token_create`, `token_validate`, `token_revoke`, `audit_query`, `config_get`, `config_set`, `agent_list`, `agent_spawn`, `agent_stop`, `fsm_transition`, and more.

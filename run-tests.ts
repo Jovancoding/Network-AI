@@ -55,6 +55,8 @@ const SUITES = [
   'test-perpetual-safety.ts',
   'test-perpetual-phase5.ts',
   'test-perpetual-fuzz.ts',
+  'test-skill-scripts.ts',
+  'test-plugin-pins.ts',
 ];
 
 const WIDTH = 60;

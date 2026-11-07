@@ -12,7 +12,7 @@
  *   0 — all fixable alerts absent (gptSecurity, debugAccess gone)
  *   1 — one or more fixable alerts still present, or scan failed
  *
- * Requires: npx @socketsecurity/cli (installed on first run via npx -y)
+ * Requires: @socketsecurity/cli, pinned to SOCKET_CLI below (run via npx on first use).
  */
 
 'use strict';
@@ -20,6 +20,9 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+/** Exact Socket CLI version (never a floating tag: the scanner must not change under us). */
+const SOCKET_CLI = '@socketsecurity/cli@1.14.0';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
@@ -75,8 +78,21 @@ if (forceVersion && !SEMVER_RE.test(forceVersion)) {
   process.exit(1);
 }
 
-// npx binary name — on Windows the shim is npx.cmd
-const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+// Run npx through node itself: Node >= 18.20 / 20.12 / 22 refuse to spawn npx.cmd without a shell on
+// Windows (CVE-2024-27980), and a shell is what we must avoid. npm sets npm_execpath under `npm run`.
+function npxCommand(args) {
+  const npmCli = process.env.npm_execpath;
+  const npxCli = npmCli ? path.join(path.dirname(npmCli), 'npx-cli.js') : path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js');
+  if (fs.existsSync(npxCli)) return { cmd: process.execPath, args: [npxCli, ...args] };
+  return { cmd: 'npx', args };
+}
+
+function runSocket(socketArgs) {
+  const { cmd, args: argv } = npxCommand(['-y', SOCKET_CLI, ...socketArgs]);
+  const r = spawnSync(cmd, argv, { cwd: path.join(__dirname, '..'), encoding: 'utf8', shell: false, maxBuffer: 16 * 1024 * 1024 });
+  if (r.error) return { stdout: '', all: `spawn failed: ${r.error.message}` };
+  return { stdout: r.stdout || '', all: (r.stdout || '') + (r.stderr || '') };
+}
 
 // ── Run Socket CLI ──────────────────────────────────────────────────────────
 
@@ -84,22 +100,22 @@ console.log(`\n${c.bold}${c.cyan}Socket.dev Score Check${c.reset}`);
 console.log(`${c.gray}${'─'.repeat(50)}${c.reset}`);
 
 let raw;
+let scoreJson = null;
 if (localMode) {
   console.log(`${c.gray}Mode: local scan (${process.cwd()})${c.reset}\n`);
-  const r = spawnSync(
-    npx, ['-y', '@socketsecurity/cli', 'scan', '.'],
-    { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
-  );
-  raw = (r.stdout || '') + (r.stderr || '');
+  raw = runSocket(['scan', '.']).all;
 } else {
   const purl = `npm ${packageName}@${version}`;
   console.log(`${c.gray}Mode: published package — ${purl}${c.reset}\n`);
-  // Use spawnSync with an arg array — no shell interpolation, immune to injection
-  const r = spawnSync(
-    npx, ['-y', '@socketsecurity/cli', 'package', 'shallow', 'npm', `${packageName}@${version}`],
-    { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
-  );
-  raw = (r.stdout || '') + (r.stderr || '');
+  // Arg array, no shell: immune to injection (version is semver-validated above).
+  const out = runSocket(['package', 'score', 'npm', `${packageName}@${version}`, '--json']);
+  raw = out.all;
+  try {
+    const parsed = JSON.parse(out.stdout.slice(out.stdout.indexOf('{')));
+    scoreJson = (parsed && parsed.data) || parsed;
+  } catch {
+    scoreJson = null;
+  }
 }
 
 // ── Parse output ─────────────────────────────────────────────────────────────
@@ -114,9 +130,12 @@ const clean = stripAnsi(raw);
 
 /**
  * Extract supply-chain score from CLI output.
- * Looks for: "- Supply Chain Risk:   75"
+ * Prefers the `package score --json` report (`self.score.supplyChain`, 0–100);
+ * falls back to text: "- Supply Chain Risk:   75".
  */
 function parseScore(text) {
+  const fromJson = scoreJson && scoreJson.self && scoreJson.self.score && scoreJson.self.score.supplyChain;
+  if (typeof fromJson === 'number') return fromJson <= 1 ? Math.round(fromJson * 100) : Math.round(fromJson);
   const m = text.match(/Supply Chain(?:\s+Risk)?:\s*(\d+)/i);
   if (!m) return null;
   const v = parseInt(m[1], 10);
@@ -124,15 +143,21 @@ function parseScore(text) {
 }
 
 /**
- * Extract alert list from the Alerts line:
- *   "- Alerts (0/4/4):  [middle] gptSecurity, [middle] networkAccess, ..."
+ * Extract alerts: from the JSON report (`self.alerts[].name/severity`), or the
+ * text Alerts line: "- Alerts (0/4/4):  [middle] gptSecurity, [middle] networkAccess, ..."
  */
 function parseAlerts(text) {
   const alerts = [];
-  const tokenRe = /\[(middle|low|high|critical)\]\s+(\w+)/g;
-  let m;
-  while ((m = tokenRe.exec(text)) !== null) {
-    alerts.push({ severity: m[1], name: m[2] });
+  if (scoreJson && scoreJson.self && Array.isArray(scoreJson.self.alerts)) {
+    for (const a of scoreJson.self.alerts) {
+      if (a && typeof a.name === 'string') alerts.push({ severity: String(a.severity || 'low'), name: a.name });
+    }
+  } else {
+    const tokenRe = /\[(middle|low|high|critical)\]\s+(\w+)/g;
+    let m;
+    while ((m = tokenRe.exec(text)) !== null) {
+      alerts.push({ severity: m[1], name: m[2] });
+    }
   }
   // Deduplicate
   const seen = new Set();

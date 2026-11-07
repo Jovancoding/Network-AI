@@ -64,7 +64,7 @@ npm run demo -- --07
 
 **Repo:** https://github.com/Jovancoding/Network-AI  
 **npm:** `npm install network-ai`  
-**MCP server:** `npx network-ai-server --port 3001`
+**MCP server:** `npx -y -p network-ai@6.0.1 network-ai-server --port 3001`
 
 Happy to answer questions about the coordination model, the FSM design, or how the atomic commits work.
 

@@ -108,7 +108,7 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 
 ### Stability Signals
 
-- 4,561 passing assertions across 45 suites
+- 4,588 passing assertions across 47 suites
 - Deterministic scoring — no random outcomes in permission evaluation or budget enforcement
 - CI runs on every push and every PR
 - All examples ship with the repo and run without mocking
@@ -123,7 +123,7 @@ Network-AI follows [Semantic Versioning](https://semver.org/):
 | Add permission gating | `AuthGuardian` in [QUICKSTART.md](QUICKSTART.md) |
 | Add budget enforcement | `FederatedBudget` in [QUICKSTART.md](QUICKSTART.md) |
 | Add FSM workflow governance | `JourneyFSM` in [ARCHITECTURE.md](ARCHITECTURE.md) |
-| MCP server (SSE transport) | `npx network-ai-mcp` — see [QUICKSTART.md](QUICKSTART.md) |
+| MCP server (SSE transport) | `npx -y -p network-ai@6.0.1 network-ai-server --port 3001` — see [QUICKSTART.md](QUICKSTART.md) |
 | MCP server (Streamable HTTP, 2025-03-26 spec) | `McpStreamableServer` in `lib/mcp-transport-http.ts` |
 | Durable multi-phase pipelines with crash-resume | `PhasePipeline` + `checkpointPath` — see [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Persistent semantic vector index | `SemanticMemory` + `persistPath` — see [ARCHITECTURE.md](ARCHITECTURE.md) |

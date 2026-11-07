@@ -44,9 +44,10 @@ function pickHighlights(log: string): string[] {
 
 function runTsDemo(file: string, silentSummary: boolean): Promise<{ code: number; log: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn('npx', ['ts-node', file], {
+    // Run the project's own ts-node with this Node binary: no npx fetch, no shell.
+    const child = spawn(process.execPath, [require.resolve('ts-node/dist/bin.js'), file], {
       stdio: silentSummary ? 'pipe' : 'inherit',
-      shell: true,
+      shell: false,
     });
 
     let stdoutLog = '';

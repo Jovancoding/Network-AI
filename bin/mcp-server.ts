@@ -7,7 +7,7 @@
  *
  * Usage:
  *   npx ts-node bin/mcp-server.ts [options]
- *   npx network-ai-server [options]              (after clawhub publish)
+ *   npx -y -p network-ai@6.0.1 network-ai-server [options]              (after clawhub publish)
  *
  * Options:
  *   --port <n>           TCP port to listen on (default: 3001)
@@ -137,7 +137,7 @@ Options:
   --help               Show this help
 
 Stdio mode (for MCP clients like Claude Desktop, Cursor, Glama):
-  npx network-ai-server --stdio
+  npx -y -p network-ai@6.0.1 network-ai-server --stdio
 
 SSE/HTTP mode (for network clients):
   GET  http://localhost:3001/sse     SSE stream

@@ -581,13 +581,13 @@ npm test
 npm run test:all
 
 # Interactive console (TUI dashboard)
-npx network-ai-console
+npx -y -p network-ai@6.0.1 network-ai-console
 
 # Pipe mode for AI-driven control (JSON stdin/stdout)
-npx network-ai-console --pipe
+npx -y -p network-ai@6.0.1 network-ai-console --pipe
 
 # Console with custom settings
-npx network-ai-console --base-path ./workspace --budget 50000 --allow "npm *,git status"
+npx -y -p network-ai@6.0.1 network-ai-console --base-path ./workspace --budget 50000 --allow "npm *,git status"
 ```
 
 To persist `OPENAI_API_KEY` across sessions, add it to your PowerShell profile or set it via *System Properties → Environment Variables*.
@@ -716,7 +716,7 @@ import tools from './claude-tools.json' assert { type: 'json' };
 
 **Custom GPT Actions:**
 In the GPT editor → Actions → Import from URL, or paste `openapi.yaml` directly.
-Set the server URL to your running `npx network-ai-server --port 3001` instance.
+Set the server URL to your running `npx -y -p network-ai@6.0.1 network-ai-server --port 3001` instance.
 
 **Claude Projects:**
 Copy the contents of `claude-project-prompt.md` into a Claude Project's Custom Instructions field. No server required for instruction-only mode.
@@ -729,13 +729,13 @@ Install Network-AI as a [Claude Code](https://code.claude.com) plugin — the MC
 /plugin install network-ai@network-ai
 ```
 
-Every Network-AI tool (`blackboard_read`, `budget_status`, `audit_query`, …) then loads natively. The plugin runs `npx -y -p network-ai network-ai-server --stdio`. Validate the manifests locally with `claude plugin validate .`.
+Every Network-AI tool (`blackboard_read`, `budget_status`, `audit_query`, …) then loads natively. The plugin runs `npx -y -p network-ai@6.0.1 network-ai-server --stdio`. Validate the manifests locally with `claude plugin validate .`.
 
 **OpenAI Codex (CLI & IDE):**
 Add Network-AI as a Codex MCP server with one command:
 
 ```bash
-codex mcp add network-ai -- npx -y -p network-ai network-ai-server --stdio
+codex mcp add network-ai -- npx -y -p network-ai@6.0.1 network-ai-server --stdio
 ```
 
 Or commit it per-project — the repo root ships a [`.codex/config.toml`](.codex/config.toml) that registers the same stdio server for trusted checkouts. Run `/mcp` in the Codex TUI to verify it connected.

@@ -126,9 +126,12 @@ console.log(`  Staged : ${STAGE_FILES.length} files → ${stage}`);
 console.log(`${'─'.repeat(50)}\n`);
 
 // ── Publish ───────────────────────────────────────────────────────────────────
+// Exact CLI version (never unpinned): the publisher must not change under us.
+const CLAWHUB_CLI = 'clawhub@0.7.0';
+cmd[0] = CLAWHUB_CLI;
 const result = process.platform === 'win32'
-  ? spawnSync('npx', cmd.map(quoteArg), { cwd: ROOT, stdio: 'inherit', shell: true })
-  : spawnSync('npx', cmd, { cwd: ROOT, stdio: 'inherit' });
+  ? spawnSync('npx', ['-y', ...cmd.map(quoteArg)], { cwd: ROOT, stdio: 'inherit', shell: true })
+  : spawnSync('npx', ['-y', ...cmd], { cwd: ROOT, stdio: 'inherit' });
 
 // ── Cleanup ───────────────────────────────────────────────────────────────────
 fs.rmSync(stage, { recursive: true });

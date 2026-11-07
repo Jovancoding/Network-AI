@@ -5,8 +5,8 @@ info:
     Multi-agent swarm orchestration API. Provides task delegation, shared
     blackboard coordination, parallel agent spawning, and permission gating
     via AuthGuardian. Requires the companion MCP server:
-    `npm install -g network-ai && npx network-ai-server --port 3001`
-  version: 6.0.0
+    `npm install -g network-ai && npx -y -p network-ai@6.0.1 network-ai-server --port 3001`
+  version: 6.0.1
   license:
     name: MIT
     url: https://github.com/Jovancoding/Network-AI/blob/main/LICENSE

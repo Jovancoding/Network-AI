@@ -27,27 +27,32 @@ const NOFOLLOW = typeof fsConstants.O_NOFOLLOW === 'number' ? fsConstants.O_NOFO
 /**
  * Open a spool file without following symlinks. The spool directory is
  * writable by the agent, so a planted symlink must never redirect the
- * authority-side puller to another file. Refuses anything but a regular file.
+ * authority-side puller to another file. Open first (O_NOFOLLOW where the OS
+ * has it), then verify the opened descriptor: it must be a regular file and
+ * the same file the path names now, and the path must not be a link.
  */
 function openSpoolFile(file: string, mode: 'r' | 'a'): number | null {
-  let st: ReturnType<typeof lstatSync> | null = null;
-  try {
-    st = lstatSync(file);
-  } catch {
-    st = null;
-  }
-  if (st && (st.isSymbolicLink() || !st.isFile())) throw new Error(`spool: ${file} is not a regular file`);
-  if (!st && mode === 'r') return null;
   const flags = mode === 'r'
     ? fsConstants.O_RDONLY | NOFOLLOW
     : fsConstants.O_WRONLY | fsConstants.O_APPEND | fsConstants.O_CREAT | NOFOLLOW;
-  const fd = openSync(file, flags, 0o600);
-  // Re-check the opened descriptor (closes the lstat/open window where O_NOFOLLOW is unavailable).
-  if (!fstatSync(fd).isFile()) {
-    closeSync(fd);
-    throw new Error(`spool: ${file} is not a regular file`);
+  let fd: number;
+  try {
+    fd = openSync(file, flags, 0o600);
+  } catch (err) {
+    if (mode === 'r' && (err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
   }
-  return fd;
+  try {
+    const opened = fstatSync(fd);
+    const named = lstatSync(file);
+    if (!opened.isFile() || named.isSymbolicLink() || !named.isFile() || opened.ino !== named.ino || opened.dev !== named.dev) {
+      throw new Error(`spool: ${file} is not a regular file`);
+    }
+    return fd;
+  } catch (err) {
+    closeSync(fd);
+    throw err;
+  }
 }
 
 /** Read complete lines appended since `offset`. */

@@ -76,9 +76,9 @@ High-risk policies (`elevated` tier, `self_improve`, or a granted financial rout
 Run on every control-plane host before starting anything:
 
 ```bash
-npx network-ai perpetual doctor --role authority --operator-pub operator.pub --key /keys/authority.key \
+npx -y network-ai@6.0.1 perpetual doctor --role authority --operator-pub operator.pub --key /keys/authority.key \
   --agent-user nai-agent --host 0.0.0.0 --allow-remote --tls-terminated --authority-threshold 2
-npx network-ai perpetual doctor --role agent --node-flags "$(node -p 'process.execArgv.join(" ")')"
+npx -y network-ai@6.0.1 perpetual doctor --role agent --node-flags "$(node -p 'process.execArgv.join(" ")')"
 ```
 
 `perpetual authority` and `perpetual proxy` run the same checks and refuse to start on a failure unless you pass `--accept-risk <check-id>`, which is written to the audit log.
@@ -100,9 +100,9 @@ npx network-ai perpetual doctor --role agent --node-flags "$(node -p 'process.ex
 ### 6. Tripwires
 
 ```bash
-npx network-ai perpetual tripwires --workspace /srv/agent/workspace --manifest /etc/nai/tripwires.json
-npx network-ai perpetual proxy ... --tripwires /etc/nai/tripwires.json      # NETWORK_AI_LEASE_SENTRY_SECRET_PROXY set
-npx network-ai perpetual sentry --id files --audit-log ... --tripwires /etc/nai/tripwires.json
+npx -y network-ai@6.0.1 perpetual tripwires --workspace /srv/agent/workspace --manifest /etc/nai/tripwires.json
+npx -y network-ai@6.0.1 perpetual proxy ... --tripwires /etc/nai/tripwires.json      # NETWORK_AI_LEASE_SENTRY_SECRET_PROXY set
+npx -y network-ai@6.0.1 perpetual sentry --id files --audit-log ... --tripwires /etc/nai/tripwires.json
 ```
 
 Decoy credentials and files look real. Any request carrying a decoy is refused (generic 403, never forwarded) and reported as `sentry:proxy`; with `stopWhen.tripwire` every run is revoked at once and the authority latches — no new run gets a lease until an operator runs `perpetual resume`.
@@ -110,7 +110,7 @@ Decoy credentials and files look real. Any request carrying a decoy is refused (
 ### 7. Human checkpoints
 
 ```bash
-npx network-ai perpetual checkpoint --all --key operator.key --policy policy.signed.json --authority-url https://a1 …
+npx -y network-ai@6.0.1 perpetual checkpoint --all --key operator.key --policy policy.signed.json --authority-url https://a1 …
 ```
 
 Checkpoints are bound to the reviewed policy hash, expire within an hour of signing, and are single-use. Without one, renewal stops at `humanCheckpointEveryMs` and the run halts within one lease.

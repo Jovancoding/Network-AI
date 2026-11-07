@@ -70,7 +70,7 @@ function validRel(p: string): boolean {
 
 /** A set of decoy credentials and files, with fast detection. */
 export class TripwireSet {
-  private readonly credentials = new Map<string, { label: string; format: DecoyCredentialFormat }>();
+  private readonly credentials = new Map<string, { label: string; format: DecoyCredentialFormat; b64: string }>();
   private readonly files = new Map<string, { kind: DecoyFileKind; content: string }>();
 
   /** Create a decoy credential and return its value. */
@@ -79,7 +79,7 @@ export class TripwireSet {
     if (!['openai', 'aws', 'github', 'generic'].includes(format)) throw new TypeError('TripwireSet: invalid format');
     this.assertCapacity();
     const value = decoyValue(format);
-    this.credentials.set(value, { label, format });
+    this.credentials.set(value, { label, format, b64: base64NoPad(value) });
     return value;
   }
 
@@ -103,7 +103,7 @@ export class TripwireSet {
     } else if (kind === 'pem') {
       const body = randomBytes(48).toString('base64');
       this.assertCapacity();
-      this.credentials.set(body, { label: `${rel}:private-key`, format: 'generic' });
+      this.credentials.set(body, { label: `${rel}:private-key`, format: 'generic', b64: base64NoPad(body) });
       // Assembled at runtime: the decoy must look like a key file, but no key-shaped literal lives in source.
       const label = ['PRIVATE', 'KEY'].join(' ');
       content = `-----BEGIN ${label}-----\n${body}\n-----END ${label}-----\n`;
@@ -154,9 +154,7 @@ export class TripwireSet {
     if (haystack.length < MIN_VALUE) return [];
     const hits: TripwireHit[] = [];
     for (const [canary, meta] of this.credentials) {
-      if (haystack.includes(canary) || haystack.includes(Buffer.from(canary, 'utf8').toString('base64').replace(/=+$/, ''))) {
-        hits.push({ canary, label: meta.label });
-      }
+      if (haystack.includes(canary) || haystack.includes(meta.b64)) hits.push({ canary, label: meta.label });
     }
     return hits;
   }
@@ -188,7 +186,7 @@ export class TripwireSet {
     const set = new TripwireSet();
     for (const c of m.credentials) {
       if (!c || typeof c.value !== 'string' || c.value.length < MIN_VALUE || c.value.length > 512 || !LABEL.test(c.label)) throw new TypeError('invalid decoy credential');
-      set.credentials.set(c.value, { label: c.label, format: c.format });
+      set.credentials.set(c.value, { label: c.label, format: c.format, b64: base64NoPad(c.value) });
     }
     for (const f of m.files) {
       if (!f || !validRel(f.path) || typeof f.content !== 'string' || !['env', 'pem', 'config'].includes(f.kind)) throw new TypeError('invalid decoy file');
@@ -218,6 +216,14 @@ export function tripwireDetector(set: Pick<TripwireSet, 'scan' | 'isDecoyPath'>)
         : null;
     },
   };
+}
+
+/** Base64 of `value` without trailing padding (linear; no regex on manifest-supplied data). */
+function base64NoPad(value: string): string {
+  const b64 = Buffer.from(value, 'utf8').toString('base64');
+  let end = b64.length;
+  while (end > 0 && b64.charCodeAt(end - 1) === 61 /* '=' */) end--;
+  return b64.slice(0, end);
 }
 
 function safeStringify(value: unknown): string {

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.1] - 2026-11-07
+
+### Security
+- **ClawHub skill: pending-change files are never resolved or followed** (SkillSpector Excessive Agency, medium) — `_safe_pending_path()` in `scripts/blackboard.py` called `.resolve()` before the symlink and `O_NOFOLLOW` checks, so a link planted at a pending path was followed instead of refused, and its string-prefix containment accepted siblings such as `pending_changes_extra/`. The path is now built without resolving; the directory's real path must be inside `data/` by path components; the entry must be a regular file; every propose, validate, commit, abort, and list opens pending files with `O_NOFOLLOW` and checks the descriptor, and listing skips links and non-regular entries.
+- **CodeQL** — `VsockRelay` egress builds its target from the configured proxy origin and only takes path and query from the guest (#193, server-side request forgery); `TripwireSet` precomputes base64 decoy forms without a regex on manifest data (#194, polynomial regex); `SpoolPuller` opens first and verifies the descriptor against the path afterwards instead of check-then-open (#195, file-system race); a fuzz-loop condition that could never change was removed (#196).
+
+### Fixed
+- **Launchers pin the exact package version** (Claude Code plugin review) — `.mcp.json`, `gemini-extension.json`, `server.json`, `.codex/config.toml`, the Claude Code hook example, `SKILL.md`, CLI/server help text, and the docs now run `npx -y -p network-ai@6.0.1 …` instead of an unpinned `npx network-ai…` or `network-ai@latest`. `npx network-ai-server` in docs fetched an unrelated package name; `ENTERPRISE.md` named a non-existent `network-ai-mcp` bin.
+- npm scripts call the local `ts-node` directly (no `npx`); new `npm run typecheck`. `examples/demo-runner.ts` and `examples/05-code-review-swarm.ts` run the project's own `ts-node` / `tsc` through `process.execPath` without a shell; `scripts/clawhub-publish.js` and `scripts/socket-check.js` pin their CLIs (`clawhub@0.7.0`, `@socketsecurity/cli@1.14.0`).
+- `npm run socket:check` works again on Windows (Node 22 refuses to spawn `npx.cmd` without a shell; the script now runs npm's `npx-cli.js` through Node) and reads the `package score --json` report, so "no alerts" and current scores are reported correctly.
+
+### Added
+- `test-skill-scripts.ts` — runs the Python skill scripts against a throwaway project (file-symlink cases on Linux/macOS, junction and non-regular-entry cases everywhere); runs in CI on every push.
+- `test-plugin-pins.ts` — fails a release if any launcher or run instruction is unpinned, uses a floating tag, or pins a version other than `package.json`'s; runs in CI on every push.
+
 ## [6.0.0] - 2026-11-05
 
 Perpetual Runtime Phase 5 — binary-level resilience and zero-day containment. Opt-in, no new runtime dependencies. Guide: [docs/hardened-deployment.md](docs/hardened-deployment.md).

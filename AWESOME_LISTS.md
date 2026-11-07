@@ -13,13 +13,13 @@ Submit these as pull requests to the respective repositories.
 
 **One-liner to add to the list:**
 ```markdown
-- [network-ai](https://github.com/Jovancoding/Network-AI) - Multi-agent orchestration MCP server. 20+ MCP tools: blackboard read/write, agent spawn/stop, FSM transitions, budget tracking, token management, audit log query. `npx network-ai-server --port 3001`. TypeScript/Node.js.
+- [network-ai](https://github.com/Jovancoding/Network-AI) - Multi-agent orchestration MCP server. 20+ MCP tools: blackboard read/write, agent spawn/stop, FSM transitions, budget tracking, token management, audit log query. `npx -y -p network-ai@6.0.1 network-ai-server --port 3001`. TypeScript/Node.js.
 ```
 
 **Where to add it:** Under the orchestration or multi-agent section.
 
 **PR body:**
-> network-ai ships a production-ready MCP server (`network-ai-server` binary) that exposes the full orchestration control plane over HTTP/SSE + JSON-RPC 2.0. It includes 20+ tools across 4 groups: blackboard coordination (read/write/lock), agent control (spawn/stop/list), FSM governance (transition/state), and observability (budget status, audit trail, token lifecycle). Zero config — `npx network-ai-server` starts immediately.
+> network-ai ships a production-ready MCP server (`network-ai-server` binary) that exposes the full orchestration control plane over HTTP/SSE + JSON-RPC 2.0. It includes 20+ tools across 4 groups: blackboard coordination (read/write/lock), agent control (spawn/stop/list), FSM governance (transition/state), and observability (budget status, audit trail, token lifecycle). Zero config — `npx -y -p network-ai@6.0.1 network-ai-server` starts immediately.
 
 ---
 
