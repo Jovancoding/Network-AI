@@ -429,18 +429,19 @@ Network-AI ships as a [Claude Code](https://code.claude.com) plugin — the MCP 
 /plugin install network-ai@network-ai
 ```
 
-That's it — `blackboard_read`, `budget_status`, `audit_query`, `token_create`, and the rest load as native Claude Code tools. Under the hood the plugin runs `npx -y -p network-ai@6.0.1 network-ai-server --stdio` (stdio MCP transport), so it always uses the published npm package.
+That's it — `blackboard_read`, `budget_status`, `audit_query`, `token_create`, and the rest load as native Claude Code tools. Under the hood the plugin runs `npx -y -p network-ai@6.0.1 network-ai-server --stdio` (stdio MCP transport), pinned to the exact published npm version.
 
-The repo root carries the standard plugin layout:
+The plugin lives in its own folder, so the directory only reads plugin files:
 
 | File | Role |
 |---|---|
-| [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) | Plugin manifest |
-| [`.mcp.json`](.mcp.json) | Registers the Network-AI MCP server (stdio) |
-| [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) | Self-hosted marketplace catalog |
-| [`commands/`](commands/status.md) | Slash commands — `/network-ai:status`, `/network-ai:budget`, `/network-ai:audit`, `/network-ai:blackboard` |
+| [`plugins/network-ai/.claude-plugin/plugin.json`](plugins/network-ai/.claude-plugin/plugin.json) | Plugin manifest (icon: `.claude-plugin/icon.png`) |
+| [`plugins/network-ai/.mcp.json`](plugins/network-ai/.mcp.json) | Registers the Network-AI MCP server (stdio, pinned version) |
+| [`plugins/network-ai/commands/`](plugins/network-ai/commands/status.md) | Slash commands — `/network-ai:status`, `/network-ai:budget`, `/network-ai:audit`, `/network-ai:blackboard` |
+| [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) | Self-hosted marketplace catalog (points at `plugins/network-ai`) |
+| [`.mcp.json`](.mcp.json) | Project MCP config for contributors working in this repository |
 
-Validate the manifests locally with `claude plugin validate .`.
+Validate locally with `claude plugin validate ./plugins/network-ai` and `claude plugin validate .` (marketplace).
 
 **Gate Claude Code itself with AuthGuardian (hooks).** Every tool call Claude Code makes — shell commands, file edits, web fetches — can be audited and permission-gated through the same weighted scoring (justification 40%, trust 30%, risk 30%) Network-AI applies to swarm agents:
 

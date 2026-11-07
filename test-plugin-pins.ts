@@ -39,7 +39,7 @@ function testManifests(): void {
     const servers = json<{ mcpServers: Record<string, { command: string; args: string[] }> }>(rel).mcpServers;
     return servers['network-ai'];
   };
-  for (const rel of ['.mcp.json', 'gemini-extension.json']) {
+  for (const rel of ['.mcp.json', 'plugins/network-ai/.mcp.json', 'gemini-extension.json']) {
     const l = launcherArgs(rel);
     assert(l.command === 'npx' && l.args.includes(PIN) && !l.args.includes('network-ai'), `${rel} launches ${PIN}`, JSON.stringify(l.args));
   }
@@ -49,10 +49,16 @@ function testManifests(): void {
   assert(read('.codex/config.toml').includes(`"${PIN}"`), `.codex/config.toml pins ${PIN}`);
 
   section('Plugin and manifest versions match package.json');
-  for (const rel of ['.claude-plugin/plugin.json', 'gemini-extension.json', 'skill.json']) {
+  for (const rel of ['plugins/network-ai/.claude-plugin/plugin.json', 'gemini-extension.json', 'skill.json']) {
     assert(json<{ version: string }>(rel).version === version, `${rel} version is ${version}`);
   }
-  const market = json<{ plugins?: { version?: string }[]; metadata?: { version?: string } }>('.claude-plugin/marketplace.json');
+  const market = json<{ plugins?: { version?: string; source?: string }[]; metadata?: { version?: string } }>('.claude-plugin/marketplace.json');
+  assert((market.plugins ?? []).every((p) => p.source === './plugins/network-ai'), 'marketplace.json points at plugins/network-ai');
+  for (const rel of ['plugins/network-ai/README.md', 'plugins/network-ai/LICENSE', 'plugins/network-ai/.claude-plugin/icon.png']) {
+    assert(fs.existsSync(path.join(root, rel)), `${rel} exists`);
+  }
+  const pluginFiles = trackedFiles().filter((f) => f.startsWith('plugins/network-ai/'));
+  assert(pluginFiles.every((f) => /^(plugins\/network-ai\/)(\.claude-plugin\/(plugin\.json|icon\.png)|\.mcp\.json|README\.md|LICENSE|commands\/[a-z-]+\.md)$/.test(f)), 'the plugin folder holds only manifest, icon, MCP config, commands, README, and LICENSE', pluginFiles.join(', '));
   const marketVersions = [...(market.plugins ?? []).map((p) => p.version), market.metadata?.version].filter((v): v is string => typeof v === 'string');
   assert(marketVersions.length > 0 && marketVersions.every((v) => v === version), `.claude-plugin/marketplace.json versions are ${version}`, marketVersions.join(','));
 
